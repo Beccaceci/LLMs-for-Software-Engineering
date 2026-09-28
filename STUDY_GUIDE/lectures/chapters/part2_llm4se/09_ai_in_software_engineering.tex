@@ -1,0 +1,46 @@
+\documentclass[../../main.tex]{subfiles}
+\begin{document}
+
+\chapter{Foundations of AI in software engineering}
+\label{ch:ai_in_software_engineering}
+
+\section{Chapter overview and learning outcomes}
+This chapter marks the beginning of Part~II, bridging foundational generative models with the rigorous engineering discipline of Software Engineering (SE). We explore the duality of software artifacts, examine structural code representations (AST, CFG, DFG), analyze the difficulties of tokenizing source code, and review specialized code foundation models.
+
+Upon completing this chapter, you will be able to:
+\begin{itemize}
+    \item Analyze the dual nature of software: human natural language intent combined with rigid machine-executable formal semantics.
+    \item Construct Abstract Syntax Trees (ASTs), Control Flow Graphs (CFGs), and Data Flow Graphs (DFGs) from source code.
+    \item Explain code tokenization pitfalls: CamelCase/snake\_case fragmentation and operator explosion.
+    \item Contrast general-purpose text LLMs with specialized code foundation models (CodeBERT \citep{feng2020codebert}, Codex \citep{chen2021codex}, StarCoder).
+    \item Understand the spectrum of AI interventions across the Software Development Life Cycle (SDLC).
+\end{itemize}
+
+\section{The dual channel nature of software artifacts}
+Unlike arbitrary natural language prose, source code exhibits strict, bi-channel properties:
+\begin{enumerate}
+    \item \textbf{The Human Channel}: Identifiers, function names, docstrings, and comments designed to communicate intentionality to human maintainers.
+    \item \textbf{The Machine Channel}: Grammar, scope, types, and operational semantics strictly parsed and executed by compilers and virtual machines.
+\end{enumerate}
+
+\begin{definition}{Abstract syntax tree (AST)}{ast_def}
+An Abstract Syntax Tree (AST) is a directed finite tree representation of the abstract syntactic structure of source code:
+\begin{equation}
+\mathcal{T} = (\mathcal{V}_N \cup \mathcal{V}_T, \mathcal{E}, r),
+\end{equation}
+where $\mathcal{V}_N$ represents non-terminal syntactic constructs (e.g., \texttt{IfStatement}, \texttt{BinaryExpression}), $\mathcal{V}_T$ represents terminal tokens (identifiers, literals), $\mathcal{E}$ denotes directed child edges, and $r \in \mathcal{V}_N$ is the root compilation unit.
+\end{definition}
+
+\begin{examinsight}[Exam comparison: CFG vs DFG]
+Professors Coppola and Giobergia frequently ask students to differentiate between Control Flow Graphs (CFG) and Data Flow Graphs (DFG):
+\begin{itemize}
+    \item \textbf{Control Flow Graph (CFG)}: Nodes represent basic execution blocks; directed edges represent branch transitions (\texttt{if-else}, loops, returns). Shows the \emph{order} of execution.
+    \item \textbf{Data Flow Graph (DFG)}: Directed edges trace the def-use chains of variables ($\text{var}_x \text{ defined at line } i \to \text{read at line } j$). Preserves semantic data dependencies invariant to code formatting and variable renaming.
+\end{itemize}
+\end{examinsight}
+
+\begin{deepdive}[CodeBERT and pre-trained models of code]
+Feng et al. \citep{feng2020codebert} introduced CodeBERT, a bimodal pre-trained model combining natural language documentation with source code via masked language modeling and replaced token detection. Subsequent breakthroughs such as OpenAI's Codex \citep{chen2021codex} demonstrated that scaling causal decoders on hundreds of gigabytes of open-source code repositories produces emergent zero-shot code generation capabilities.
+\end{deepdive}
+
+\end{document}

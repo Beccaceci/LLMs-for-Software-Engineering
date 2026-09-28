@@ -1,0 +1,57 @@
+\documentclass[../main.tex]{subfiles}
+\begin{document}
+
+\chapter*{Preface}
+\addcontentsline{toc}{chapter}{Preface}
+
+\section*{Pedagogical vision}
+The emergence of Large Language Models (LLMs) represents a fundamental paradigm shift in computer science and software engineering. Moving beyond rigid syntax-directed rules, modern software engineering increasingly leverages deep probabilistic models capable of synthesizing code, repairing complex bugs, formalizing requirements, and orchestrating multi-agent systems.
+
+This study guide accompanies the Master of Science course \emph{Large Language Models for Software Engineering} at Politecnico di Torino, taught by Prof.~Flavio Giobergia and Prof.~Riccardo Coppola. The curriculum is intentionally structured into two complementary pillars:
+\begin{enumerate}
+    \item \textbf{Part~I: Foundations of large language models} --- Traces the mathematical and architectural lineage of language modeling, beginning with $n$-gram Markov chains, proceeding through feedforward networks, distributed word embeddings (Word2Vec, FastText), recurrent networks and vanishing gradient proofs, and culminating in the self-attention Transformer architecture, pre-training scaling laws, instruction tuning (RLHF, DPO), and parameter-efficient fine-tuning (LoRA, QLoRA).
+    \item \textbf{Part~II: Large language models for software engineering} --- Bridges foundational model capabilities with the Software Development Life Cycle (SDLC), exploring prompt engineering patterns, autonomous agent frameworks (ReAct, multi-agent collaboration), automated test generation, software maintenance and refactoring, rigorous evaluation methodologies ($\PassAtK{k}$, CodeBLEU), and security, intellectual property, and ethical implications.
+\end{enumerate}
+
+\section*{Visual callout structure}
+To maximize learning effectiveness and exam readiness, the guide embeds three specialized pedagogical environments:
+
+\begin{examinsight}[Recurrent exam patterns and pitfalls]
+Highlighted in terracotta/amber, these boxes isolate specific questions frequently asked in oral and written examinations, point out common mathematical misconceptions (e.g., mixing logarithm bases when computing perplexity), and underscore key grading criteria.
+\end{examinsight}
+
+\begin{intuition}[Geometric and conceptual analogies]
+Highlighted in royal purple, these boxes provide conceptual, visual, and intuitive interpretations of complex mathematical machinery (e.g., attention as a soft differentiable lookup table, high-dimensional vector space geometry).
+\end{intuition}
+
+\begin{deepdive}[Seminal research and authoritative multimedia]
+Highlighted in pine teal, these boxes contextualize textbook theory with seminal academic papers \citep{vaswani2017,brown2020,hoffmann2022} and breakdowns by leading researchers and educators.
+\end{deepdive}
+
+\section*{Examination framework and course organization}
+As detailed by the instructors in the introductory lecture, assessment in this course is divided into two distinct components:
+\begin{enumerate}
+    \item \textbf{Written Examination (18 Points)}:
+    \begin{itemize}
+        \item Duration: 75 minutes.
+        \item Format: Typically around 12 questions (combining closed-ended multiple-choice items and open-ended technical/mathematical derivations).
+        \item Scope: Comprehensive coverage across all foundational and applied software engineering topics.
+        \item Threshold: A minimum score of 10/18 is strictly required to achieve sufficiency.
+    \end{itemize}
+    \item \textbf{Practical Course Project (14 Points)}:
+    \begin{itemize}
+        \item Implementation: Development of an applied LLM-for-software-engineering system using Python and PyTorch.
+        \item Modality: Undertaken individually or in small teams.
+        \item Scoring: Total points across the written test (18) and project (14) sum to 32, with scores exceeding 30 earning \emph{30 e Lode} (honors).
+    \end{itemize}
+    \item \textbf{Lecture and Lab Schedule}:
+    \begin{itemize}
+        \item Monday: 08:30 -- 11:30 (Room 8) --- Core theoretical foundations.
+        \item Wednesday: 11:30 -- 13:00 (Room R1) --- Practical workshops, interactive coding, and PyTorch laboratories.
+    \end{itemize}
+\end{enumerate}
+
+\section*{How to use this study guide}
+Each chapter is fully self-contained and begins with precise learning objectives, followed by exhaustive mathematical derivations, algorithmic walkthroughs, and practical software engineering implications. Students are encouraged to independently verify all mathematical derivations and implement the core algorithms to develop deep mechanical empathy for large language models.
+
+\end{document}

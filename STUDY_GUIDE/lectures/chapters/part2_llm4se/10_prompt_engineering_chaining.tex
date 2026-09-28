@@ -1,0 +1,53 @@
+\documentclass[../../main.tex]{subfiles}
+\begin{document}
+
+\chapter{Prompt engineering and prompt chaining for software engineering}
+\label{ch:prompt_engineering_chaining}
+
+\section{Chapter overview and learning outcomes}
+Prompt engineering is the systematic discipline of designing conditioning context to steer foundation model outputs toward desired distributions without updating model parameters. This chapter studies prompting patterns specifically tailored for software engineering tasks, including few-shot learning, chain-of-thought reasoning, multi-path tree search, and modular prompt chaining.
+
+Upon completing this chapter, you will be able to:
+\begin{itemize}
+    \item Formalize Zero-Shot and Few-Shot In-Context Learning (ICL) as conditional probability steering.
+    \item Explain the mechanics and failure modes of Chain-of-Thought (CoT) prompting in code synthesis \citep{wei2022chain}.
+    \item Implement Self-Consistency decoding using Monte Carlo sampling and majority voting over reasoning traces.
+    \item Formulate Tree-of-Thoughts (ToT) and Graph-of-Thoughts (GoT) for multi-alternative architectural exploration.
+    \item Architect multi-stage prompt chains separating software specification, typing, implementation, and test generation.
+    \item Design Retrieval-Augmented Generation (RAG) pipelines over multi-file repositories using AST-aware chunking.
+\end{itemize}
+
+\section{In-context learning and chain-of-thought reasoning}
+In-Context Learning conditions the model on $k$ demonstration exemplars $\mathcal{E} = \{(x_1, y_1), \dots, (x_k, y_k)\}$ preceding the target query $x_{\text{target}}$:
+\begin{equation}
+\hat{y} = \argmax_{y \in \mathcal{Y}} \Prob(y \mid x_1, y_1, x_2, y_2, \dots, x_k, y_k, x_{\text{target}}).
+\end{equation}
+
+\begin{definition}{Chain-of-thought (CoT) prompting}{cot_def}
+Wei et al. \citep{wei2022chain} showed that augmenting demonstrations with intermediate reasoning steps $z = (z_1, \dots, z_m)$ allows the language model to allocate computation steps dynamically prior to generating final output $y$:
+\begin{equation}
+\Prob(y \mid x) = \sum_{z} \Prob(z \mid x) \Prob(y \mid x, z).
+\end{equation}
+\end{definition}
+
+\begin{intuition}[CoT as additional working memory]
+Standard autoregressive decoders use fixed computational FLOPs per token. When asked to generate complex code immediately, the model is forced to commit to variable choices and control flow in a single pass. CoT prompting allows the model to "think aloud" across intermediate token positions, effectively using the context window as scratchpad memory.
+\end{intuition}
+
+\section{Tree-of-Thoughts and self-consistency}
+\begin{definition}{Self-consistency sampling}{self_consistency}
+Given an input prompt $x$, sample $N$ independent reasoning paths and code solutions $\{ (z^{(i)}, y^{(i)}) \}_{i=1}^N$ with temperature $\tau > 0$, and select the output via marginal majority voting:
+\begin{equation}
+y^* = \argmax_{y} \sum_{i=1}^N \mathbf{1}\left( y^{(i)} = y \right).
+\end{equation}
+\end{definition}
+
+\begin{examinsight}[Exam highlight: code equivalence in self-consistency]
+In natural language, majority voting groups identical strings. In software engineering, two syntactically distinct code solutions may be functionally identical (semantic equivalence). On exams, highlight that self-consistency over code must group candidates by passing identical test suites, rather than raw string equality.
+\end{examinsight}
+
+\begin{deepdive}[Repository-level RAG and contextual search]
+Real-world software engineering takes place in large repositories spanning hundreds of thousands of lines of code. Naive fixed-size text chunking breaks AST syntactic boundaries, leading to severe hallucination. State-of-the-art code RAG decomposes code at syntax tree boundaries (classes, functions), indexes them into vector databases using code-specialized embedding models, and dynamically re-ranks relevant context into prompt chains.
+\end{deepdive}
+
+\end{document}

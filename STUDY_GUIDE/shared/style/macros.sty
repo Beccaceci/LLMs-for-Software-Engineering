@@ -1,0 +1,319 @@
+\ProvidesPackage{style/macros}[2026/09/22 v1.0 PoliTo LLM4SE Course Macros and Styling]
+
+% ------------------------------------------------------------------------------
+% Required Dependencies
+% ------------------------------------------------------------------------------
+\RequirePackage{xcolor}
+\RequirePackage{tcolorbox}
+\tcbuselibrary{skins,breakable,theorems,listings}
+\RequirePackage{fontawesome5}
+\RequirePackage{etoolbox}
+\RequirePackage{amsmath,mathtools,amssymb,bm}
+\let\openbox\relax
+\RequirePackage{amsthm}
+
+% Ensure hyperref and cleveref are loaded before defining cleveref-dependent theorems
+\@ifpackageloaded{hyperref}{}{\RequirePackage{hyperref}}
+\@ifpackageloaded{cleveref}{}{\RequirePackage{cleveref}}
+
+% ------------------------------------------------------------------------------
+% Color Definitions
+% ------------------------------------------------------------------------------
+% Official Politecnico di Torino Blue and Primary Palette
+\definecolor{politoNavy}{RGB}{0, 45, 98}          % #002D62
+\definecolor{steelBlue}{RGB}{35, 100, 160}        % #2364A0
+\definecolor{skyBlue}{RGB}{230, 240, 250}
+
+% Semantic Box Colors
+\definecolor{examAmber}{RGB}{185, 85, 15}         % Dark amber text/accent (#B9550F)
+\definecolor{examAmberLine}{RGB}{220, 120, 35}    % Border line
+\definecolor{examAmberBg}{RGB}{254, 248, 240}     % Soft warm cream background
+
+\definecolor{intuitionPurple}{RGB}{95, 45, 140}   % Deep violet text/accent (#5F2D8C)
+\definecolor{intuitionPurpleLine}{RGB}{135, 75, 190}
+\definecolor{intuitionPurpleBg}{RGB}{250, 245, 255} % Soft lavender background
+
+\definecolor{deepdiveTeal}{RGB}{15, 115, 100}     % Deep teal text/accent (#0F7364)
+\definecolor{deepdiveTealLine}{RGB}{35, 155, 135}
+\definecolor{deepdiveTealBg}{RGB}{242, 250, 248}  % Soft mint background
+
+\definecolor{defBlue}{RGB}{10, 60, 130}
+\definecolor{defBlueLine}{RGB}{50, 110, 190}
+\definecolor{defBlueBg}{RGB}{244, 248, 254}       % Ice blue background
+
+\definecolor{thmGreen}{RGB}{20, 120, 60}
+\definecolor{thmGreenLine}{RGB}{40, 160, 85}
+\definecolor{thmGreenBg}{RGB}{242, 252, 245}      % Sage background
+
+% Shorthand diagram colors
+\definecolor{pogreen}{RGB}{40, 160, 85}
+\definecolor{porange}{RGB}{220, 120, 35}
+
+% Neutral Grays
+\definecolor{bodyDark}{RGB}{30, 30, 30}
+\definecolor{bodyGray}{RGB}{80, 85, 90}
+\definecolor{lightGrayLine}{RGB}{220, 225, 230}
+\definecolor{codeBg}{RGB}{248, 249, 251}
+\definecolor{codeFrame}{RGB}{225, 230, 238}
+
+% ------------------------------------------------------------------------------
+% The 3 Specialized Callout Box Environments
+% ------------------------------------------------------------------------------
+
+% 1. Exam Insights Box (Amber border, soft cream background, faGraduationCap icon)
+\newtcolorbox{examinsight}[1][]{%
+    enhanced,
+    breakable,
+    colback=examAmberBg,
+    colframe=examAmberLine,
+    boxrule=0pt,
+    leftrule=3.5pt,
+    sharp corners,
+    rounded corners=all,
+    arc=2pt,
+    left=12pt,
+    right=12pt,
+    top=10pt,
+    bottom=10pt,
+    before skip=14pt,
+    after skip=14pt,
+    title={\textcolor{examAmber}{\faGraduationCap\enspace\sffamily\bfseries Exam insights\ifstrempty{#1}{}{: #1}}},
+    coltitle=examAmber,
+    fonttitle=\bfseries\sffamily,
+    attach title to upper={\par\vspace{5pt}}
+}
+
+% 2. Intuition & Analogy Box (Royal purple border, soft lavender background, faLightbulb icon)
+\newtcolorbox{intuition}[1][]{%
+    enhanced,
+    breakable,
+    colback=intuitionPurpleBg,
+    colframe=intuitionPurpleLine,
+    boxrule=0pt,
+    leftrule=3.5pt,
+    sharp corners,
+    rounded corners=all,
+    arc=2pt,
+    left=12pt,
+    right=12pt,
+    top=10pt,
+    bottom=10pt,
+    before skip=14pt,
+    after skip=14pt,
+    title={\textcolor{intuitionPurple}{\faLightbulb\enspace\sffamily\bfseries Intuition \& analogy\ifstrempty{#1}{}{: #1}}},
+    coltitle=intuitionPurple,
+    fonttitle=\bfseries\sffamily,
+    attach title to upper={\par\vspace{5pt}}
+}
+
+% 3. External Deep Dive Box (Pine teal border, soft mint background, faCompass icon)
+\newtcolorbox{deepdive}[1][]{%
+    enhanced,
+    breakable,
+    colback=deepdiveTealBg,
+    colframe=deepdiveTealLine,
+    boxrule=0pt,
+    leftrule=3.5pt,
+    sharp corners,
+    rounded corners=all,
+    arc=2pt,
+    left=12pt,
+    right=12pt,
+    top=10pt,
+    bottom=10pt,
+    before skip=14pt,
+    after skip=14pt,
+    title={\textcolor{deepdiveTeal}{\faCompass\enspace\sffamily\bfseries External deep dive\ifstrempty{#1}{}{: #1}}},
+    coltitle=deepdiveTeal,
+    fonttitle=\bfseries\sffamily,
+    attach title to upper={\par\vspace{5pt}}
+}
+
+% ------------------------------------------------------------------------------
+% Numbered Definition and Theorem Environments (with cleveref integration)
+% ------------------------------------------------------------------------------
+\newtcbtheorem[number within=chapter,crefname={definition}{definitions}]{definition}{Definition}{%
+    enhanced,
+    breakable,
+    colback=defBlueBg,
+    colframe=defBlueLine,
+    boxrule=0pt,
+    leftrule=3.5pt,
+    sharp corners,
+    rounded corners=all,
+    arc=2pt,
+    left=12pt,
+    right=12pt,
+    top=10pt,
+    bottom=10pt,
+    before skip=14pt,
+    after skip=14pt,
+    coltitle=defBlue,
+    fonttitle=\bfseries\sffamily,
+    separator sign={:\enspace},
+    description font=\mdseries\itshape,
+    attach title to upper={\par\vspace{5pt}}
+}{def}
+
+\newtcbtheorem[number within=chapter,crefname={theorem}{theorems}]{theorem}{Theorem}{%
+    enhanced,
+    breakable,
+    colback=thmGreenBg,
+    colframe=thmGreenLine,
+    boxrule=0pt,
+    leftrule=3.5pt,
+    sharp corners,
+    rounded corners=all,
+    arc=2pt,
+    left=12pt,
+    right=12pt,
+    top=10pt,
+    bottom=10pt,
+    before skip=14pt,
+    after skip=14pt,
+    coltitle=thmGreen,
+    fonttitle=\bfseries\sffamily,
+    separator sign={:\enspace},
+    description font=\mdseries\itshape,
+    attach title to upper={\par\vspace{5pt}}
+}{thm}
+
+% ------------------------------------------------------------------------------
+% Code Listings Configuration
+% ------------------------------------------------------------------------------
+\definecolor{codeKw}{RGB}{0, 45, 120}
+\definecolor{codeComment}{RGB}{110, 120, 130}
+\definecolor{codeString}{RGB}{35, 135, 60}
+\definecolor{codeNumber}{RGB}{160, 40, 110}
+\definecolor{codeLineNo}{RGB}{160, 170, 180}
+
+\lstdefinestyle{studyguidecode}{
+    backgroundcolor=\color{codeBg},
+    basicstyle=\small\ttfamily,
+    keywordstyle=\bfseries\color{codeKw},
+    commentstyle=\itshape\color{codeComment},
+    stringstyle=\color{codeString},
+    numberstyle=\tiny\color{codeLineNo},
+    numbers=left,
+    numbersep=8pt,
+    stepnumber=1,
+    showstringspaces=false,
+    breaklines=true,
+    breakatwhitespace=true,
+    frame=single,
+    rulecolor=\color{codeFrame},
+    tabsize=4,
+    captionpos=b,
+    escapeinside={(*@}{@*)}
+}
+
+\lstdefinestyle{terminalOutput}{
+    backgroundcolor=\color{codeBg},
+    basicstyle=\small\ttfamily\color{bodyDark},
+    numbers=none,
+    frame=single,
+    rulecolor=\color{codeFrame},
+    breaklines=true,
+    showstringspaces=false
+}
+
+\lstset{style=studyguidecode}
+
+% ------------------------------------------------------------------------------
+% Standard Mathematical Notation & Linear Algebra Macros
+% ------------------------------------------------------------------------------
+% Sets and Number Spaces
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+
+% Matrix and Vector notation
+\newcommand{\mat}[1]{\mathbf{#1}}
+\newcommand{\vect}[1]{\mathbf{#1}}
+\newcommand{\tp}{\top}
+\newcommand{\trans}{^\top}
+\newcommand{\transpose}{^\top}
+
+% Matrices
+\newcommand{\mA}{\mat{A}}
+\newcommand{\mB}{\mat{B}}
+\newcommand{\mC}{\mat{C}}
+\newcommand{\mD}{\mat{D}}
+\newcommand{\mM}{\mat{M}}
+\newcommand{\mW}{\mat{W}}
+\newcommand{\mX}{\mat{X}}
+\newcommand{\mY}{\mat{Y}}
+\newcommand{\mZ}{\mat{Z}}
+\newcommand{\mQ}{\mat{Q}}
+\newcommand{\mK}{\mat{K}}
+\newcommand{\mV}{\mat{V}}
+\newcommand{\mI}{\mat{I}}
+\newcommand{\mU}{\mat{U}}
+\newcommand{\mH}{\mat{H}}
+
+% Vectors
+\newcommand{\vx}{\vect{x}}
+\newcommand{\vy}{\vect{y}}
+\newcommand{\vw}{\vect{w}}
+\newcommand{\vh}{\vect{h}}
+\newcommand{\vc}{\vect{c}}
+\newcommand{\ve}{\vect{e}}
+\newcommand{\vz}{\vect{z}}
+\newcommand{\vb}{\vect{b}}
+\newcommand{\vu}{\vect{u}}
+\renewcommand{\vv}{\vect{v}}
+\newcommand{\vs}{\vect{s}}
+\newcommand{\vo}{\vect{o}}
+\newcommand{\vr}{\vect{r}}
+\newcommand{\vq}{\vect{q}}
+\newcommand{\vk}{\vect{k}}
+
+% Dimensions & Sets
+\newcommand{\dmodel}{d_{\text{model}}}
+\newcommand{\dff}{d_{\text{ff}}}
+\newcommand{\dk}{d_k}
+\newcommand{\dv}{d_v}
+\newcommand{\vocab}{\mathcal{V}}
+\newcommand{\seqlen}{T}
+
+% Norms, Abs, and Inners
+\DeclarePairedDelimiter{\norm}{\lVert}{\rVert}
+\DeclarePairedDelimiter{\abs}{\lvert}{\rvert}
+\DeclarePairedDelimiter{\inner}{\langle}{\rangle}
+\DeclarePairedDelimiter{\ceil}{\lceil}{\rceil}
+\DeclarePairedDelimiter{\floor}{\lfloor}{\rfloor}
+
+% Probability & Information Theory
+\newcommand{\Prob}{\mathbb{P}}
+\DeclareMathOperator*{\E}{\mathbb{E}}
+\DeclareMathOperator{\Var}{\mathbb{V}\mathrm{ar}}
+\DeclareMathOperator{\Cov}{\mathbb{C}\mathrm{ov}}
+\newcommand{\KL}[2]{D_{\mathrm{KL}}\left(#1 \;\parallel\; #2\right)}
+\newcommand{\CE}[2]{\mathcal{H}\left(#1, #2\right)}
+\newcommand{\Entropy}{\mathcal{H}}
+\newcommand{\PPL}{\mathrm{PPL}}
+
+% Activations & Operators
+\DeclareMathOperator{\softmax}{\mathrm{softmax}}
+\DeclareMathOperator{\sigmoid}{\sigma}
+\DeclareMathOperator{\relu}{\mathrm{ReLU}}
+\DeclareMathOperator{\gelu}{\mathrm{GELU}}
+\DeclareMathOperator{\swiglu}{\mathrm{SwiGLU}}
+\DeclareMathOperator{\silu}{\mathrm{SiLU}}
+\newcommand{\tanhact}{\tanh}
+\DeclareMathOperator{\LayerNorm}{\mathrm{LayerNorm}}
+\DeclareMathOperator{\RMSNorm}{\mathrm{RMSNorm}}
+\DeclareMathOperator*{\argmax}{\mathrm{arg\,max}}
+\DeclareMathOperator*{\argmin}{\mathrm{arg\,min}}
+
+% Transformer Primitives & Loss
+\newcommand{\Attn}[1]{\operatorname{Attention}\left(#1\right)}
+\newcommand{\MHA}[1]{\operatorname{MultiHead}\left(#1\right)}
+\newcommand{\Loss}{\mathcal{L}}
+\let\oldL\L
+\DeclareRobustCommand{\L}{\ifmmode\mathcal{L}\else\oldL\fi}
+
+% Software Engineering Metrics
+\newcommand{\PassAtK}[1]{\mathrm{Pass}@#1}
+\newcommand{\CodeBLEU}{\mathrm{CodeBLEU}}
+
+\endinput

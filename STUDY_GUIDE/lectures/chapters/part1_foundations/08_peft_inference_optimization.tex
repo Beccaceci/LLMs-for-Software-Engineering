@@ -1,0 +1,56 @@
+\documentclass[../../main.tex]{subfiles}
+\begin{document}
+
+\chapter{Parameter-efficient fine-tuning and inference optimization}
+\label{ch:peft_inference_optimization}
+
+\section{Chapter overview and learning outcomes}
+Fine-tuning a 70-billion parameter model requires over 1.4 TB of GPU VRAM when accounting for gradients, Adam optimizer states, and activations. Serving such models at scale introduces extreme memory bandwidth bottlenecks. This chapter studies Parameter-Efficient Fine-Tuning (PEFT) techniques and inference acceleration algorithms.
+
+Upon completing this chapter, you will be able to:
+\begin{itemize}
+    \item Explain the memory footprint breakdown of full fine-tuning (weights, gradients, 1st and 2nd Adam moments).
+    \item Formulate the Low-Rank Adaptation (LoRA) decomposition $\Delta \mW = \frac{\alpha}{r} \mathbf{B} \mathbf{A}$ \citep{hu2021lora}.
+    \item Detail the asymmetric initialization of LoRA matrices $\mathbf{A}$ and $\mathbf{B}$ and the rank scaling factor $\frac{\alpha}{r}$.
+    \item Describe QLoRA innovations: NormalFloat4 (NF4), Double Quantization, and Paged Optimizers \citep{dettmers2023qlora}.
+    \item Calculate KV cache memory consumption for autoregressive inference across context lengths.
+    \item Define arithmetic intensity and differentiate compute-bound pre-fill from memory-bandwidth-bound token decoding.
+    \item Understand FlashAttention GPU SRAM tiling and IO-awareness.
+\end{itemize}
+
+\section{Low-rank adaptation (LoRA)}
+\begin{definition}{LoRA reparameterization}{lora_def}
+For a pre-trained frozen weight matrix $\mW_0 \in \R^{d \times k}$, LoRA \citep{hu2021lora} constrains its update $\Delta \mW$ by a low-rank decomposition $\mathbf{B} \mathbf{A}$:
+\begin{equation}
+\label{eq:lora_eq}
+\vh = \mW_0 \vx + \Delta \mW \vx = \mW_0 \vx + \frac{\alpha}{r} \mathbf{B} \mathbf{A} \vx,
+\end{equation}
+where $\mathbf{B} \in \R^{d \times r}$, $\mathbf{A} \in \R^{r \times k}$, with rank $r \ll \min(d, k)$ and scaling hyperparameter $\alpha$.
+\end{definition}
+
+\begin{examinsight}[Exam trap: LoRA matrix initialization]
+Professors regularly test the specific initialization protocol of LoRA matrices:
+\begin{itemize}
+    \item $\mathbf{A}$ is initialized using random Gaussian noise: $\mathbf{A}_{i,j} \sim \mathcal{N}(0, \sigma^2)$.
+    \item $\mathbf{B}$ is initialized to \textbf{exact zeros}: $\mathbf{B} = \mathbf{0}$.
+\end{itemize}
+Consequently, at the start of fine-tuning, $\Delta \mW = \mathbf{B} \mathbf{A} = \mathbf{0}$. The model starts exactly from its pre-trained state without any destructive perturbations.
+\end{examinsight}
+
+\section{Inference bottlenecks and KV caching}
+During autoregressive generation, past tokens are re-evaluated at every new token step. Because attention keys and values for prior tokens do not change, they can be cached in GPU VRAM (the Key-Value or KV Cache).
+
+\begin{theorem}{KV cache memory footprint}{kv_cache_mem}
+For a Transformer with $L$ layers, $h$ key-value heads, per-head dimension $d_k$, context length $T$, and precision $b$ bytes per parameter (e.g., $b=2$ for FP16/BF16):
+\begin{equation}
+\text{Memory}_{\text{KV}} = 2 \cdot b \cdot L \cdot h \cdot d_k \cdot T \quad \text{bytes}.
+\end{equation}
+The factor of $2$ accounts for storing both keys and values.
+\end{theorem}
+
+\begin{intuition}[Why decoding is memory-bound, not compute-bound]
+During the initial prompt ingestion (pre-fill), all prompt tokens are processed concurrently, resulting in high arithmetic intensity (dense matrix multiplication $\mQ \mK\trans$).
+During token generation (decoding), the model processes a single query token $\vq \in \R^{1 \times d}$ against large cached matrices $\mK, \mV \in \R^{T \times d}$. The GPU spend nearly all its cycles waiting to load weights and KV vectors from High Bandwidth Memory (HBM) into SRAM, rather than performing arithmetic computation.
+\end{intuition}
+
+\end{document}

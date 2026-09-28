@@ -1,0 +1,60 @@
+\documentclass[../../main.tex]{subfiles}
+\begin{document}
+
+\chapter{Evaluation methodologies and benchmarks for code LLMs}
+\label{ch:evaluation_metrics_benchmarks_se}
+
+\section{Chapter overview and learning outcomes}
+Evaluating code-generating models requires fundamentally different paradigms than evaluating natural language models. A code snippet with a single misplaced semicolon or flipped boolean condition achieves high surface text similarity while being completely broken. This chapter explores syntactic metrics, derives execution-based metrics ($\PassAtK{k}$), and analyzes standard software engineering benchmarks.
+
+Upon completing this chapter, you will be able to:
+\begin{itemize}
+    \item Explain the failure modes of surface NLP metrics (BLEU, ROUGE) when applied to source code.
+    \item Formulate the multi-aspect components of the CodeBLEU metric.
+    \item Derive the unbiased combinatorial estimator of the $\PassAtK{k}$ metric \citep{chen2021codex}.
+    \item Contrast synthetic standalone benchmarks (HumanEval, MBPP) with repository-level benchmarks (SWE-bench \citep{jimenez2024swebench}).
+    \item Identify benchmark contamination and design decontamination filtering pipelines.
+\end{itemize}
+
+\section{Surface and syntactic metrics: CodeBLEU}
+Standard BLEU measures $n$-gram lexical overlap between generated code and reference implementations. However, renaming variable \texttt{counter} to \texttt{idx} severely penalizes BLEU despite having zero semantic impact.
+
+\begin{definition}{CodeBLEU metric}{codebleu_metric}
+CodeBLEU combines four distinct structural and semantic dimensions via a weighted linear combination:
+\begin{equation}
+\label{eq:codebleu}
+\CodeBLEU = \alpha \cdot \text{BLEU} + \beta \cdot \text{BLEU}_{\text{weight}} + \gamma \cdot \text{Match}_{\text{AST}} + \delta \cdot \text{Match}_{\text{DF}},
+\end{equation}
+where $\text{Match}_{\text{AST}}$ evaluates tree edit similarity on parsed Abstract Syntax Trees, $\text{Match}_{\text{DF}}$ evaluates overlap on Data Flow def-use graphs, and weights typically sum to $1$ ($\alpha = \beta = \gamma = \delta = 0.25$).
+\end{definition}
+
+\section{Execution-based evaluation: the Pass@k metric}
+Because code is executable, the ultimate measure of functional correctness is running the generated code against a unit test suite.
+
+\begin{theorem}{Unbiased combinatorial estimator of Pass@k}{pass_at_k}
+Suppose that for each programming problem, we sample $n$ candidate code solutions from the model ($n \ge k$), and evaluate each against unit tests. Let $c$ be the number of generated samples that pass all test cases ($0 \le c \le n$).
+The naive estimator $1 - (1 - c/n)^k$ suffers from severe bias for small $n$. Chen et al. \citep{chen2021codex} derived the uniformly minimum-variance unbiased estimator of $\PassAtK{k}$:
+\begin{equation}
+\label{eq:pass_at_k_unbiased}
+\PassAtK{k} = \E_{\text{problems}} \left[ 1 - \frac{\binom{n - c}{k}}{\binom{n}{k}} \right] = \E_{\text{problems}} \left[ 1 - \frac{\prod_{i=0}^{k-1} (n - c - i)}{\prod_{i=0}^{k-1} (n - i)} \right],
+\end{equation}
+with the convention that if $n - c < k$, the ratio $\frac{\binom{n-c}{k}}{\binom{n}{k}} = 0$, hence $\PassAtK{k} = 1.0$.
+\end{theorem}
+
+\begin{examinsight}[Exam derivation: combinatorial probability of Pass@k]
+Oral and written exams frequently ask students to derive Equation~\eqref{eq:pass_at_k_unbiased}:
+\begin{enumerate}
+    \item The total number of ways to choose a subset of $k$ samples from $n$ generated candidates is $\binom{n}{k}$.
+    \item A problem \textbf{fails} under $\PassAtK{k}$ if and only if \emph{all} $k$ selected samples are incorrect.
+    \item The number of incorrect samples is $n - c$. The number of ways to choose $k$ incorrect samples is $\binom{n-c}{k}$.
+    \item The probability that all $k$ samples fail is therefore $\frac{\binom{n-c}{k}}{\binom{n}{k}}$.
+    \item The probability that \textbf{at least one} sample passes is $1 - \frac{\binom{n-c}{k}}{\binom{n}{k}}$.
+\end{enumerate}
+This derivation requires zero approximations and produces completely unbiased estimates.
+\end{examinsight}
+
+\begin{deepdive}[Benchmark contamination and decontamination]
+Because modern LLMs pre-train on terabytes of public GitHub repositories, test benchmarks such as HumanEval or LeetCode problems may have been present in pre-training corpora. Evaluating on contaminated data yields misleadingly inflated $\PassAtK{k}$ scores. State-of-the-art evaluation requires $n$-gram decontamination filtering, syntactic perturbation, or dynamic test execution on freshly committed repositories.
+\end{deepdive}
+
+\end{document}

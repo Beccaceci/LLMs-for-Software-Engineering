@@ -1,0 +1,72 @@
+\documentclass[../../main.tex]{subfiles}
+\begin{document}
+
+\chapter{Instruction tuning and alignment}
+\label{ch:instruction_tuning_alignment}
+
+\section{Chapter overview and learning outcomes}
+Raw pre-trained language models act as unconditional text continuators, frequently outputting toxic text, hallucinating falsehoods, or failing to follow user instructions. This chapter studies the alignment pipeline that shapes foundation models into helpful, honest, and harmless conversational assistants.
+
+Upon completing this chapter, you will be able to:
+\begin{itemize}
+    \item Define the 3Hs of AI alignment (Helpfulness, Honesty, Harmlessness).
+    \item Formulate the Supervised Fine-Tuning (SFT) stage and cross-entropy loss over response tokens.
+    \item Model pairwise human preferences via the Bradley--Terry logistic formulation \citep{ouyang2022}.
+    \item Derive the RLHF optimization objective with Proximal Policy Optimization (PPO) and KL divergence penalty.
+    \item Derive the closed-form implicit reward model of Direct Preference Optimization (DPO) \citep{rafailov2023}.
+    \item Compare RLHF with DPO regarding training stability, hyperparameter sensitivity, and computational cost.
+\end{itemize}
+
+\section{The alignment problem and supervised fine-tuning}
+Base models optimize next-token prediction over web text. When prompted with a question like \emph{"How do I write a binary search tree in C++?"}, a base model may simply output another exam question.
+
+Supervised Fine-Tuning (SFT) trains the model on curated prompt-response pairs $\mathcal{D}_{\text{SFT}} = \{(x^{(i)}, y^{(i)})\}_{i=1}^N$, computing loss exclusively on the completion tokens $y$:
+\begin{equation}
+\Loss_{\text{SFT}}(\theta) = -\sum_{t=1}^{|y|} \log \Prob_\theta(y_t \mid x, y_{<t}).
+\end{equation}
+
+\section{Reinforcement learning from human feedback (RLHF)}
+Ouyang et al. \citep{ouyang2022} established the canonical three-step RLHF pipeline:
+\begin{enumerate}
+    \item SFT on high-quality demonstrations.
+    \item Reward Model ($r_\psi$) training on pairwise comparisons $(x, y_w, y_l)$, where human evaluators prefer winning response $y_w$ over losing response $y_l$:
+    \begin{equation}
+    \Loss_{\text{RM}}(\psi) = -\E_{(x, y_w, y_l)} \left[ \log \sigma\left( r_\psi(x, y_w) - r_\psi(x, y_l) \right) \right].
+    \end{equation}
+    \item Policy Optimization via PPO, maximizing expected reward while constraining the policy $\pi_\theta$ from diverging excessively from the reference model $\pi_{\text{ref}}$:
+    \begin{equation}
+    \label{eq:rlhf_objective}
+    \max_{\theta} \E_{x \sim \mathcal{D}, y \sim \pi_\theta(y \mid x)} \left[ r_\psi(x, y) - \beta \KL{\pi_\theta(y \mid x)}{\pi_{\text{ref}}(y \mid x)} \right].
+    \end{equation}
+\end{enumerate}
+
+\section{Direct preference optimization (DPO)}
+\begin{theorem}{DPO implicit reward derivation}{dpo_theorem}
+Rafailov et al. \citep{rafailov2023} showed that the optimal policy $\pi^*$ under the KL-regularized RL objective in Equation~\eqref{eq:rlhf_objective} satisfies:
+\begin{equation}
+\label{eq:optimal_policy}
+\pi^*(y \mid x) = \frac{1}{Z(x)} \pi_{\text{ref}}(y \mid x) \exp\left( \frac{1}{\beta} r(x, y) \right),
+\end{equation}
+where $Z(x) = \sum_y \pi_{\text{ref}}(y \mid x) \exp\left( \frac{1}{\beta} r(x, y) \right)$ is the partition function.
+Inverting Equation~\eqref{eq:optimal_policy} yields the exact ground-truth reward in terms of policy probabilities:
+\begin{equation}
+\label{eq:dpo_implicit_reward}
+r(x, y) = \beta \log \frac{\pi^*(y \mid x)}{\pi_{\text{ref}}(y \mid x)} + \beta \log Z(x).
+\end{equation}
+Substituting Equation~\eqref{eq:dpo_implicit_reward} directly into the Bradley--Terry preference likelihood causes the partition function $\beta \log Z(x)$ to cancel out identically, yielding the parameter-efficient DPO loss:
+\begin{equation}
+\Loss_{\text{DPO}}(\theta; \pi_{\text{ref}}) = -\E_{(x, y_w, y_l) \sim \mathcal{D}} \left[ \log \sigma\left( \beta \log \frac{\pi_\theta(y_w \mid x)}{\pi_{\text{ref}}(y_w \mid x)} - \beta \log \frac{\pi_\theta(y_l \mid x)}{\pi_{\text{ref}}(y_l \mid x)} \right) \right].
+\end{equation}
+\end{theorem}
+
+\begin{examinsight}[Oral exam question: why does DPO cancel the partition function?]
+In oral examinations, students are often asked to explain the mathematical elegance of DPO.
+The critical insight is that $Z(x) = \sum_y \pi_{\text{ref}}(y \mid x) \exp(\frac{1}{\beta} r(x, y))$ depends \textbf{only on prompt $x$}, not on response $y$.
+When subtracting the reward of the losing response from the winning response:
+\[
+r(x, y_w) - r(x, y_l) = \beta \log \frac{\pi_\theta(y_w \mid x)}{\pi_{\text{ref}}(y_w \mid x)} + \beta \log Z(x) - \left( \beta \log \frac{\pi_\theta(y_l \mid x)}{\pi_{\text{ref}}(y_l \mid x)} + \beta \log Z(x) \right),
+\]
+the intractable term $\beta \log Z(x)$ cancels completely! This allows direct optimization of the language model without training an auxiliary reward model or sampling during RL.
+\end{examinsight}
+
+\end{document}

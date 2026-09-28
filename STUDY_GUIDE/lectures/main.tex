@@ -1,0 +1,173 @@
+\documentclass[11pt,a4paper,oneside,openany]{book}
+
+% ------------------------------------------------------------------------------
+% Encoding and Fonts
+% ------------------------------------------------------------------------------
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{mathtools}
+\usepackage{bm}
+
+% Publication typography: Palatino clone with math support & Source Code Pro
+\usepackage{newpxtext,newpxmath}
+\usepackage[scaled=0.88]{sourcecodepro}
+\usepackage{microtype}
+
+% ------------------------------------------------------------------------------
+% Geometry & Page Layout
+% ------------------------------------------------------------------------------
+\usepackage[
+    a4paper,
+    top=25mm,
+    bottom=25mm,
+    left=25mm,
+    right=25mm,
+    headheight=22pt,
+    footskip=12mm
+]{geometry}
+
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{titletoc}
+
+% ------------------------------------------------------------------------------
+% Colors & Tables
+% ------------------------------------------------------------------------------
+\usepackage[dvipsnames,table,x11names]{xcolor}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{enumitem}
+
+% ------------------------------------------------------------------------------
+% Code Listings & TikZ
+% ------------------------------------------------------------------------------
+\usepackage{listings}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,calc,fit,shapes.geometric,shapes.misc,backgrounds,matrix,decorations.pathreplacing,decorations.markings}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+
+% ------------------------------------------------------------------------------
+% Modular Subfiles Support
+% ------------------------------------------------------------------------------
+\usepackage{subfiles}
+
+% ------------------------------------------------------------------------------
+% Bibliography Management (Natbib + BibTeX for native Apple Silicon support)
+% ------------------------------------------------------------------------------
+\usepackage[numbers,sort&compress]{natbib}
+
+% ------------------------------------------------------------------------------
+% Hyperlinks & Cross-Referencing
+% ------------------------------------------------------------------------------
+\usepackage{hyperref}
+\usepackage{bookmark}
+\usepackage{cleveref}
+
+% ------------------------------------------------------------------------------
+% Custom Course Style & Macros (Loaded after hyperref & cleveref for theorem support)
+% ------------------------------------------------------------------------------
+\usepackage{style/macros}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=politoNavy,
+    citecolor=deepdiveTeal,
+    urlcolor=steelBlue,
+    pdfauthor={Politecnico di Torino - Master in Computer Engineering},
+    pdftitle={Large Language Models for Software Engineering: Comprehensive Study Guide},
+    pdfsubject={Course Notes for Prof. Flavio Giobergia and Prof. Riccardo Coppola},
+    pdfkeywords={Large Language Models, Deep Learning, Software Engineering, Transformers, SE Agents},
+    bookmarksnumbered=true,
+    bookmarksopen=true,
+    bookmarksopenlevel=1
+}
+
+% ------------------------------------------------------------------------------
+% Header and Footer Styling
+% ------------------------------------------------------------------------------
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\sffamily\textcolor{bodyGray}{\nouppercase{\leftmark}}}
+\fancyhead[R]{\small\sffamily\bfseries\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\headrule}{\hbox to\headwidth{\color{lightGrayLine}\leaders\hrule height \headrulewidth\hfill}}
+
+\fancypagestyle{plain}{
+    \fancyhf{}
+    \fancyfoot[C]{\small\sffamily\thepage}
+    \renewcommand{\headrulewidth}{0pt}
+}
+
+% ------------------------------------------------------------------------------
+% Chapter & Section Title Formats
+% ------------------------------------------------------------------------------
+\titleformat{\chapter}[display]
+  {\normalfont\sffamily\huge\bfseries\color{politoNavy}}
+  {\filright\small\bfseries\scshape\color{steelBlue}\chaptertitlename\ \thechapter}
+  {6pt}
+  {\titlerule[1.5pt]\vspace{6pt}\huge}
+  [{\vspace{8pt}\titlerule[0.5pt]}]
+
+\titleformat{\section}
+  {\normalfont\sffamily\Large\bfseries\color{politoNavy}}
+  {\thesection}{1em}{}
+
+\titleformat{\subsection}
+  {\normalfont\sffamily\large\bfseries\color{steelBlue}}
+  {\thesubsection}{1em}{}
+
+% ------------------------------------------------------------------------------
+% Document Structure
+% ------------------------------------------------------------------------------
+\begin{document}
+
+\frontmatter
+\subfile{frontmatter/titlepage}
+\tableofcontents
+\subfile{frontmatter/preface}
+\subfile{frontmatter/notation}
+
+\mainmatter
+
+% ==============================================================================
+% PART I: LARGE LANGUAGE MODEL FOUNDATIONS
+% ==============================================================================
+\part{Foundations of large language models}
+
+\subfile{chapters/part1_foundations/01_language_models_intro}
+\subfile{chapters/part1_foundations/02_deep_learning_foundations}
+\subfile{chapters/part1_foundations/03_word_embeddings}
+\subfile{chapters/part1_foundations/04_recurrent_neural_networks}
+% Temporarily commented out to focus exclusively on lecture material covered by the professor:
+% \subfile{chapters/part1_foundations/05_transformer_architecture}
+% \subfile{chapters/part1_foundations/06_scaling_laws_pretraining}
+% \subfile{chapters/part1_foundations/07_instruction_tuning_alignment}
+% \subfile{chapters/part1_foundations/08_peft_inference_optimization}
+% 
+% % ==============================================================================
+% % PART II: LLMS FOR SOFTWARE ENGINEERING
+% % ==============================================================================
+% \part{Large language models for software engineering}
+% 
+% \subfile{chapters/part2_llm4se/09_ai_in_software_engineering}
+% \subfile{chapters/part2_llm4se/10_prompt_engineering_chaining}
+% \subfile{chapters/part2_llm4se/11_ai_agents_multiagent}
+% \subfile{chapters/part2_llm4se/12_automated_test_generation_repair}
+% \subfile{chapters/part2_llm4se/13_requirements_engineering_modeling}
+% \subfile{chapters/part2_llm4se/14_code_refactoring_maintainability}
+% \subfile{chapters/part2_llm4se/15_evaluation_metrics_benchmarks_se}
+% \subfile{chapters/part2_llm4se/16_safety_bias_ethics_ip}
+
+
+\backmatter
+\bibliographystyle{unsrtnat}
+\bibliography{references}
+
+\end{document}

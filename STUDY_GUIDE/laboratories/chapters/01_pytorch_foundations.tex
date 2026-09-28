@@ -1,0 +1,1167 @@
+\documentclass[../labs.tex]{subfiles}
+\begin{document}
+
+\chapter{Laboratory 01: Deep learning foundations with PyTorch}
+\label{ch:lab01_pytorch_foundations}
+
+\section{Laboratory overview and macro perspective in LLM systems}
+
+Before building modern foundation models with tens of billions of parameters, an AI software engineer must master the computational primitives that underpin all deep learning. Every Large Language Model (LLM)---from decoder-only transformers like LLaMA and GPT-4 to encoder-decoder models like T5---is executed on top of tensor arithmetic, automatic differentiation engines, and hardware-accelerated memory hierarchies.
+
+\subsection{Where this laboratory fits in the LLM lifecycle}
+To understand why we begin with PyTorch tensors, autograd, and transfer learning, consider the macroscopic lifecycle of an LLM shown in Figure~\ref{fig:lab01_llm_lifecycle}.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    scale=0.88,
+    every node/.style={transform shape},
+    block/.style={rectangle, draw=politoNavy, fill=skyBlue!30, very thick, rounded corners=4pt, minimum height=10mm, minimum width=24mm, font=\small\bfseries, align=center},
+    focusblock/.style={rectangle, draw=deepdiveTeal, fill=deepdiveTealBg, very thick, rounded corners=4pt, minimum height=12mm, minimum width=26mm, font=\small\bfseries, align=center},
+    arr/.style={-{Stealth[scale=1.1]}, thick, draw=bodyDark}
+]
+
+\node[block] (data) at (0, 0) {1. Raw Text \&\\Code Corpus};
+\node[block] (tok) at (3.2, 0) {2. Subword\\Tokenization};
+\node[focusblock] (tensor) at (6.6, 0) {3. Tensor\\Embeddings\\ {\scriptsize (Lab 01)}};
+\node[focusblock] (nn) at (10.0, 0) {4. Neural Layers\\\& Autograd\\ {\scriptsize (Lab 01)}};
+\node[block] (attn) at (13.4, 0) {5. Transformer\\Blocks\\ {\scriptsize (Lab 02)}};
+
+\node[block] (loss) at (13.4, -2.5) {6. Cross-Entropy\\Objective};
+\node[focusblock] (bwd) at (10.0, -2.5) {7. Reverse-Mode\\Backprop\\ {\scriptsize (Lab 01)}};
+\node[focusblock] (opt) at (6.6, -2.5) {8. Parameter\\Update (SGD/Adam)\\ {\scriptsize (Lab 01)}};
+\node[block] (peft) at (3.2, -2.5) {9. Fine-Tuning\\\& LoRA\\ {\scriptsize (Lab 05)}};
+\node[block] (app) at (0, -2.5) {10. Downstream\\RAG / Agents\\ {\scriptsize (Labs 06--10)}};
+
+\draw[arr] (data) -- (tok);
+\draw[arr] (tok) -- (tensor);
+\draw[arr] (tensor) -- (nn);
+\draw[arr] (nn) -- (attn);
+\draw[arr] (attn) -- (loss);
+\draw[arr] (loss) -- (bwd);
+\draw[arr] (bwd) -- (opt);
+\draw[arr] (opt) -- (peft);
+\draw[arr] (peft) -- (app);
+
+\end{tikzpicture}
+\caption{The end-to-end lifecycle of Large Language Models. Laboratory~01 establishes the atomic computational substrate: multidimensional tensors (Step~3), modular neural layers and forward graphs (Step~4), reverse-mode autograd (Step~7), and iterative optimization loops (Step~8).}
+\label{fig:lab01_llm_lifecycle}
+\end{figure}
+
+Regardless of whether a model processes computer vision pixels ($32 \times 32 \times 3$) or textual tokens ($B \times T \times d_{\text{model}}$), the underlying execution pattern is strictly invariant across machine learning domains:
+\begin{enumerate}
+    \item Input data is projected into multidimensional floating-point \textbf{tensors}.
+    \item A parameterized computational model (\texttt{nn.Module}) applies affine transformations interspersed with non-linear activations.
+    \item A scalar \textbf{loss function} evaluates prediction discrepancies against target ground truth.
+    \item An \textbf{automatic differentiation engine} traverses the Directed Acyclic Graph (DAG) in reverse, computing exact partial derivatives $\nabla_\theta \Loss$.
+    \item An \textbf{optimizer} updates parameters along the negative gradient surface.
+\end{enumerate}
+
+\subsection{Curriculum structure and pedagogical roadmap}
+As emphasized during the introductory laboratory lecture, the laboratory practicum adopts a progressive, modular structure:
+\begin{itemize}
+    \item \textbf{Laboratory 01 (Foundational substrate)}: A self-contained, single-part introductory practicum establishing tensor manipulation, autograd mechanics, loss formulations, training loops, and transfer learning fundamentals.
+    \item \textbf{Laboratories 02--10 (Dual-part advanced practicums)}: Starting from Laboratory~02, every subsequent session is partitioned into two complementary modules:
+    \begin{enumerate}
+        \item \emph{Architectural implementation from scratch} (e.g., implementing multi-head self-attention, positional encodings, subword tokenization, or LoRA adapters).
+        \item \emph{High-level industrial frameworks} (e.g., Hugging Face libraries such as \texttt{transformers}, \texttt{peft}, \texttt{trl}, and \texttt{accelerate}).
+    \end{enumerate}
+\end{itemize}
+
+\begin{examinsight}[Exam syllabus scope: NLP vs computer vision in LLM4SE]
+During the live laboratory session, the instructors explicitly clarified the examination boundaries: \emph{students will not be evaluated on computer vision details, image data augmentation primitives (\texttt{RandomCrop}, \texttt{RandomHorizontalFlip}), or convolutional feature maps in the final exam}. 
+
+Computer vision datasets (specifically CIFAR-10) are utilized exclusively in this first laboratory as an accessible, visually intuitive sandbox for high-dimensional tensors ($3 \times 32 \times 32$), batch slicing, multi-channel normalization, and pretrained transfer learning before students transition to discrete subword tokens, vocabulary embeddings, and causal attention masks.
+\end{examinsight}
+
+\subsection{Laboratory learning outcomes}
+Upon completing this laboratory, you will be able to:
+\begin{itemize}
+    \item Manipulate PyTorch tensors, analyze underlying memory layouts (strides and contiguity), and evaluate hardware precision trade-offs (FP64 vs.\ FP32 vs.\ BF16).
+    \item Trace and visualize Directed Acyclic Computational Graphs (DAGs) using reverse-mode automatic differentiation.
+    \item Subclass \texttt{torch.nn.Module}, implement custom parameter layers, and configure optimizers and loss functions.
+    \item Author robust, multi-epoch training loops from scratch with metric tracking and loss visualization.
+    \item Compute per-channel dataset statistics (mean and standard deviation) and build data transformation and augmentation pipelines with \texttt{torchvision.transforms}.
+    \item Implement multi-layer perceptron classifiers (\texttt{SimpleNN}) and construct evaluation loops with \texttt{model.eval()} and \texttt{torch.no\_grad()}.
+    \item Apply transfer learning with pretrained deep residual networks (ResNet-18), freeze convolutional feature extractors, and adapt classification heads for new downstream domains.
+\end{itemize}
+
+
+\section{PyTorch tensors, memory storage, and precision benchmarking}
+
+In deep learning, a \textbf{tensor} is a generalized geometric object comprising a multidimensional array of numbers characterized by a specific data type (\texttt{dtype}) and memory device (\texttt{device}).
+
+\subsection{Importing the environment and OpenMP configuration}
+To ensure robust multi-threaded tensor execution across Apple Silicon and Linux environments, we initialize the required libraries and set environment flags:
+
+\begin{lstlisting}[language=Python, caption={Initial library imports and environment configuration (Cell 2).}, label={lst:lab01_imports}]
+# Import necessary libraries
+import os
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import torch.nn.functional as F
+from torch.utils.data import DataLoader, TensorDataset
+import matplotlib.pyplot as plt
+
+import torchvision
+import torchvision.transforms as transforms
+\end{lstlisting}
+
+\subsection{Basic tensor algebra}
+A PyTorch tensor acts as a multidimensional view over a contiguous chunk of flat physical memory:
+
+\begin{lstlisting}[language=Python, caption={Tensor creation, element-wise addition, and inspection (Cell 4).}, label={lst:lab01_tensor_basics}]
+# Create a tensor
+a = torch.tensor([1.0, 2.0, 3.0])
+
+# Perform basic tensor operations
+b = torch.tensor([4.0, 5.0, 6.0])
+c = a + b  # Element-wise addition
+print(f"Tensor c: {c}")
+
+# Check tensor's shape and type
+print(f"Shape of tensor c: {c.shape}")
+print(f"Data type of tensor c: {c.dtype}")
+\end{lstlisting}
+
+Executing Listing~\ref{lst:lab01_tensor_basics} outputs:
+\begin{lstlisting}[style=terminalOutput]
+Tensor c: tensor([5., 7., 9.])
+Shape of tensor c: torch.Size([3])
+Data type of tensor c: torch.float32
+\end{lstlisting}
+
+\subsection{Floating-point representations and empirical speed benchmarking}
+A critical engineering decision in modern AI is the choice of numerical precision. Standard scientific computing defaults to double precision (\texttt{torch.float64} or FP64), requiring 64 bits per scalar (1 sign bit, 11 exponent bits, 52 mantissa bits). In contrast, deep learning predominantly operates with single precision (\texttt{torch.float32} or FP32: 1 sign, 8 exponent, 23 mantissa bits) or half precision (FP16 / BF16).
+
+To observe the substantial performance differential directly, the laboratory benchmarks matrix multiplication ($\mM_1 \times \mM_2$) on two $1000 \times 1000$ matrices across 100 repetitions:
+
+\begin{lstlisting}[language=Python, caption={Empirical matrix multiplication benchmark comparing FP64 and FP32 (Cell 6).}, label={lst:lab01_speed_benchmark}]
+from timeit import timeit
+
+mat_size = 1000
+
+M1_64 = torch.randn(mat_size, mat_size, dtype=torch.float64)
+M2_64 = torch.randn(mat_size, mat_size, dtype=torch.float64)
+
+M1_32 = torch.randn(mat_size, mat_size)
+M2_32 = torch.randn(mat_size, mat_size)
+
+t64 = timeit(lambda: M1_64 @ M2_64, number=100)
+t32 = timeit(lambda: M1_32 @ M2_32, number=100)
+
+print(f"Time for matrix multiplication (float64): {t64:.4f}s")
+print(f"Time for matrix multiplication (float32): {t32:.4f}s")
+\end{lstlisting}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{l c c c >{\raggedright\arraybackslash}X}
+\toprule
+\textbf{Precision Format} & \textbf{Bit Width} & \textbf{Dynamic Range} & \textbf{Benchmark} & \textbf{Relative Throughput} \\
+\midrule
+\texttt{torch.float64} (FP64) & 64 bits & $\approx 10^{\pm 308}$ & $0.6864\,\text{s}$ & $1.0\times$ (Baseline) \\
+\texttt{torch.float32} (FP32) & 32 bits & $\approx 10^{\pm 38}$  & $0.1877\,\text{s}$ & $\mathbf{3.65\times\text{ faster}}$ \\
+\texttt{torch.float16} (FP16) & 16 bits & $\approx 10^{\pm 5}$   & Fast on TC & Up to $8\times$ vs FP32 \\
+\texttt{torch.bfloat16} (BF16) & 16 bits & $\approx 10^{\pm 38}$  & Modern GPUs & Stable for LLMs \\
+\bottomrule
+\end{tabularx}
+\caption{Numerical precision comparison in deep learning. Transitioning from FP64 to FP32 yields an immediate $\approx 3.7\times$ speedup due to vector SIMD register capacity and halved memory bandwidth demands.}
+\label{tab:precision_benchmark}
+\end{table}
+
+\subsection{Hardware acceleration, device dispatch, and the overloaded \texttt{.to()} method}
+A primary advantage of PyTorch over NumPy is native support for hardware accelerators (NVIDIA CUDA GPUs and Apple Silicon MPS cores). To write hardware-agnostic code, deep learning engineers dynamically discover the execution target:
+
+\begin{lstlisting}[language=Python, caption={Hardware-agnostic device configuration and tensor dispatch.}, label={lst:lab01_device_dispatch}]
+# Determine the optimal acceleration backend
+if torch.cuda.is_available():
+    device = torch.device("cuda")
+elif torch.backends.mps.is_available():
+    device = torch.device("mps")
+else:
+    device = torch.device("cpu")
+
+print(f"Active execution device: {device}")
+\end{lstlisting}
+
+During the laboratory lecture, the instructor emphasized the dual, polymorphic role of the \texttt{.to()} method in PyTorch:
+\begin{enumerate}
+    \item \textbf{Type Casting}: Transforming numeric representations without altering physical hardware location (e.g., \texttt{x.to(torch.float16)} or \texttt{x.double()}).
+    \item \textbf{Hardware Placement}: Moving data and model parameters across memory boundaries (e.g., from host CPU RAM to GPU High-Bandwidth Memory via \texttt{x.to(device)}).
+\end{enumerate}
+
+\begin{examinsight}[The strict homogeneous device invariant]
+All operands in any tensor computation (the model parameters $\mW, \vb$, input features $\vx$, and target labels $\vy$) \textbf{must strictly reside on the exact same physical device}. 
+
+If an input tensor on CPU is passed into a neural network situated in GPU VRAM, PyTorch immediately halts execution with a fatal runtime exception:
+\begin{lstlisting}[style=terminalOutput]
+RuntimeError: Expected all tensors to be on the same device, but found at least two devices, cuda:0 and cpu!
+\end{lstlisting}
+Therefore, every robust training and inference pipeline must explicitly ensure consistent device placement before initiating the forward pass.
+\end{examinsight}
+
+\begin{deepdive}[Why deep learning and LLMs mandate lower numerical precision]
+Standard scientific computing defaults to double precision (\texttt{torch.float64} or FP64), requiring 64 bits per scalar (1 sign bit, 11 exponent bits, 52 mantissa bits). In contrast, deep learning and natural language processing predominantly operate with single precision (\texttt{torch.float32} or FP32), half precision (\texttt{torch.float16} / \texttt{torch.bfloat16}), or quantized formats (8-bit and 4-bit).
+
+As highlighted by the laboratory instructors, two primary engineering rationales govern this preference:
+\begin{enumerate}
+    \item \textbf{Computational Throughput}: Modern GPU Tensor Cores and vector SIMD arithmetic units execute 16-bit matrix multiplications orders of magnitude faster than 64-bit doubles.
+    \item \textbf{GPU VRAM Capacity Bottleneck}: High-bandwidth memory (HBM) on AI accelerators is severely limited and prohibitively expensive. Every model parameter in FP32 requires $4$~bytes of memory. Halving precision to FP16 or BF16 ($2$~bytes per parameter) instantaneously \textbf{doubles the number of parameters that fit within the same physical VRAM} with virtually zero degradation in task performance.
+\end{enumerate}
+This capacity bottleneck provides the core motivation for model quantization, which compresses weights down to 8 bits ($1$~byte) or 4 bits ($0.5$~bytes) for efficient production deployment.
+\end{deepdive}
+
+
+\section{Computational graphs, autograd, and sensitivity mechanics}
+
+In classical machine learning, engineers derived analytic gradient formulas by hand and coded them manually. In modern deep learning, the framework dynamically constructs a \textbf{Directed Acyclic Graph (DAG)} of operations as forward computations execute (PyTorch's \emph{Define-by-Run} paradigm).
+
+\subsection{Autograd mechanics, leaf nodes, and \texttt{requires\_grad}}
+When a tensor is declared with \texttt{requires\_grad=True}, PyTorch tracks every operation applied to it:
+\begin{itemize}
+    \item \textbf{Leaf Tensors}: Tensors explicitly created by the user (e.g., weight matrices $\mW$ and biases $\vb$). Their gradients are accumulated in the \texttt{.grad} attribute.
+    \item \textbf{Non-Leaf Tensors}: Intermediate results produced by operator nodes (e.g., activations $\vz = \mW \vx + \vb$). Their gradients are computed dynamically during backpropagation but discarded after use to conserve memory unless \texttt{.retain\_grad()} is invoked.
+    \item \textbf{\texttt{grad\_fn}}: Every non-leaf tensor stores a reference to the backward function node that created it (e.g., \texttt{AddBackward0}, \texttt{MulBackward0}).
+\end{itemize}
+
+\begin{examinsight}[\texttt{requires\_grad} in training vs inference]
+When \texttt{requires\_grad=True} is set, PyTorch allocates dedicated memory buffers for gradient tracking and builds the dynamic DAG during the forward pass. 
+
+While essential during model training, retaining \texttt{requires\_grad=True} during \textbf{inference} incurs substantial, unnecessary overhead:
+\begin{itemize}
+    \item It wastes GPU VRAM by storing intermediate activation histories that will never be used for backward differentiation.
+    \item It introduces computational latency by constructing graph metadata.
+\end{itemize}
+Consequently, during inference or validation, engineers must always de-activate autograd graph construction using \texttt{with torch.no\_grad():} or by setting \texttt{param.requires\_grad = False}.
+\end{examinsight}
+
+\subsection{External authority: Andrej Karpathy's Micrograd engine}
+To demystify how PyTorch implements reverse-mode automatic differentiation without treating it as a black box, Andrej Karpathy developed \emph{Micrograd}---a scalar-level autograd engine that mirrors PyTorch's C++ autograd internals in pure Python.
+
+\begin{deepdive}[Andrej Karpathy's Micrograd: Autograd stripped to its core]
+In Micrograd, every number is wrapped in a lightweight \texttt{Value} object. Each object maintains:
+\begin{itemize}
+    \item \texttt{data}: The forward numerical scalar.
+    \item \texttt{grad}: The accumulated adjoint partial derivative $\partial \Loss / \partial \text{self}$.
+    \item \texttt{\_prev}: Pointers to upstream parent nodes in the computation graph.
+    \item \texttt{\_backward}: A local closure encapsulating the single-step multivariate chain rule.
+\end{itemize}
+
+\begin{lstlisting}[language=Python, caption={Core structure of Andrej Karpathy's scalar autograd engine.}, label={lst:karpathy_micrograd}]
+class Value:
+    def __init__(self, data, _children=(), _op=''):
+        self.data = data
+        self.grad = 0.0
+        self._backward = lambda: None
+        self._prev = set(_children)
+        self._op = _op
+
+    def __add__(self, other):
+        other = other if isinstance(other, Value) else Value(other)
+        out = Value(self.data + other.data, (self, other), '+')
+        def _backward():
+            self.grad += 1.0 * out.grad
+            other.grad += 1.0 * out.grad
+        out._backward = _backward
+        return out
+
+    def __mul__(self, other):
+        other = other if isinstance(other, Value) else Value(other)
+        out = Value(self.data * other.data, (self, other), '*')
+        def _backward():
+            self.grad += other.data * out.grad
+            other.grad += self.data * out.grad
+        out._backward = _backward
+        return out
+
+    def backward(self):
+        # Topological sort of all nodes in the DAG
+        topo = []
+        visited = set()
+        def build_topo(v):
+            if v not in visited:
+                visited.add(v)
+                for child in v._prev:
+                    build_topo(child)
+                topo.append(v)
+        build_topo(self)
+
+        # Base gradient: dLoss / dLoss = 1.0
+        self.grad = 1.0
+        # Traverse graph in reverse topological order
+        for node in reversed(topo):
+            node._backward()
+\end{lstlisting}
+
+When calling \texttt{loss.backward()}, the engine conducts a \textbf{depth-first topological sort} of the DAG. It initializes $\frac{\partial \Loss}{\partial \Loss} = 1.0$ and propagates scalar derivatives backward through every closure. PyTorch operates on the exact same mathematical principle, scaling scalar closures to multidimensional tensor Jacobian-vector products.
+\end{deepdive}
+
+\begin{intuition}[3Blue1Brown's sensitivity view of backpropagation]
+Grant Sanderson (3Blue1Brown) articulates backpropagation not as abstract multivariable calculus, but as \textbf{sensitivity propagation}.
+Imagine giving parameter $\theta_1$ a slight physical nudge of size $\epsilon$. That nudge ripples forward through the graph:
+\begin{equation}
+\theta_1 \to \theta_1 + \epsilon \implies a = (\theta_1 + \epsilon)\theta_2 = a + \epsilon \theta_2.
+\end{equation}
+The change in $a$ wiggles the downstream product $b$, which shifts difference $c$, which finally scales loss $\Loss$ by an amount proportional to $\epsilon$. The partial derivative $\frac{\partial \Loss}{\partial \theta_1}$ is simply the ratio of the final output wiggle to the initial parameter nudge as $\epsilon \to 0$. Reverse-mode automatic differentiation systematically traverses these interconnected sensitivity levers backward from output to input.
+\end{intuition}
+
+
+\section{Building neural models, datasets, and the canonical training loop}
+
+The laboratory transitions from primitive tensor operations to structured neural modeling.
+
+\subsection{Defining models with \texttt{torch.nn.Module}}
+In PyTorch, all neural layers and complete architectures inherit from \texttt{nn.Module}:
+
+\begin{lstlisting}[language=Python, caption={Defining a single-input single-output linear model (Cells 11--18).}, label={lst:lab01_simple_linear}]
+# Define a simple linear model
+class SimpleLinearModel(nn.Module):
+    def __init__(self, input_size, output_size):
+        super(SimpleLinearModel, self).__init__()
+        self.linear = nn.Linear(input_size, output_size)
+    
+    def forward(self, x):
+        return self.linear(x)
+
+# Initialize the model and configure device
+model = SimpleLinearModel(1, 1)
+device = torch.device("cuda" if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu"))
+model = model.to(device)
+
+print(f"Device: {device}")
+print("Initial Weight:", model.linear.weight)
+print("Initial Bias:", model.linear.bias)
+\end{lstlisting}
+
+\begin{intuition}[Interactive classroom quiz: Parameter counting in linear layers]
+During the live laboratory walkthrough, the instructor posed an interactive puzzle testing students' structural understanding of linear projections:
+\begin{enumerate}
+    \item \textbf{Case A ($d_{\text{in}} = 5, d_{\text{out}} = 1$)}: How many weights and biases are instantiated?
+    \begin{itemize}
+        \item \emph{Solution}: Exactly \textbf{5 weights} and \textbf{1 bias} (total $= 6$ parameters). Each input scalar is scaled by an individual weight, summed together, and shifted by a single scalar bias: $\hat{y} = \sum_{j=1}^5 w_j x_j + b$.
+    \end{itemize}
+    \item \textbf{Case B ($d_{\text{in}} = 1, d_{\text{out}} = 5$)}: How many weights and biases are instantiated?
+    \begin{itemize}
+        \item \emph{Solution}: Exactly \textbf{5 weights} and \textbf{5 biases} (total $= 10$ parameters!).
+        \item \emph{Geometric intuition}: As the instructor emphasized, moving from $1$ to $5$ outputs is conceptually equivalent to \emph{parallelizing the data across 5 independent linear hyperplanes}. Each output feature neuron requires its own private scaling factor and its own translation threshold: $\hat{y}_k = w_k x + b_k$ for $k \in \{1, \dots, 5\}$.
+    \end{itemize}
+\end{enumerate}
+In general, a fully connected linear layer mapping from $d_{\text{in}}$ to $d_{\text{out}}$ computes:
+\begin{equation}
+\vy = \vx \mW^\top + \vb, \quad \text{where } \mW \in \R^{d_{\text{out}} \times d_{\text{in}}}, \; \vb \in \R^{d_{\text{out}}},
+\end{equation}
+instantiating exactly $P = d_{\text{out}} \cdot d_{\text{in}} + d_{\text{out}}$ trainable parameters.
+\end{intuition}
+
+\subsection{Configuring criterion and optimizer}
+Every learning pipeline couples an objective metric with a gradient-directed stepping policy:
+\begin{itemize}
+    \item \textbf{Criterion (Loss Function)}: Evaluates the magnitude of prediction error against ground-truth targets. The instructor framed the loss function as an \emph{informed oracle}: because the loss function observes the true target $y$, it calculates the exact scalar error $\Loss(\hat{y}, y)$ required to steer the parameters.
+    \begin{itemize}
+        \item \emph{Continuous Regression}: Mean Squared Error (MSE):
+        \begin{equation}
+        \Loss_{\text{MSE}}(\hat{y}, y) = \frac{1}{N} \sum_{i=1}^N (\hat{y}_i - y_i)^2.
+        \end{equation}
+        \item \emph{Discrete Classification}: Multi-class Cross-Entropy Loss:
+        \begin{equation}
+        \Loss_{\text{CE}}(\hat{\vy}, y) = -\log\left(\frac{e^{\hat{y}_y}}{\sum_{j=1}^C e^{\hat{y}_j}}\right).
+        \end{equation}
+    \end{itemize}
+    \item \textbf{Optimizer}: Dictates how parameters move in response to the backward gradient $\nabla_\theta \Loss$. While the loss function provides the \emph{direction} of descent, the optimizer governs the \emph{step size and trajectory dynamics}.
+\end{itemize}
+
+\begin{examinsight}[LLMs as giant classification models]
+The instructor highlighted an essential theoretical link bridging primitive neural networks with foundation models: \emph{Large Language Models are, at their computational core, massive multi-class classification networks}. 
+
+Instead of classifying an image into 10 classes, an autoregressive LLM projects hidden representation $\vh_t \in \R^{d_{\text{model}}}$ through an unembedding projection layer $\mW_U \in \R^{V \times d_{\text{model}}}$ to output logits over a vocabulary $V$ containing $32{,}000$ to $128{,}000+$ tokens, supervised by the exact same Cross-Entropy Loss formulation.
+\end{examinsight}
+
+\begin{deepdive}[Optimizer dynamics: From SGD to Adam's oscillation damping]
+In pure Gradient Descent, updates follow:
+\begin{equation}
+\theta_{t+1} = \theta_t - \eta \nabla_\theta \Loss(\theta_t).
+\end{equation}
+However, modern deep learning mandates two critical modifications:
+\begin{enumerate}
+    \item \textbf{Stochastic Mini-Batching}: Evaluating the true gradient over millions of data points simultaneously is computationally impossible and exceeds GPU memory. Mini-batches (e.g., $B = 64$ or $256$) provide stochastic estimates of the gradient, introducing beneficial noise that helps parameters escape shallow saddle points.
+    \item \textbf{Adaptive Moment Estimation (Adam)}: The instructor presented an intuitive physical view of Adam's stability. If a parameter's gradient oscillates wildly between consecutive batches (e.g., pointing positive in step $t$, negative in step $t+1$, and positive in step $t+2$), standard SGD wastes energy zigzagging across valley walls. Adam tracks exponentially decaying moving averages of past gradients ($m_t$) and squared gradients ($v_t$):
+    \begin{equation}
+    m_t = \beta_1 m_{t-1} + (1 - \beta_1) g_t, \quad v_t = \beta_2 v_{t-1} + (1 - \beta_2) g_t^2.
+    \end{equation}
+    When high-frequency oscillation occurs, $v_t$ grows relative to $m_t$, and the denominator $\sqrt{\hat{v}_t} + \epsilon$ automatically \textbf{dampens the effective step size}, stabilizing training without manual learning rate decay.
+\end{enumerate}
+\end{deepdive}
+
+\begin{lstlisting}[language=Python, caption={Configuring loss function and SGD optimizer (Cell 20).}, label={lst:lab01_criterion_opt}]
+criterion = nn.MSELoss()
+optimizer = optim.SGD(model.parameters(), lr=0.01)
+\end{lstlisting}
+
+\subsection{Exercise 1: Synthetic regression dataset}
+The laboratory tasks the student with generating a synthetic dataset of $N = 2048$ points drawn from a known underlying linear relation $y = w_{\text{true}} \cdot x + b_{\text{true}} + \epsilon$, batched using \texttt{TensorDataset} and \texttt{DataLoader}.
+
+\begin{lstlisting}[language=Python, caption={Verified solution for synthetic dataset generation (Cell 22).}, label={lst:lab01_synthetic_dataset}]
+# Create a dataset (synthetic linear regression dataset)
+n_pts = 2048
+
+# Ground-truth parameters to be recovered by the model
+w_true = 2.0
+b_true = 1.0
+
+# Generate random inputs X ~ N(0, 1) of shape (n_pts, 1)
+X = torch.randn(n_pts, 1)
+
+# Generate targets y with additive Gaussian noise
+y = w_true * X + b_true + 0.1 * torch.randn(n_pts, 1)
+
+# Package into DataLoader
+dataset = TensorDataset(X, y)
+trainloader = DataLoader(dataset, batch_size=256, shuffle=True)
+\end{lstlisting}
+
+\begin{deepdive}[Dataset abstractions and the mechanics of steps vs epochs]
+During the laboratory lecture, the instructor meticulously unpacked the roles of \texttt{TensorDataset} and \texttt{DataLoader}:
+\begin{itemize}
+    \item \textbf{\texttt{TensorDataset}}: Serves as a contiguous indexing wrapper binding feature tensors $\mX \in \R^{N \times 1}$ and label tensors $\vy \in \R^{N \times 1}$. Slicing \texttt{dataset[i]} yields tuple $(\vx_i, y_i)$.
+    \item \textbf{\texttt{DataLoader}}: Manages multi-threaded mini-batch generation, memory pinning, and sample permutation:
+    \begin{enumerate}
+        \item \textbf{Batch Slicing}: Subdivides the dataset into mini-batches of size $B = 256$.
+        \item \textbf{Shuffling (\texttt{shuffle=True})}: Permutes the row indices at the start of every epoch. This ensures that the model does not encounter sample pairings in identical sequence, preventing cyclical limit cycles in parameter space.
+    \end{enumerate}
+\end{itemize}
+
+\textbf{Steps vs.\ Epochs}: A fundamental metric distinction emphasized in the course:
+\begin{itemize}
+    \item An \textbf{Epoch} corresponds to one complete traversal over the entire training corpus ($N = 2048$ samples).
+    \item A \textbf{Step} (or iteration) corresponds to a single parameter update evaluated on one mini-batch ($B = 256$).
+\end{itemize}
+The number of steps per epoch is given by:
+\begin{equation}
+S_{\text{epoch}} = \left\lceil \frac{N}{B} \right\rceil = \frac{2048}{256} = 8 \text{ steps per epoch}.
+\end{equation}
+Over $E = 50$ epochs, the model performs exactly $S_{\text{total}} = 50 \times 8 = 400$ parameter update steps.
+\end{deepdive}
+
+\subsection{Exercise 1: Multi-epoch training loop with parameter tracking}
+To observe convergence, we implement the \textbf{5 canonical steps} of the PyTorch training loop:
+\begin{enumerate}
+    \item \textbf{Gradient Reset}: \texttt{optimizer.zero\_grad()} erases residual gradient accumulations from preceding mini-batches.
+    \item \textbf{Forward Evaluation}: \texttt{outputs = model(inputs)} traverses the neural network's forward DAG.
+    \item \textbf{Error Quantification}: \texttt{loss = criterion(outputs, labels)} evaluates scalar discrepancy.
+    \item \textbf{Adjoint Backpropagation}: \texttt{loss.backward()} traverses the DAG in reverse via autograd.
+    \item \textbf{Parameter Step}: \texttt{optimizer.step()} translates weights along the gradient trajectory.
+\end{enumerate}
+
+\begin{lstlisting}[language=Python, caption={Verified solution for the 50-epoch training loop with metric tracking (Cell 24).}, label={lst:lab01_training_loop}]
+# Training loop
+num_epochs = 50
+
+losses = []
+weights = []
+biases = []
+
+model.train()
+for epoch in range(num_epochs):
+    running_loss = 0.0
+    for inputs, labels in trainloader:
+        inputs, labels = inputs.to(device), labels.to(device)
+
+        # 1. Zero the parameter gradients from previous step
+        optimizer.zero_grad()
+
+        # 2. Forward pass: compute predictions
+        outputs = model(inputs)
+
+        # 3. Compute scalar loss
+        loss = criterion(outputs, labels)
+
+        # 4. Backward pass: compute gradients via autograd
+        loss.backward()
+
+        # 5. Optimizer step: update weights along negative gradient
+        optimizer.step()
+
+        # Track metrics at each step
+        losses.append(loss.item())
+        weights.append(model.linear.weight.item())
+        biases.append(model.linear.bias.item())
+
+        running_loss += loss.item()
+
+    if (epoch + 1) % 10 == 0 or epoch == 0:
+        print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {running_loss/len(trainloader):.4f}")
+\end{lstlisting}
+
+\begin{lstlisting}[style=terminalOutput]
+Epoch [1/50], Loss: 2.2321
+Epoch [10/50], Loss: 0.1246
+Epoch [20/50], Loss: 0.0140
+Epoch [30/50], Loss: 0.0099
+Epoch [40/50], Loss: 0.0097
+Epoch [50/50], Loss: 0.0097
+Learned weights: tensor([[2.0000]])
+Learned biases: tensor([0.9988])
+\end{lstlisting}
+
+The model successfully converges from arbitrary random initialization to recover the true underlying slope $w \to 2.0000$ and intercept $b \to 0.9988$, matching the 3-panel visualization in Figure~\ref{fig:lab01_convergence_plots}.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    width=0.32\textwidth,
+    height=4.5cm,
+    title={\small\textbf{Loss Convergence}},
+    xlabel={\scriptsize Steps},
+    ylabel={\scriptsize MSE Loss},
+    grid=major,
+    grid style={dashed, gray!30},
+    ymode=log,
+    tick label style={font=\tiny},
+    title style={font=\small\color{politoNavy}}
+]
+\addplot[thick, politoNavy, smooth] coordinates {
+    (0, 9.30) (50, 0.81) (100, 0.12) (200, 0.015) (300, 0.0099) (400, 0.0097)
+};
+\end{axis}
+\end{tikzpicture}
+\hfill
+\begin{tikzpicture}
+\begin{axis}[
+    width=0.32\textwidth,
+    height=4.5cm,
+    title={\small\textbf{Weight Trajectory}},
+    xlabel={\scriptsize Steps},
+    ylabel={\scriptsize Weight $w$},
+    grid=major,
+    grid style={dashed, gray!30},
+    tick label style={font=\tiny},
+    title style={font=\small\color{politoNavy}},
+    ymin=0.0, ymax=2.5
+]
+\addplot[thick, pogreen, smooth] coordinates {
+    (0, 0.47) (50, 1.25) (100, 1.72) (200, 1.96) (300, 1.995) (400, 2.000)
+};
+\addplot[dashed, red, thick] coordinates {(0, 2.0) (400, 2.0)};
+\end{axis}
+\end{tikzpicture}
+\hfill
+\begin{tikzpicture}
+\begin{axis}[
+    width=0.32\textwidth,
+    height=4.5cm,
+    title={\small\textbf{Bias Trajectory}},
+    xlabel={\scriptsize Steps},
+    ylabel={\scriptsize Bias $b$},
+    grid=major,
+    grid style={dashed, gray!30},
+    tick label style={font=\tiny},
+    title style={font=\small\color{politoNavy}},
+    ymin=0.0, ymax=1.5
+]
+\addplot[thick, porange, smooth] coordinates {
+    (0, 0.57) (50, 0.78) (100, 0.91) (200, 0.98) (300, 0.996) (400, 0.999)
+};
+\addplot[dashed, red, thick] coordinates {(0, 1.0) (400, 1.0)};
+\end{axis}
+\end{tikzpicture}
+\caption{Visualizing optimization dynamics across 50 epochs (Cell 25). The mean squared error decays logarithmically towards the irreducible noise floor ($\sigma^2 = 0.01$), while weight $w$ asymptotically reaches $2.0$ and bias $b$ reaches $1.0$.}
+\label{fig:lab01_convergence_plots}
+\end{figure}
+
+
+\section{Computer vision pipeline and data augmentation (CIFAR-10)}
+
+Moving beyond 1D synthetic scalars, Section~2 of the laboratory introduces the \textbf{CIFAR-10} benchmark (60,000 $32 \times 32$ color images across 10 classes: airplane, automobile, bird, cat, deer, dog, frog, horse, ship, truck).
+
+\subsection{Channel ordering: PyTorch vs Matplotlib}
+PyTorch standardizes on the \textbf{Channel-First} format $[B, C, H, W]$, where $C = 3$ color channels (Red, Green, Blue) precede height $H = 32$ and width $W = 32$. However, Matplotlib and visualization libraries expect the \textbf{Channel-Last} format $[H, W, C]$. To render a PyTorch image tensor with \texttt{plt.imshow()}, one must invoke:
+\begin{equation}
+\vx_{\text{plot}} = \vx_{\text{torch}}.\text{permute}(1, 2, 0).
+\end{equation}
+
+\subsection{Exercise 2: Computing dataset mean and standard deviation from scratch}
+Standardization accelerates gradient descent by ensuring zero-centered inputs with unit variance across all feature channels:
+\begin{equation}
+\tilde{x}_{c, i, j} = \frac{x_{c, i, j} - \mu_c}{\sigma_c} \quad \text{for } c \in \{R, G, B\}.
+\end{equation}
+In Cell 33, students are tasked with computing $\mu_c$ and $\sigma_c$ across all 50,000 training images scaled to $[0, 1]$:
+
+\begin{lstlisting}[language=Python, caption={Verified solution for calculating dataset mean and standard deviation per channel (Cell 33).}, label={lst:lab01_cifar_mean_std}]
+# Download initial dataset to compute raw statistics
+import os
+dataset_dir = os.path.expanduser('~/data')
+
+trainset = torchvision.datasets.CIFAR10(
+    root=dataset_dir, train=True, download=True, transform=transforms.ToTensor()
+)
+
+# trainset.data is a numpy array of shape (50000, 32, 32, 3) with uint8 values [0, 255]
+# Scale to [0, 1] floating-point range
+scaled_data = trainset.data / 255.0
+
+# Compute mean and standard deviation across image batches, heights, and widths (axes 0, 1, 2)
+images_mean = tuple(scaled_data.mean(axis=(0, 1, 2)).tolist())
+images_std = tuple(scaled_data.std(axis=(0, 1, 2)).tolist())
+
+print(f"Calculated Mean (R, G, B): {images_mean}")
+print(f"Calculated Std  (R, G, B): {images_std}")
+\end{lstlisting}
+
+The resulting values match the canonical CIFAR-10 population statistics:
+\begin{equation}
+\boldsymbol{\mu} = (0.4914, 0.4822, 0.4465), \quad \boldsymbol{\sigma} = (0.2470, 0.2435, 0.2616).
+\end{equation}
+
+\subsection{Data augmentation and visualization pipeline}
+Data augmentation synthetically expands the training distribution by applying label-preserving geometric perturbations. In Cell 37, the laboratory constructs a visualization pipeline applying \texttt{RandomHorizontalFlip} and \texttt{RandomCrop} with reflection padding:
+
+\begin{lstlisting}[language=Python, caption={Verified solution for data augmentation visualization (Cell 37).}, label={lst:lab01_augmentation_viz}]
+viz_transform = transforms.Compose([
+    transforms.RandomHorizontalFlip(),
+    # Reflect border pixels to handle crop margins
+    transforms.RandomCrop(32, padding_mode='reflect', padding=5)
+])
+
+# Extract a sample image tensor and convert to PIL format
+images, labels = next(iter(trainloader))
+im = transforms.ToPILImage()(images[10])
+n_transforms = 9
+
+fig, ax = plt.subplots(3, 3, figsize=(4, 4))
+
+# Slot 0: Original unaugmented image
+ax[0, 0].imshow(im)
+ax[0, 0].set_title('Original', fontsize=8)
+ax[0, 0].axis('off')
+
+# Slots 1-8: Stochastic variations generated by the transform
+for i in range(1, n_transforms):
+    r, c = divmod(i, 3)
+    ax[r, c].imshow(viz_transform(im))
+    ax[r, c].set_title(f'Aug {i}', fontsize=8)
+    ax[r, c].axis('off')
+
+plt.tight_layout()
+\end{lstlisting}
+
+
+\section{Multi-layer perceptron for classification (\texttt{SimpleNN})}
+
+In Section~2.0, the laboratory constructs a Multi-Layer Perceptron (MLP) for 10-class image classification.
+
+\subsection{Mathematical formulation of the architecture}
+The network maps a 3D image tensor into a flattened vector, passes it through two hidden layers with Rectified Linear Unit ($\relu$) activations, and outputs unnormalized class logits:
+\begin{align}
+\vx_{\text{flat}} &= \text{vec}(\vx) \in \R^{32 \times 32 \times 3} = \R^{3072}, \\
+\vh_1 &= \relu(\mW_1 \vx_{\text{flat}} + \vb_1) \in \R^{512}, \quad &&\mW_1 \in \R^{512 \times 3072}, \; \vb_1 \in \R^{512}, \\
+\vh_2 &= \relu(\mW_2 \vh_1 + \vb_2) \in \R^{256}, \quad &&\mW_2 \in \R^{256 \times 512}, \; \vb_2 \in \R^{256}, \\
+\hat{\vy} &= \mW_3 \vh_2 + \vb_3 \in \R^{10}, \quad &&\mW_3 \in \R^{10 \times 256}, \; \vb_3 \in \R^{10}.
+\end{align}
+
+Figure~\ref{fig:lab01_simplenn_architecture} illustrates the end-to-end architectural topology of \texttt{SimpleNN}, visualizing the tensor dimensions, fully connected weight matrices, non-linear $\relu$ activations, and reverse-mode gradient flow.
+
+\begin{figure}[htbp]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[
+    scale=0.92,
+    font=\sffamily,
+    inputnode/.style={circle, draw=politoNavy, fill=skyBlue!40, thick, minimum size=7.5mm, inner sep=0pt, font=\scriptsize\bfseries},
+    h1node/.style={circle, draw=deepdiveTeal, fill=deepdiveTealBg, thick, minimum size=7.5mm, inner sep=0pt, font=\scriptsize\bfseries},
+    h2node/.style={circle, draw=intuitionPurple, fill=intuitionPurpleBg, thick, minimum size=7.5mm, inner sep=0pt, font=\scriptsize\bfseries},
+    outnode/.style={circle, draw=examAmber, fill=examAmberBg, thick, minimum size=7.5mm, inner sep=0pt, font=\scriptsize\bfseries},
+    lossnode/.style={rectangle, rounded corners=5pt, draw=red!75!black, fill=red!6, very thick, minimum width=26mm, minimum height=13mm, align=center, font=\small\bfseries},
+    targetnode/.style={rectangle, rounded corners=4pt, draw=bodyGray, fill=gray!8, thick, minimum width=24mm, minimum height=8mm, align=center, font=\scriptsize\bfseries},
+    infobox/.style={rectangle, rounded corners=4pt, draw=gray!30, fill=white, inner sep=3.5pt, align=center, font=\tiny},
+    synapse/.style={draw=gray!30, line width=0.35pt},
+    arr/.style={-{Stealth[scale=1.1]}, thick, draw=bodyDark},
+    headerlabel/.style={align=center, font=\footnotesize\bfseries}
+]
+
+    % 1. Input Image: CIFAR-10 32x32x3 (Isometric representation)
+    \begin{scope}[xshift=-5.2cm, yshift=0cm]
+        \filldraw[fill=skyBlue!35, draw=politoNavy, thick, opacity=0.9] 
+            (0, 1.4) -- (1.5, 2.2) -- (1.5, -0.6) -- (0, -1.4) -- cycle;
+        \filldraw[fill=pogreen!30, draw=pogreen, thick, opacity=0.9] 
+            (0.35, 1.58) -- (1.85, 2.38) -- (1.85, -0.42) -- (0.35, -1.22) -- cycle;
+        \filldraw[fill=red!25, draw=red!75!black, thick, opacity=0.9] 
+            (0.7, 1.76) -- (2.2, 2.56) -- (2.2, -0.24) -- (0.7, -1.04) -- cycle;
+
+        \node[font=\small\bfseries, text=politoNavy] at (1.1, -1.8) {CIFAR-10};
+        \node[font=\footnotesize, text=bodyDark] at (1.1, -2.2) {Input Image};
+        \node[font=\scriptsize\ttfamily, text=bodyGray] at (1.1, -2.6) {$[3, 32, 32]$};
+
+        \node[font=\tiny\bfseries, text=politoNavy] at (0.25, 0.4) {B};
+        \node[font=\tiny\bfseries, text=pogreen!90!black] at (0.95, 0.6) {G};
+        \node[font=\tiny\bfseries, text=red!85!black] at (1.65, 0.8) {R};
+    \end{scope}
+
+    % Flattening Transformation Arrow
+    \draw[arr, very thick, steelBlue] (-2.2, 0) -- (-0.8, 0) 
+        node[midway, above=3pt, font=\scriptsize\bfseries\ttfamily, text=politoNavy] {.view($B$, -1)}
+        node[midway, below=3pt, font=\tiny, text=bodyGray] {Flatten: $\text{vec}(\vx)$};
+
+    % 2. Input Feature Vector (3072 features)
+    \node[headerlabel, text=politoNavy] at (0, 3.6) {Input Features $\vx$\\[2pt]\scriptsize\normalfont\color{bodyGray} $d_{\text{in}} = 3072$};
+
+    \node[inputnode] (in1) at (0, 2.3) {$x_1$};
+    \node[inputnode] (in2) at (0, 1.5) {$x_2$};
+    \node[inputnode] (in3) at (0, 0.7) {$x_3$};
+    \node[font=\normalsize\bfseries, text=politoNavy] (indots) at (0, -0.05) {$\vdots$};
+    \node[inputnode] (inK) at (0, -0.8) {$x_k$};
+    \node[font=\normalsize\bfseries, text=politoNavy] (indots2) at (0, -1.55) {$\vdots$};
+    \node[inputnode] (inN) at (0, -2.3) {$x_{3072}$};
+
+    \node[infobox] at (0, -3.2) {Pixel intensities\\$\tilde{x}_i \in \R$};
+
+    % 3. Hidden Layer 1 (512 units, ReLU)
+    \node[headerlabel, text=deepdiveTeal] at (4.0, 3.6) {Hidden Layer 1 ($\vh_1$)\\[2pt]\scriptsize\normalfont\color{deepdiveTeal} $512$ units $\cdot$ \textbf{ReLU}};
+
+    \node[h1node] (h1_1) at (4.0, 2.3) {$h_{1,1}$};
+    \node[h1node] (h1_2) at (4.0, 1.5) {$h_{1,2}$};
+    \node[h1node] (h1_3) at (4.0, 0.7) {$h_{1,3}$};
+    \node[font=\normalsize\bfseries, text=deepdiveTeal] (h1dots) at (4.0, -0.05) {$\vdots$};
+    \node[h1node] (h1_j) at (4.0, -0.8) {$h_{1,j}$};
+    \node[font=\normalsize\bfseries, text=deepdiveTeal] (h1dots2) at (4.0, -1.55) {$\vdots$};
+    \node[h1node] (h1_m) at (4.0, -2.3) {$h_{1,512}$};
+
+    % Synapses: Input -> Hidden 1
+    \foreach \i in {in1, in2, in3, inK, inN} {
+        \foreach \j in {h1_1, h1_2, h1_3, h1_j, h1_m} {
+            \draw[synapse] (\i.east) -- (\j.west);
+        }
+    }
+
+    % Transformation 1 Annotations
+    \node[infobox, draw=deepdiveTeal!50] at (2.0, 0) {$\mW_1 \in \R^{512 \times 3072}$\\[2pt]$\vb_1 \in \R^{512}$};
+    \node[infobox, draw=gray!30] at (4.0, -3.2) {$\vh_1 = \relu(\mW_1 \vx + \vb_1)$\\[1pt]\color{bodyGray}$1{,}573{,}376$ params ($92.1\%$)};
+
+    % 4. Hidden Layer 2 (256 units, ReLU)
+    \node[headerlabel, text=intuitionPurple] at (8.0, 3.6) {Hidden Layer 2 ($\vh_2$)\\[2pt]\scriptsize\normalfont\color{intuitionPurple} $256$ units $\cdot$ \textbf{ReLU}};
+
+    \node[h2node] (h2_1) at (8.0, 2.0) {$h_{2,1}$};
+    \node[h2node] (h2_2) at (8.0, 1.2) {$h_{2,2}$};
+    \node[h2node] (h2_3) at (8.0, 0.4) {$h_{2,3}$};
+    \node[font=\normalsize\bfseries, text=intuitionPurple] (h2dots) at (8.0, -0.35) {$\vdots$};
+    \node[h2node] (h2_k) at (8.0, -1.1) {$h_{2,k}$};
+    \node[font=\normalsize\bfseries, text=intuitionPurple] (h2dots2) at (8.0, -1.65) {$\vdots$};
+    \node[h2node] (h2_m) at (8.0, -2.2) {$h_{2,256}$};
+
+    % Synapses: Hidden 1 -> Hidden 2
+    \foreach \i in {h1_1, h1_2, h1_3, h1_j, h1_m} {
+        \foreach \j in {h2_1, h2_2, h2_3, h2_k, h2_m} {
+            \draw[synapse] (\i.east) -- (\j.west);
+        }
+    }
+
+    % Transformation 2 Annotations
+    \node[infobox, draw=intuitionPurple!50] at (6.0, 0) {$\mW_2 \in \R^{256 \times 512}$\\[2pt]$\vb_2 \in \R^{256}$};
+    \node[infobox, draw=gray!30] at (8.0, -3.2) {$\vh_2 = \relu(\mW_2 \vh_1 + \vb_2)$\\[1pt]\color{bodyGray}$131{,}328$ params ($7.7\%$)};
+
+    % 5. Output Layer (10 Logits)
+    \node[headerlabel, text=examAmber] at (12.0, 3.6) {Output Logits ($\hat{\vy}$)\\[2pt]\scriptsize\normalfont\color{examAmber} $10$ classes $\cdot$ Linear};
+
+    \node[outnode] (out0) at (12.0, 2.25) {$\hat{y}_0$};
+    \node[outnode] (out1) at (12.0, 1.5) {$\hat{y}_1$};
+    \node[outnode] (out2) at (12.0, 0.75) {$\hat{y}_2$};
+    \node[outnode] (out3) at (12.0, 0.0) {$\hat{y}_3$};
+    \node[font=\normalsize\bfseries, text=examAmber] (outdots) at (12.0, -0.65) {$\vdots$};
+    \node[outnode] (out9) at (12.0, -1.4) {$\hat{y}_9$};
+
+    % Synapses: Hidden 2 -> Output
+    \foreach \i in {h2_1, h2_2, h2_3, h2_k, h2_m} {
+        \foreach \j in {out0, out1, out2, out3, out9} {
+            \draw[synapse] (\i.east) -- (\j.west);
+        }
+    }
+
+    % Transformation 3 Annotations
+    \node[infobox, draw=examAmber!50] at (10.0, 0) {$\mW_3 \in \R^{10 \times 256}$\\[2pt]$\vb_3 \in \R^{10}$};
+    \node[infobox, draw=gray!30] at (12.0, -3.2) {$\hat{\vy} = \mW_3 \vh_2 + \vb_3$\\[1pt]\color{bodyGray}$2{,}570$ params ($0.2\%$)};
+
+    % Class Names Callout Table next to Output
+    \node[right=1.5mm of out0, font=\tiny\ttfamily, text=bodyDark] {0: airplane};
+    \node[right=1.5mm of out1, font=\tiny\ttfamily, text=bodyDark] {1: automobile};
+    \node[right=1.5mm of out2, font=\tiny\ttfamily, text=bodyDark] {2: bird};
+    \node[right=1.5mm of out3, font=\tiny\ttfamily, text=bodyDark] {3: cat};
+    \node[right=1.5mm of out9, font=\tiny\ttfamily, text=bodyDark] {9: truck};
+
+    % Right curly brace encompassing outputs
+    \draw[decorate, decoration={brace, amplitude=6pt, mirror}, thick, politoNavy] 
+        (14.4, 2.5) -- (14.4, -1.65) node[midway, right=8pt, font=\scriptsize\bfseries, text=politoNavy] (braceTip) {};
+
+    % 6. Loss & Optimization Supervision
+    \node[lossnode] (loss) at (17.5, 0.42) {Cross-Entropy\\Loss $\Loss_{\text{CE}}$\\[2pt]\tiny\normalfont $\Loss = -\log\left(\frac{e^{\hat{y}_y}}{\sum_j e^{\hat{y}_j}}\right)$};
+
+    % Connect logits to loss via brace tip
+    \draw[arr, thick, steelBlue] (14.8, 0.42) -- (loss.west)
+        node[midway, above, font=\tiny\bfseries, text=politoNavy] {Logits $\hat{\vy}$};
+
+    % Ground truth target
+    \node[targetnode] (target) at (17.5, 2.4) {Ground Truth Target\\[1pt]\color{politoNavy}$y \in \{0, \dots, 9\}$};
+    \draw[arr, thick, dashed, draw=bodyGray] (target.south) -- (loss.north)
+        node[midway, right, font=\tiny, text=bodyGray] {One-Hot};
+
+    % Backward autograd pass
+    \node[rectangle, rounded corners=4pt, draw=pogreen, fill=pogreen!8, thick, minimum width=26mm, minimum height=9mm, align=center, font=\scriptsize\bfseries] 
+        (grad) at (17.5, -1.8) {Backpropagation\\[1pt]\color{pogreen}$\nabla_\theta \Loss = \frac{\partial \Loss}{\partial \theta}$};
+    
+    \draw[arr, thick, dashed, draw=pogreen] (loss.south) -- (grad.north)
+        node[midway, right, font=\tiny\bfseries, text=pogreen] {\texttt{loss.backward()}};
+
+    % Backward path below the infoboxes
+    \draw[arr, thick, dashed, draw=pogreen] (grad.south) -- (17.5, -4.0) -- (-1.0, -4.0) -- (-1.0, -0.6);
+    \node[font=\tiny\bfseries, text=pogreen, fill=white, inner sep=2.5pt, rounded corners=2pt, draw=pogreen!40] at (8.0, -4.0) 
+        {$\longleftarrow$ Reverse-Mode Gradient Propagation via Chain Rule (Optimizer Step $\theta \leftarrow \theta - \eta \nabla_\theta \Loss$)};
+
+    % 7. Global Summary Badge
+    \node[rectangle, rounded corners=5pt, draw=politoNavy, fill=skyBlue!20, thick, inner sep=5pt, font=\scriptsize] 
+        at (6.0, -4.85) {\textbf{Total Trainable Parameters}: $1{,}573{,}376 + 131{,}328 + 2{,}570 = \mathbf{1{,}707{,}274}$ ($\approx 1.71\text{M}$) \quad $\vert$ \quad \textbf{Curse of Dimensionality}: $92.16\%$ in $\mW_1$};
+
+\end{tikzpicture}%
+}
+\caption{Architectural topology of the \texttt{SimpleNN} Multi-Layer Perceptron (MLP) for CIFAR-10 classification (Section~1.6.1). An input color image $[3 \times 32 \times 32]$ is flattened into feature vector $\vx \in \R^{3072}$, sequentially propagated through two hidden fully-connected layers with non-linear $\relu$ activations ($512$ and $256$ units), and projected into $10$ unnormalized class logits $\hat{\vy} \in \R^{10}$. Training is supervised by Cross-Entropy Loss with gradients propagated in reverse mode.}
+\label{fig:lab01_simplenn_architecture}
+\end{figure}
+
+\subsection{Exercise: Implementing \texttt{SimpleNN}}
+
+\begin{lstlisting}[language=Python, caption={Verified implementation of \texttt{SimpleNN} architecture (Cell 42).}, label={lst:lab01_simplenn}]
+class SimpleNN(nn.Module):
+    def __init__(self):
+        super(SimpleNN, self).__init__()
+        # Linear layer 1: 3072 input features -> 512 hidden features
+        self.fc1 = nn.Linear(32 * 32 * 3, 512)
+        # Linear layer 2: 512 hidden features -> 256 hidden features
+        self.fc2 = nn.Linear(512, 256)
+        # Output layer: 256 hidden features -> 10 class logits
+        self.fc3 = nn.Linear(256, 10)
+
+    def forward(self, x):
+        # Flatten input: preserve batch dimension, collapse (C, H, W)
+        x = x.view(x.size(0), -1)
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        # Logits output (no activation needed; CrossEntropyLoss applies Softmax internally)
+        x = self.fc3(x)
+        return x
+\end{lstlisting}
+
+\subsection{Evaluation function and gradient deactivation}
+Validation requires disabling parameter updates to prevent memory leaks and ensure deterministic evaluation:
+
+\begin{lstlisting}[language=Python, caption={Validation routine with \texttt{model.eval()} and \texttt{torch.no\_grad()} (Cell 48).}, label={lst:lab01_val_model}]
+def val_model(model, testloader):
+    model.eval()  # Switch to evaluation mode (deactivates dropout/batchnorm training behavior)
+    correct = 0
+    total = 0
+    with torch.no_grad():  # Disable autograd DAG construction to conserve memory
+        for inputs, labels in testloader:
+            inputs, labels = inputs.to(device), labels.to(device)
+            outputs = model(inputs)
+            _, predicted = torch.max(outputs.data, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+
+    accuracy = 100 * correct / total
+    print(f"Accuracy of the network on test images: {accuracy:.2f}%")
+\end{lstlisting}
+
+Prior to training, random guessing on a 10-class dataset yields an accuracy of $\approx 10.0\%$. After 5 epochs of training via Listing~\ref{lst:lab01_training_loop}, the multi-layer perceptron achieves approximately $47.5\%$ accuracy.
+
+
+\section{Transfer learning and parameter freezing with ResNet-18}
+
+While training an MLP from scratch yields $\approx 47\%$ accuracy on CIFAR-10, modern engineering relies on \textbf{transfer learning}: reusing representations acquired by deep models pretrained on massive datasets (such as ImageNet's 1.2 million images).
+
+\subsection{Deep residual learning (ResNet)}
+Introduced by He et al.\ \cite{he2016deep}, Deep Residual Networks solve the vanishing gradient problem in networks with dozens of layers by introducing \textbf{identity shortcut connections}:
+\begin{equation}
+\vy = \mathcal{F}(\vx, \{\mW_i\}) + \vx.
+\end{equation}
+During backpropagation, the additive residual connection ensures gradients flow unimpeded directly to early layers:
+\begin{equation}
+\frac{\partial \Loss}{\partial \vx} = \frac{\partial \Loss}{\partial \vy} \left( \frac{\partial \mathcal{F}}{\partial \vx} + \mI \right).
+\end{equation}
+Even if the learned Jacobian $\frac{\partial \mathcal{F}}{\partial \vx}$ vanishes, the identity term $\mI$ guarantees an uninterrupted gradient conduit.
+
+\subsection{Exercise: Adapting pretrained ResNet-18 for CIFAR-10}
+The base \texttt{models.resnet18} has an output fully connected layer (\texttt{fc}) sized for 1000 ImageNet classes. In Cell 65, the student replaces this head with a new 10-class linear projection:
+
+\begin{lstlisting}[language=Python, caption={Loading pretrained ResNet-18 and replacing the classifier head (Cell 65).}, label={lst:lab01_resnet_cifar10}]
+from torchvision import models
+
+# Load ResNet-18 with ImageNet weights
+pretrained_model = models.resnet18(weights='DEFAULT')
+
+# Access original input feature dimension (512) and replace head
+pretrained_model.fc = nn.Linear(pretrained_model.fc.in_features, 10)
+
+# Transfer model to active device
+pretrained_model = pretrained_model.to(device)
+\end{lstlisting}
+
+Fine-tuning this model for 5 epochs elevates validation accuracy from $47.5\%$ to over $\mathbf{82.4\%}$.
+
+\subsection{Exercise: Transfer to CIFAR-100 and parameter freezing}
+In Section~2.3, the challenge shifts to fine-tuning the model for \textbf{CIFAR-100} (100 fine-grained classes). To prevent overwriting the valuable pretrained visual feature extractors and drastically accelerate training, we \textbf{freeze all backbone layers} and only train the newly attached classification head:
+
+\begin{lstlisting}[language=Python, caption={Freezing backbone parameters and unfreezing the classification head (Cells 72--75).}, label={lst:lab01_freeze_head}]
+# Modify classification head for 100 classes
+model = pretrained_model
+model.fc = nn.Linear(model.fc.in_features, 100)
+model = model.to(device)
+
+# Step 1: Freeze all layers across the network
+for param in model.parameters():
+    param.requires_grad = False
+
+# Step 2: Unfreeze ONLY the classification head parameters
+for param in model.fc.parameters():
+    param.requires_grad = True
+
+# Optimizer tracks ONLY the head parameters
+optimizer = optim.SGD(model.fc.parameters(), lr=0.01, momentum=0.9, weight_decay=5e-4)
+\end{lstlisting}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}X c c c}
+\toprule
+\textbf{Configuration} & \textbf{Total Parameters} & \textbf{Trainable Parameters} & \textbf{Trainable Ratio} \\
+\midrule
+Full ResNet-18 Fine-Tuning & $11{,}176{,}512$ & $11{,}176{,}512$ & $100.0\%$ \\
+Frozen Backbone + Head Only & $11{,}227{,}584$ & $\mathbf{51{,}300}$ & $\mathbf{0.457\%}$ \\
+\bottomrule
+\end{tabularx}
+\caption{Parameter efficiency comparison under layer freezing. By training only the newly attached classification head (\texttt{model.fc}), the number of active gradients drops by over $99.5\%$, serving as a direct conceptual precursor to LoRA (Laboratory~05).}
+\label{tab:parameter_freezing}
+\end{table}
+
+\subsection{The foundation model paradigm: Bridging ResNet in vision and BERT in NLP}
+During the laboratory lecture, the instructor established an indispensable pedagogical bridge connecting convolutional vision backbones with large language models. In industrial machine learning, the era of training massive architectures from scratch on modest consumer hardware has drawn to a close:
+\begin{itemize}
+    \item \textbf{The Economics of Pretraining}: Pretraining foundation models (such as BERT, RoBERTa, LLaMA, or deep vision backbones) demands millions of dollars in compute, warehouse-scale GPU clusters, and massive data ingestion pipelines. More than $99\%$ of practitioners and industrial teams cannot pretrain foundation models from scratch.
+    \item \textbf{Latent Space Representations}: Pretrained foundation models arrive equipped with non-random, semantically structured weights. In vision, ResNet maps raw pixels into rich hierarchical visual features (edges $\to$ textures $\to$ object contours). In NLP, an encoder like BERT maps raw token sequences into structured latent embeddings $\vz \in \R^{d_{\text{model}}}$ capturing syntactic grammar, context, and semantic co-occurrence.
+\end{itemize}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{>{\bfseries}l >{\raggedright}X >{\raggedright}X >{\raggedright\arraybackslash}X}
+\toprule
+\textbf{Strategy} & \textbf{Training From Scratch} & \textbf{Full Fine-Tuning} & \textbf{Linear Probing (Freezing)} \\
+\midrule
+Weight Initialization & Random Gaussian / Xavier & Pretrained foundation weights & Pretrained foundation weights \\
+Active Gradients & All layers ($100\%$) & All layers ($100\%$) & Output head only ($< 0.5\%$) \\
+Memory Footprint & High (full optimizer states) & Very High (full backward graph) & Minimal (activations frozen) \\
+Training Speed & Very Slow & Moderate & Very Fast (few epochs) \\
+Data Requirement & Massive dataset required & Modest downstream dataset & Small downstream dataset \\
+Convergence Risk & High risk of divergence/overfit & Stable, high accuracy & Fast, competitive accuracy \\
+Downstream Example & Training ResNet from zero & Fine-tuning BERT end-to-end & Frozen BERT + classification head \\
+\bottomrule
+\end{tabularx}
+\caption{Systematic comparison of downstream adaptation strategies across computer vision and natural language processing, as presented during the laboratory lecture.}
+\label{tab:adaptation_strategies}
+\end{table}
+
+\begin{intuition}[From parameter freezing to PEFT and LoRA]
+Notice the profound connection to Large Language Models: freezing the backbone and training a lightweight linear adapter on top ($51{,}300$ parameters vs.\ $11.2\text{M}$) achieves nearly identical accuracy in a fraction of the wall-clock time while completely eliminating gradient computations across deep residual blocks.
+
+This exact mathematical philosophy underpins \textbf{Parameter-Efficient Fine-Tuning (PEFT)} and \textbf{Low-Rank Adaptation (LoRA)} in modern LLMs: instead of fine-tuning all $7\text{B}$ or $70\text{B}$ parameters of a foundation model, engineers freeze the transformer weights and update only low-rank adapter matrices, drastically lowering VRAM thresholds and democratizing model customization.
+\end{intuition}
+
+
+\section{Exercise 3 in-depth: analytical derivation and autograd DAG trace}
+
+The final exercise of the laboratory (Cells 80--84) analyzes automatic differentiation on a composite mathematical function, reconciling analytical calculus with PyTorch's autograd engine.
+
+\subsection{Mathematical problem definition}
+Given input $x = 1.0$, target $y = 3.0$, and parameters $\theta_1 = 2.0$, $\theta_2 = 3.0$, we define the predicted value $\hat{y}$ and quadratic loss $\Loss$:
+\begin{equation}
+\label{eq:lab01_ex3_loss}
+\hat{y} = \theta_1 \theta_2 x, \quad \Loss(\theta_1, \theta_2) = (\theta_1 \theta_2 x - y)^2.
+\end{equation}
+
+\subsection{Analytical derivation of partial derivatives}
+We decompose the forward pass into elementary atomic operations:
+\begin{align}
+a &= \theta_1 \theta_2, \\
+b &= a \cdot x, \\
+c &= b - y, \\
+\Loss &= c^2.
+\end{align}
+
+Applying the multivariate chain rule in reverse:
+\begin{align}
+\frac{\partial \Loss}{\partial c} &= 2c = 2(b - y) = 2(\theta_1 \theta_2 x - y), \\
+\frac{\partial \Loss}{\partial b} &= \frac{\partial \Loss}{\partial c} \frac{\partial c}{\partial b} = 2c \cdot 1 = 2c, \\
+\frac{\partial \Loss}{\partial a} &= \frac{\partial \Loss}{\partial b} \frac{\partial b}{\partial a} = 2c \cdot x = 2cx.
+\end{align}
+
+Now computing the parameter sensitivities:
+\begin{align}
+\label{eq:analytical_theta1}
+\frac{\partial \Loss}{\partial \theta_1} &= \frac{\partial \Loss}{\partial a} \frac{\partial a}{\partial \theta_1} = (2cx) \cdot \theta_2 = 2(\theta_1 \theta_2 x - y) \theta_2 x, \\
+\label{eq:analytical_theta2}
+\frac{\partial \Loss}{\partial \theta_2} &= \frac{\partial \Loss}{\partial a} \frac{\partial a}{\partial \theta_2} = (2cx) \cdot \theta_1 = 2(\theta_1 \theta_2 x - y) \theta_1 x.
+\end{align}
+
+\subsection{Numerical evaluation}
+Substituting the problem's values $\theta_1 = 2.0, \theta_2 = 3.0, x = 1.0, y = 3.0$:
+\begin{align}
+a &= 2.0 \times 3.0 = 6.0, \\
+b &= 6.0 \times 1.0 = 6.0, \\
+c &= 6.0 - 3.0 = 3.0, \\
+\Loss &= 3.0^2 = \mathbf{9.0}.
+\end{align}
+Evaluating the gradients:
+\begin{align}
+\frac{\partial \Loss}{\partial \theta_1} &= 2(3.0) \times 3.0 \times 1.0 = \mathbf{18.0}, \\
+\frac{\partial \Loss}{\partial \theta_2} &= 2(3.0) \times 2.0 \times 1.0 = \mathbf{12.0}.
+\end{align}
+
+\subsection{PyTorch implementation and computational graph visualization}
+
+\begin{lstlisting}[language=Python, caption={Verified solution for Exercise 3 autograd calculation and visualization (Cells 83--84).}, label={lst:lab01_autograd_code}]
+import torch
+from torchviz import make_dot
+
+# Define parameter and input tensors with gradient tracking
+theta1 = torch.tensor(2.0, requires_grad=True)
+theta2 = torch.tensor(3.0, requires_grad=True)
+x = torch.tensor(1.0, requires_grad=True)
+y = torch.tensor(3.0, requires_grad=True)
+
+# Forward pass: compute scalar loss
+loss = (theta1 * theta2 * x - y)**2
+
+# Visualize computational graph
+dot = make_dot(loss, params={'theta1': theta1, 'theta2': theta2, 'x': x, 'y': y})
+
+# Execute reverse-mode automatic differentiation
+loss.backward()
+
+print("Computed Loss:", loss.item())
+print("dL/d(theta1):", theta1.grad.item())
+print("dL/d(theta2):", theta2.grad.item())
+\end{lstlisting}
+
+\begin{lstlisting}[style=terminalOutput]
+Computed Loss: 9.0
+dL/d(theta1): 18.0
+dL/d(theta2): 12.0
+\end{lstlisting}
+
+PyTorch's automated backward traversal produces exactly $18.0$ and $12.0$, perfectly confirming our analytic derivation. As highlighted during the laboratory lecture, invoking \texttt{torchviz.make\_dot} exposes PyTorch's internal C++ autograd backward DAG:
+\begin{itemize}
+    \item \textbf{Accumulation Nodes}: Leaf variables declared with \texttt{requires\_grad=True} ($\theta_1, \theta_2, x, y$) terminate at \texttt{AccumulateGrad} nodes that accumulate incoming adjoint gradients into each tensor's \texttt{.grad} buffer.
+    \item \textbf{Backward Operators}: Non-leaf operation nodes (such as \texttt{MulBackward0} or \texttt{SubBackward0}) represent the local multivariate derivative closures executed when \texttt{loss.backward()} is triggered.
+\end{itemize}
+Figure~\ref{fig:lab01_tikz_dag} provides a vector visualization of this exact Directed Acyclic Graph, contrasting forward computation with reverse-mode adjoint propagation.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    scale=0.95,
+    varnode/.style={circle, draw=politoNavy, fill=skyBlue!35, very thick, minimum size=11mm, font=\small\bfseries},
+    opnode/.style={circle, draw=deepdiveTeal, fill=deepdiveTealBg, very thick, minimum size=11mm, font=\large\bfseries},
+    fwdarr/.style={-{Stealth[scale=1.1]}, thick, draw=bodyDark},
+    bwdarr/.style={-{Stealth[scale=1.1]}, dashed, thick, draw=red!80!black}
+]
+
+% Leaf Variable Nodes
+\node[varnode] (th1) at (0, 3.0) {$\theta_1$};
+\node[below=2pt of th1, font=\tiny\bfseries, text=politoNavy] {$2.0$};
+
+\node[varnode] (th2) at (0, 1.2) {$\theta_2$};
+\node[below=2pt of th2, font=\tiny\bfseries, text=politoNavy] {$3.0$};
+
+\node[varnode] (x) at (2.5, 0.0) {$x$};
+\node[below=2pt of x, font=\tiny\bfseries, text=politoNavy] {$1.0$};
+
+\node[varnode] (y) at (5.5, -1.0) {$y$};
+\node[below=2pt of y, font=\tiny\bfseries, text=politoNavy] {$3.0$};
+
+% Operator Nodes
+\node[opnode] (mul1) at (2.5, 2.1) {$\times$};
+\node[above=2pt of mul1, font=\tiny\bfseries, text=deepdiveTeal] {MulBackward};
+
+\node[opnode] (mul2) at (5.0, 1.0) {$\times$};
+\node[above=2pt of mul2, font=\tiny\bfseries, text=deepdiveTeal] {MulBackward};
+
+\node[opnode] (sub) at (7.5, 0.0) {$-$};
+\node[above=2pt of sub, font=\tiny\bfseries, text=deepdiveTeal] {SubBackward};
+
+\node[opnode] (pow2) at (10.0, 0.0) {$(\cdot)^2$};
+\node[above=2pt of pow2, font=\tiny\bfseries, text=deepdiveTeal] {PowBackward};
+
+% Output Loss Node
+\node[varnode, draw=red!80!black, fill=examAmberBg] (L) at (12.2, 0.0) {$\Loss$};
+\node[below=2pt of L, font=\tiny\bfseries, text=red!80!black] {$9.0$};
+
+% Forward Connections
+\draw[fwdarr] (th1) -- (mul1);
+\draw[fwdarr] (th2) -- (mul1);
+\draw[fwdarr] (mul1) -- node[above, font=\scriptsize] {$a = 6.0$} (mul2);
+\draw[fwdarr] (x) -- (mul2);
+\draw[fwdarr] (mul2) -- node[above, font=\scriptsize] {$b = 6.0$} (sub);
+\draw[fwdarr] (y) -- (sub);
+\draw[fwdarr] (sub) -- node[above, font=\scriptsize] {$c = 3.0$} (pow2);
+\draw[fwdarr] (pow2) -- (L);
+
+% Backward Adjoint Connections (Curved)
+\draw[bwdarr] (L) to[bend left=25] node[below, font=\scriptsize, text=red!80!black] {$2c = 6.0$} (pow2);
+\draw[bwdarr] (pow2) to[bend left=25] node[below, font=\scriptsize, text=red!80!black] {$6.0$} (sub);
+\draw[bwdarr] (sub) to[bend left=25] node[below, font=\scriptsize, text=red!80!black] {$6.0$} (mul2);
+
+\draw[bwdarr] (mul2) to[bend left=25] node[below, font=\scriptsize, text=red!80!black] {$6.0 \cdot x = 6.0$} (mul1);
+\draw[bwdarr] (mul1) to[bend right=25] node[above, font=\scriptsize, text=red!80!black] {$\frac{\partial \Loss}{\partial \theta_1} = 18.0$} (th1);
+\draw[bwdarr] (mul1) to[bend left=25] node[below, font=\scriptsize, text=red!80!black] {$\frac{\partial \Loss}{\partial \theta_2} = 12.0$} (th2);
+
+\end{tikzpicture}
+\caption{Vector rendering of the computational graph for Exercise~3 (reproducing the notebook's \texttt{computational\_graph.png} and \texttt{backpropagation.png}). Black solid paths trace forward evaluation; red dashed arrows trace reverse-mode adjoint gradient propagation via the chain rule.}
+\label{fig:lab01_tikz_dag}
+\end{figure}
+
+
+\section{Laboratory summary and engineering checklist}
+
+Table~\ref{tab:lab01_summary} synthesizes the core PyTorch modules, classes, and design patterns mastered in Laboratory~01.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{l >{\raggedright\arraybackslash}X}
+\toprule
+\textbf{PyTorch API / Component} & \textbf{Engineering Function \& Best Practice} \\
+\midrule
+\texttt{torch.tensor(..., requires\_grad=True)} & Leaf node instantiation with autograd sensitivity tracking. \\
+\texttt{torch.randn(shape)} & Gaussian initialization; prefer FP32/BF16 over FP64 for throughput. \\
+\texttt{nn.Module} & Object-oriented base class for all neural layers and architectures. \\
+\texttt{nn.Linear(in\_features, out\_features)} & Affine matrix transformation $\mW \vx + \vb$ with automatic parameter registration. \\
+\texttt{TensorDataset(X, y)} & Packs input and label tensors into a unified iterable indexing structure. \\
+\texttt{DataLoader(dataset, batch\_size, shuffle)} & Provides minibatching, shuffling, and multi-threaded parallel worker loading. \\
+\texttt{optimizer.zero\_grad()} & Resets parameter gradients to zero before backpropagation to prevent accumulation. \\
+\texttt{loss.backward()} & Executes reverse-mode DAG topological traversal and accumulates partial derivatives. \\
+\texttt{optimizer.step()} & Updates model parameters along the negative gradient vector. \\
+\texttt{model.eval()} & Sets evaluation mode; freezes stochastic layers (e.g., dropout and batchnorm). \\
+\texttt{torch.no\_grad()} & Context manager deactivating the autograd graph engine to conserve VRAM. \\
+\texttt{param.requires\_grad = False} & Parameter freezing; isolates feature backbones during transfer learning. \\
+\bottomrule
+\end{tabularx}
+\caption{Summary of foundational PyTorch APIs mastered in Laboratory~01.}
+\label{tab:lab01_summary}
+\end{table}
+
+\subsection{Bridge to Laboratory 02}
+In Laboratory~01, we established the fundamental tensor mechanisms of deep learning, progressing from scalar regression to convolutional transfer learning. In \textbf{Laboratory~02}, we transition from continuous computer vision pixels to discrete natural language text. We will explore how subword tokenizers (Hugging Face \texttt{AutoTokenizer}) map text into discrete token IDs, examine the encoder-decoder architecture of \textbf{T5}, and construct the \textbf{Scaled Dot-Product Attention mechanism} ($QK^\top / \sqrt{d_k}$) from scratch.
+
+\end{document}

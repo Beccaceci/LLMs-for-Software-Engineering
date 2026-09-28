@@ -1,0 +1,50 @@
+\documentclass[../../main.tex]{subfiles}
+\begin{document}
+
+\chapter{Automated test generation and program repair}
+\label{ch:automated_test_generation_repair}
+
+\section{Chapter overview and learning outcomes}
+Automated verification is a cornerstone of reliable software engineering. This chapter contrasts classical algorithmic test generation with modern LLM-driven testing, formalizes the test oracle problem, and dissects Automated Program Repair (APR) pipelines from fault localization to patch validation.
+
+Upon completing this chapter, you will be able to:
+\begin{itemize}
+    \item Define code coverage criteria: statement coverage, branch coverage, and mutation score.
+    \item Contrast Search-Based Software Testing (e.g., EvoSuite) with generative LLM test generation.
+    \item Analyze the Test Oracle Problem: distinguishing meaningful assertion generation from trivial tautologies.
+    \item Calculate Spectrum-Based Fault Localization (SBFL) suspiciousness coefficients (Ochiai, Tarantula).
+    \item Design an LLM-driven Automated Program Repair (APR) workflow with differential validation.
+    \item Explain and diagnose the Patch Overfitting pathology in automated repair.
+\end{itemize}
+
+\section{The test oracle problem in LLM-generated suites}
+While traditional tools like EvoSuite excel at optimizing branch coverage, they struggle to infer expected semantic values, often generating empty assertions (\texttt{assertNotNull(x)}). Conversely, LLMs possess world knowledge of domain logic and can hypothesize realistic business assertions.
+
+\begin{definition}{The test oracle problem}{test_oracle}
+A test case consists of an input state $I$ and an oracle function $\Omega: \mathcal{O} \to \{\text{Pass}, \text{Fail}\}$ that determines whether program output $O = P(I)$ satisfies the intended specification. When the true specification is implicit, informal, or absent, generating an accurate oracle $\Omega$ without hallucinating incorrect behavior constitutes the \emph{Test Oracle Problem}.
+\end{definition}
+
+\begin{examinsight}[Exam highlight: patch overfitting in APR]
+A critical exam topic in Software Engineering with AI is \textbf{Patch Overfitting}.
+An automated tool or LLM generates a patch $\Delta P$ that passes all existing unit tests ($T_{\text{test}}$). However, the patch is incorrect because:
+\begin{itemize}
+    \item It hardcodes return values for specific test inputs (\emph{plausible but incorrect}).
+    \item It deletes critical functionality that tests failed to cover.
+    \item It alters edge-case behavior not exercised by the test suite.
+\end{itemize}
+Always emphasize that passing an existing test suite is a \emph{necessary but insufficient} condition for patch correctness.
+\end{examinsight}
+
+\section{Spectrum-based fault localization (SBFL)}
+Before an LLM can fix a bug in a 100,000-line codebase, the suspicious source lines must be localized.
+
+\begin{definition}{Ochiai suspiciousness coefficient}{ochiai_def}
+Let $e_f$ denote the number of failing tests executing statement $s$, $e_p$ denote passing tests executing $s$, and $n_f$ denote total failing tests in the test suite. The Ochiai metric computes suspiciousness as:
+\begin{equation}
+\label{eq:ochiai}
+\text{Suspiciousness}(s) = \frac{e_f}{\sqrt{n_f \cdot (e_f + e_p)}}.
+\end{equation}
+Statements with the highest suspiciousness score are prioritized in the LLM's repair prompt context.
+\end{definition}
+
+\end{document}

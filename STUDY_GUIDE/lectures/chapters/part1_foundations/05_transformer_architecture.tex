@@ -1,0 +1,55 @@
+\documentclass[../../main.tex]{subfiles}
+\begin{document}
+
+\chapter{The Transformer architecture and attention mechanisms}
+\label{ch:transformer_architecture}
+
+\section{Chapter overview and learning outcomes}
+In 2017, Vaswani et al. \citep{vaswani2017} introduced the Transformer in their seminal work \emph{"Attention Is All You Need"}, entirely discarding recurrence and convolutions in favor of self-attention mechanisms. This chapter presents an exhaustive architectural and mathematical breakdown of the Transformer model.
+
+Upon completing this chapter, you will be able to:
+\begin{itemize}
+    \item Explain the fundamental bottleneck of sequential recurrence and how self-attention achieves $O(1)$ sequential operations during training.
+    \item Derive Scaled Dot-Product Attention and explain the critical role of the $\sqrt{d_k}$ scaling factor.
+    \item Formulate Multi-Head Attention (MHA) and contrast it with Multi-Query (MQA) and Grouped-Query Attention (GQA).
+    \item Analyze Positional Encodings: absolute sinusoidal encodings, learned embeddings, and Rotary Position Embedding (RoPE).
+    \item Dissect the sublayer structures: Residual connections, Post-LN vs Pre-LN, RMSNorm, and Feed-Forward Networks (FFN / SwiGLU).
+    \item Compute the computational and memory complexity of self-attention ($O(T^2)$ vs $O(T)$).
+\end{itemize}
+
+\section{Scaled dot-product attention}
+Let $\mQ \in \R^{T \times d_k}$, $\mK \in \R^{S \times d_k}$, and $\mV \in \R^{S \times d_v}$ denote Query, Key, and Value matrices.
+
+\begin{definition}{Scaled dot-product attention}{scaled_dot_product}
+The attention function maps queries and key-value pairs to an output matrix via:
+\begin{equation}
+\label{eq:scaled_dot_product}
+\Attn{\mQ, \mK, \mV} = \softmax\left( \frac{\mQ \mK\trans}{\sqrt{d_k}} + \mat{M} \right) \mV,
+\end{equation}
+where $\mat{M} \in \{0, -\infty\}^{T \times S}$ is an optional causal mask matrix.
+\end{definition}
+
+\begin{examinsight}[Exam highlight: why scale by $\sqrt{d_k}$?]
+A quintessential oral exam question asks: \emph{"What is the exact mathematical justification for dividing $\mQ \mK\trans$ by $\sqrt{d_k}$?"}
+Assume components of $\vq$ and $\vk$ are independent random variables with mean $0$ and variance $1$. The dot product $\vq\trans \vk = \sum_{i=1}^{d_k} q_i k_i$ has mean $0$ and variance $\sum_{i=1}^{d_k} 1 = d_k$.
+For large $d_k$ (e.g., $d_k = 64$ or $128$), variance is large, pushing the dot products into regions where the $\softmax$ function has extremely small gradients (saturation). Dividing by $\sqrt{d_k}$ normalizes the variance back to $1$, preserving healthy gradient flow during backpropagation.
+\end{examinsight}
+
+\begin{intuition}[Attention as differentiable soft key-value retrieval]
+In computer systems, a hash table maps a discrete key to a unique value. Self-attention is a soft, differentiable generalisation: a query $\vq$ is compared against all keys $\vk_i$ via inner products. The resulting softmax weights dictate how much of each value vector $\vv_i$ is blended into the output representation.
+\end{intuition}
+
+\section{Multi-head attention and sublayer design}
+\begin{definition}{Multi-head attention (MHA)}{mha}
+Instead of performing a single attention function with $d_{\text{model}}$-dimensional queries, keys, and values, Multi-Head Attention projects them linearly $h$ times with different learned parameter matrices:
+\begin{equation}
+\MHA{\mQ, \mK, \mV} = \left[ \text{head}_1 \parallel \text{head}_2 \parallel \dots \parallel \text{head}_h \right] \mW^O,
+\end{equation}
+where $\text{head}_i = \Attn{\mQ \mW_i^Q, \mK \mW_i^K, \mV \mW_i^V}$, with $\mW_i^Q \in \R^{\dmodel \times \dk}$, $\mW_i^K \in \R^{\dmodel \times \dk}$, $\mW_i^V \in \R^{\dmodel \times \dv}$, and $\mW^O \in \R^{h \dv \times \dmodel}$.
+\end{definition}
+
+\begin{deepdive}[Vaswani et al. (2017) and modern Transformer variants]
+The original Transformer architecture \citep{vaswani2017} employed Post-LayerNorm and sinusoidal positional encodings. Modern LLM architectures (such as LLaMA, Mistral, and DeepSeek) have evolved to utilize Pre-LayerNorm with RMSNorm, Rotary Position Embeddings (RoPE), and SwiGLU activations, improving training stability across hundreds of billions of tokens.
+\end{deepdive}
+
+\end{document}

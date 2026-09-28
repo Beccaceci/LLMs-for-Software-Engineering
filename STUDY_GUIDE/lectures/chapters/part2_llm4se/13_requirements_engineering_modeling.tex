@@ -1,0 +1,45 @@
+\documentclass[../../main.tex]{subfiles}
+\begin{document}
+
+\chapter{Requirements engineering and system modeling}
+\label{ch:requirements_engineering_modeling}
+
+\section{Chapter overview and learning outcomes}
+Requirements Engineering (RE) is the initial and most error-critical phase of the software development lifecycle. Defects introduced during requirements elicitation cost up to 100 times more to fix if discovered in production. This chapter studies how Large Language Models assist in disambiguating natural language specifications, synthesizing formal specifications, generating UML models, and maintaining traceability matrices.
+
+Upon completing this chapter, you will be able to:
+\begin{itemize}
+    \item Structure informal stakeholder requirements into rigorous User Stories with Acceptance Criteria.
+    \item Classify and detect linguistic ambiguities, omissions, and contradictions in natural language specifications.
+    \item Translate informal requirements into formal temporal logic (Linear Temporal Logic / LTL).
+    \item Direct LLMs to generate structured UML models (Class diagrams, Sequence diagrams) via PlantUML and Mermaid.
+    \item Synthesize and validate Requirements Traceability Matrices (RTM) connecting requirements to code artifacts.
+\end{itemize}
+
+\section{Ambiguity detection and requirements formalization}
+Natural language requirements frequently suffer from syntactic and semantic ambiguities:
+\begin{itemize}
+    \item \textbf{Lexical Ambiguity}: Terms with multiple dictionary definitions.
+    \item \textbf{Syntactic Ambiguity}: Ambiguous modifier attachments (e.g., \emph{"The system shall display errors for authenticated users and administrators"}).
+    \item \textbf{Semantic Ambiguity}: Underspecified edge conditions, missing else-clauses, and vague qualifiers (\emph{"fast", "reliable", "user-friendly"}).
+\end{itemize}
+
+\begin{definition}{Translation to linear temporal logic (LTL)}{ltl_translation}
+Given a temporal requirement \emph{"Whenever a transaction request is received, the system shall either acknowledge it or issue an alert within 3 time steps"}, an LLM translates the statement into an LTL formula over atomic propositions $\{p, q, r\}$:
+\begin{equation}
+\label{eq:ltl_spec}
+\Box \left( p \implies \Diamond_{\le 3} (q \lor r) \right),
+\end{equation}
+where $\Box$ denotes "Always (Globally)" and $\Diamond$ denotes "Eventually (In the future)".
+\end{definition}
+
+\begin{examinsight}[Exam highlight: validating model-generated UML]
+When professors examine requirements modeling with LLMs, they emphasize that generated diagrams (in PlantUML or Mermaid) must satisfy structural consistency constraints:
+\begin{itemize}
+    \item In Class Diagrams: Checking for circular inheritance, invalid multiplicities, and unmapped foreign keys.
+    \item In Sequence Diagrams: Ensuring that every message invocation corresponds to an existing method signature in the target class.
+\end{itemize}
+An LLM can readily produce visually convincing diagrams that violate fundamental object-oriented encapsulation principles.
+\end{examinsight}
+
+\end{document}

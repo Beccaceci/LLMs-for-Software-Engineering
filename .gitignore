@@ -1,0 +1,71 @@
+# ==============================================================================
+# OS & Environment
+# ==============================================================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ==============================================================================
+# Large External Sources (>50MB Welch book, copyrighted Raschka epub, recordings)
+# ==============================================================================
+STUDY_GUIDE/sources/*.pdf
+STUDY_GUIDE/sources/*.epub
+STUDY_GUIDE/sources/*.m4a
+STUDY_GUIDE/sources/*.mp4
+STUDY_GUIDE/sources/*.zip
+past_exams_2025_2026.zip
+
+# ==============================================================================
+# LaTeX Auxiliary Files (Keeps compiled PDFs in lectures/, laboratories/, and exams/)
+# ==============================================================================
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.nav
+*.out
+*.run.xml
+*.snm
+*.synctex.gz
+*.toc
+*.vrb
+
+# Standalone subfile intermediate artifacts
+STUDY_GUIDE/lectures/chapters/*/*.aux
+STUDY_GUIDE/lectures/chapters/*/*.log
+STUDY_GUIDE/lectures/chapters/*/*.out
+STUDY_GUIDE/laboratories/chapters/*/*.aux
+STUDY_GUIDE/laboratories/chapters/*/*.log
+STUDY_GUIDE/laboratories/chapters/*/*.out
+
+# ==============================================================================
+# Python & Testing Cache
+# ==============================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# ==============================================================================
+# Temporary Editor & Agent Scratch Files
+# ==============================================================================
+LABS/.git_backup/
+.vscode/
+.idea/
+.system_generated/
+.agents/orchestrator_*
+.agents/teamwork_preview_*
+.agents/worker_*
+.agents/explorer_*
+.agents/spec_miner_*
+.agents/test_writer_*

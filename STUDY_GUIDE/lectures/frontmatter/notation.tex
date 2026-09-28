@@ -1,0 +1,87 @@
+\documentclass[../main.tex]{subfiles}
+\begin{document}
+
+\chapter*{Notation and conventions}
+\addcontentsline{toc}{chapter}{Notation and conventions}
+
+Throughout this study guide, we adopt consistent mathematical, algorithmic, and typographic conventions aligned with standard deep learning and software engineering literature.
+
+\section*{Linear algebra and tensor operations}
+\begin{table}[htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\textwidth}{llX}
+\toprule
+\textbf{Symbol} & \textbf{Type} & \textbf{Description} \\
+\midrule
+$x, y, z$ & Scalar & Real-valued scalars or scalar components ($x \in \R$). \\
+$\vx, \vy, \vh$ & Vector & Column vectors ($\vx \in \R^d$). Lowercase bold font. \\
+$\vx\trans$ & Transpose & Transpose of vector $\vx$ (row vector $\vx\trans \in \R^{1 \times d}$). \\
+$\mA, \mW, \mX$ & Matrix & Real matrices ($\mA \in \R^{m \times n}$). Uppercase bold font. \\
+$\mA_{i,j}$ or $a_{ij}$ & Scalar & Entry at row $i$ and column $j$ of matrix $\mA$. \\
+$\mI$ or $\mI_d$ & Matrix & Identity matrix of dimension $d \times d$. \\
+$\norm{\vx}_2$ or $\norm{\vx}$ & Scalar & Euclidean ($L_2$) norm of vector $\vx$, $\sqrt{\sum_i x_i^2}$. \\
+$\norm{\mA}_F$ & Scalar & Frobenius norm of matrix $\mA$, $\sqrt{\sum_{i,j} A_{i,j}^2}$. \\
+$\inner{\vu, \vv}$ or $\vu\trans \vv$ & Scalar & Standard dot (inner) product between vectors $\vu$ and $\vv$. \\
+$\odot$ & Operator & Element-wise (Hadamard) product between tensors of identical shape. \\
+$\otimes$ & Operator & Outer product or Kronecker tensor product. \\
+\bottomrule
+\end{tabularx}
+\caption{Linear algebra and tensor notation summary.}
+\label{tab:notation_linalg}
+\end{table}
+
+\section*{Probability and information theory}
+\begin{table}[htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\textwidth}{llX}
+\toprule
+\textbf{Symbol} & \textbf{Type} & \textbf{Description} \\
+\midrule
+$\Prob(A)$ & Scalar & Probability of event $A$ ($\Prob: \mathcal{F} \to [0, 1]$). \\
+$\Prob(X = x)$ & Scalar & Probability mass function for discrete random variable $X$. \\
+$\Prob(Y \mid X)$ & Distribution & Conditional probability distribution of $Y$ given $X$. \\
+$\E_{x \sim P}[f(x)]$ & Scalar & Expected value of function $f(x)$ under distribution $P$. \\
+$\Var(X)$ & Scalar & Variance of random variable $X$, $\E[(X - \E[X])^2]$. \\
+$\Entropy(P)$ & Scalar & Shannon entropy of distribution $P$, $-\sum_x P(x) \log P(x)$. \\
+$\CE{P}{Q}$ & Scalar & Cross-entropy between target distribution $P$ and model $Q$. \\
+$\KL{P}{Q}$ & Scalar & Kullback--Leibler (KL) divergence from $Q$ to $P$. \\
+$\PPL(W)$ & Scalar & Perplexity of word sequence $W$ under a language model. \\
+\bottomrule
+\end{tabularx}
+\caption{Probability and information theoretic notation.}
+\label{tab:notation_prob}
+\end{table}
+
+\section*{Neural networks, transformers, and software engineering}
+\begin{table}[htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\textwidth}{llX}
+\toprule
+\textbf{Symbol} & \textbf{Type} & \textbf{Description} \\
+\midrule
+$\vocab$ & Set & Discrete vocabulary of tokens; $|\vocab| = V$ denotes vocabulary size. \\
+$T$ or $\seqlen$ & Integer & Sequence length (number of input or output tokens). \\
+$\dmodel$ & Integer & Hidden embedding dimensionality of the Transformer model. \\
+$\dff$ & Integer & Dimensionality of the intermediate Feed-Forward Network layer. \\
+$\dk, \dv$ & Integer & Dimensionality of query/key and value projections per head. \\
+$h$ & Integer & Number of parallel attention heads ($h \cdot \dk = \dmodel$). \\
+$\sigma(z)$ & Function & Standard logistic sigmoid function: $\sigma(z) = \frac{1}{1 + e^{-z}}$. \\
+$\softmax(\vz)$ & Function & Softmax normalized exponential vector operator. \\
+$\relu(z)$ & Function & Rectified Linear Unit activation: $\max(0, z)$. \\
+$\gelu(z)$ & Function & Gaussian Error Linear Unit activation. \\
+$\Loss$ or $\L$ & Scalar & Scalar objective / loss function minimized during optimization. \\
+$\PassAtK{k}$ & Metric & Probability that at least one of $k$ generated code samples passes unit tests. \\
+$\CodeBLEU$ & Metric & Multi-aspect code evaluation metric combining BLEU, AST, and data flow. \\
+\bottomrule
+\end{tabularx}
+\caption{Model architecture parameters and SE metrics.}
+\label{tab:notation_models}
+\end{table}
+
+\end{document}

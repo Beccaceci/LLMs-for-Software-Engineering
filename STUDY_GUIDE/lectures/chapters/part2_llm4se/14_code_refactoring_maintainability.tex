@@ -1,0 +1,49 @@
+\documentclass[../../main.tex]{subfiles}
+\begin{document}
+
+\chapter{Code refactoring, maintainability, and technical debt}
+\label{ch:code_refactoring_maintainability}
+
+\section{Chapter overview and learning outcomes}
+Refactoring improves the internal quality and maintainability of code without altering its external observable behavior. This chapter investigates how Large Language Models detect architectural code smells, perform semantic-preserving transformations, and reduce technical debt while respecting formal maintainability metrics.
+
+Upon completing this chapter, you will be able to:
+\begin{itemize}
+    \item Identify classic Fowler code smells (God Class, Long Method, Feature Envy, Shotgun Surgery).
+    \item Compute formal software metrics: McCabe's Cyclomatic Complexity, Cognitive Complexity, and the Maintainability Index (MI).
+    \item Formulate prompt chains for automated refactoring transformations (Extract Method, Introduce Parameter Object).
+    \item Establish semantic equivalence verification via regression suites and differential testing.
+    \item Quantify technical debt reduction achieved by AI-assisted code transformations.
+\end{itemize}
+
+\section{Software complexity metrics}
+Before and after applying an AI refactoring step, engineers must verify that structural complexity metrics decrease.
+
+\begin{definition}{McCabe cyclomatic complexity}{cyclomatic_complexity}
+Given the Control Flow Graph (CFG) of a program with $E$ directed edges, $N$ nodes, and $P$ connected components, McCabe's Cyclomatic Complexity $M$ is defined as:
+\begin{equation}
+\label{eq:cyclomatic}
+M = E - N + 2 P.
+\end{equation}
+For a single function ($P=1$), $M$ equals the number of linearly independent paths through the code.
+\end{definition}
+
+\begin{definition}{Maintainability index (MI)}{maintainability_index}
+The classic Maintainability Index combines Halstead Volume $V$, Cyclomatic Complexity $G$, lines of code $\text{LOC}$, and comment ratio $\text{CM}$:
+\begin{equation}
+\text{MI} = 171 - 5.2 \ln V - 0.23 G - 16.2 \ln(\text{LOC}) + 50 \sin\left(\sqrt{2.4 \cdot \text{CM}}\right).
+\end{equation}
+Values above $85$ denote high maintainability; values below $65$ signify severe maintenance risks.
+\end{definition}
+
+\begin{examinsight}[Exam focus: behavioral equivalence proofs]
+A standard exam question queries: \emph{"How can we guarantee that an LLM-refactored method has not altered program behavior?"}
+Unlike formal refactoring engines with AST rewriting rules, LLMs are stochastic and can silently modify operator precedence or variable state. To prove equivalence:
+\begin{enumerate}
+    \item Run mutation-tested regression test suites before and after refactoring.
+    \item Perform differential fuzzing on randomized inputs.
+    \item When feasible, employ bounded model checking or SMT solvers (e.g., Z3) to verify that outputs coincide for all symbolic inputs.
+\end{enumerate}
+\end{examinsight}
+
+\end{document}

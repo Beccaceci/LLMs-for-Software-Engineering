@@ -1,0 +1,52 @@
+\documentclass[../../main.tex]{subfiles}
+\begin{document}
+
+\chapter{Safety, bias, ethics, and intellectual property in AI-assisted SE}
+\label{ch:safety_bias_ethics_ip}
+
+\section{Chapter overview and learning outcomes}
+Integrating generative AI directly into the software engineering workflow introduces critical risks regarding security, software supply chain integrity, copyright law, and environmental sustainability. This concluding chapter investigates the security vulnerabilities prevalent in AI-synthesized code, analyzes hallucinated packages, unpacks open-source licensing conflicts, and considers the ethical evolution of software engineering.
+
+Upon completing this chapter, you will be able to:
+\begin{itemize}
+    \item Identify the Common Weakness Enumeration (CWE) vulnerabilities frequently produced by code LLMs.
+    \item Explain the mechanics of package hallucination and typosquatting supply chain attacks.
+    \item Analyze intellectual property risks, copyleft (GPL) contamination, and copyright legal precedents.
+    \item Evaluate the carbon and energy footprint of training and serving foundation code models.
+    \item Formulate governance policies for safe deployment of AI assistants in enterprise software engineering.
+\end{itemize}
+
+\section{Security vulnerabilities in synthesized code}
+Because language models optimize maximum likelihood over public code (much of which is legacy or unvetted), they frequently reproduce classic security flaws.
+
+\begin{definition}{Common Weakness Enumeration (CWE) in AI code}{cwe_vulnerabilities}
+Empirical studies reveal high prevalence of specific CWEs in LLM outputs:
+\begin{itemize}
+    \item \textbf{CWE-89 (SQL Injection)}: Concatenating unescaped user input into database queries.
+    \item \textbf{CWE-79 (Cross-Site Scripting / XSS)}: Rendering unvalidated input in web responses.
+    \item \textbf{CWE-798 (Hardcoded Credentials)}: Emitting sample API keys, passwords, or cryptographic secrets.
+    \item \textbf{CWE-20 (Improper Input Validation)}: Missing bounds checks and type validations.
+\end{itemize}
+\end{definition}
+
+\begin{examinsight}[Exam highlight: the slopsquatting supply chain attack]
+A cutting-edge exam question addresses the \textbf{Package Hallucination / Slopsquatting} vulnerability:
+\begin{enumerate}
+    \item An LLM generating code imports a non-existent package (e.g., \texttt{import flask\_security\_helper}).
+    \item Developers, trusting the output, run \texttt{pip install flask\_security\_helper}.
+    \item Attackers monitor LLM hallucinations, register the hallucinated package name on PyPI or npm, and publish malware.
+    \item Any developer or CI/CD pipeline executing the code automatically downloads and executes the attacker's payload.
+\end{enumerate}
+Defense requires strict package lockfile verification and internal repository proxy gating.
+\end{examinsight}
+
+\section{Intellectual property and licensing compliance}
+\begin{definition}{Copyleft license contamination}{copyleft_contamination}
+Under licenses such as the GNU General Public License (GPLv3), derived works must be distributed under identical copyleft terms. If an LLM memorizes and reproduces verbatim snippets from GPL-licensed repositories inside proprietary commercial software, it creates legal risks of \emph{license contamination}, potentially obligating the proprietary codebase to open its source.
+\end{definition}
+
+\begin{deepdive}[The future of software engineering with AI]
+AI assistants do not replace the software engineering discipline; they elevate it. Routine syntax generation and boilerplate code are commoditized, shifting developer focus toward high-level architectural design, formal verification, requirements validation, and system reliability. Software engineers of the future act as specification architects and verification overseers.
+\end{deepdive}
+
+\end{document}

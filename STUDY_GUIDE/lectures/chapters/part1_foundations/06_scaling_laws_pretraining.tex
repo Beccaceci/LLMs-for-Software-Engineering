@@ -1,0 +1,55 @@
+\documentclass[../../main.tex]{subfiles}
+\begin{document}
+
+\chapter{LLM pre-training, scaling laws, and history}
+\label{ch:scaling_laws_pretraining}
+
+\section{Chapter overview and learning outcomes}
+This chapter analyzes the pre-training paradigm that transforms uninitialized neural networks into foundation models. We review the historical evolution of Transformer architectures, dissect self-supervised objectives, examine subword tokenization algorithms, and formulate empirical scaling laws.
+
+Upon completing this chapter, you will be able to:
+\begin{itemize}
+    \item Trace the historical fork: Encoder-only (BERT \citep{devlin2019}), Encoder-Decoder (T5), and Decoder-only (GPT-2/3 \citep{radford2019,brown2020}).
+    \item Formalize pre-training objectives: Causal Language Modeling (CLM), Masked Language Modeling (MLM), and Fill-in-the-Middle (FIM).
+    \item Explain the Byte-Pair Encoding (BPE) algorithm and vocabulary construction.
+    \item Formulate the empirical scaling laws of Kaplan et al. \citep{kaplan2020}.
+    \item State the Chinchilla compute-optimal frontier derived by Hoffmann et al. \citep{hoffmann2022} ($N \propto \sqrt{C}, D \propto \sqrt{C}$).
+    \item Critically evaluate claims regarding "emergent abilities" versus smooth non-linear metric effects.
+\end{itemize}
+
+\section{Self-supervised pre-training objectives}
+Pre-training trains a Transformer on massive corpora (trillions of tokens) without human labels. In Causal Language Modeling (CLM), the network minimizes negative log-likelihood:
+\begin{equation}
+\Loss_{\text{CLM}}(\theta) = -\frac{1}{T} \sum_{t=1}^T \log \Prob_\theta(w_t \mid w_{<t}).
+\end{equation}
+
+\begin{definition}{Fill-in-the-Middle (FIM) objective}{fim_objective}
+For code generation, models often need to infill code between a prefix and suffix. The document $x$ is partitioned into Prefix ($P$), Middle ($M$), and Suffix ($S$), and rearranged into format:
+\begin{equation}
+x_{\text{FIM}} = \langle\text{PRE}\rangle \, P \, \langle\text{SUF}\rangle \, S \, \langle\text{MID}\rangle \, M,
+\end{equation}
+enabling the standard causal decoder to predict $M$ conditioned on both $P$ and $S$.
+\end{definition}
+
+\section{Empirical scaling laws: Kaplan vs Chinchilla}
+\begin{theorem}{Compute-optimal scaling (Chinchilla)}{chinchilla_frontier}
+Given a compute budget $C \approx 6 N D$ FLOPs (for a standard Transformer forward-backward pass), Hoffmann et al. \citep{hoffmann2022} proved that to minimize cross-entropy loss $L(N, D)$, parameters $N$ and tokens $D$ should scale in equal proportion:
+\begin{equation}
+\label{eq:chinchilla_opt}
+N_{\text{opt}} \propto C^{a}, \quad D_{\text{opt}} \propto C^{b}, \quad \text{with } a \approx b \approx 0.50.
+\end{equation}
+\end{theorem}
+
+\begin{examinsight}[Exam comparison: Kaplan (2020) vs Hoffmann (2022)]
+Students frequently face exam questions contrasting the OpenAI scaling laws (Kaplan et al., 2020) with DeepMind's Chinchilla findings (Hoffmann et al., 2022).
+\begin{itemize}
+    \item \textbf{Kaplan et al. (2020)}: Concluded that model size should scale much faster than dataset size ($N \propto C^{0.73}, D \propto C^{0.27}$). This led to over-parameterized models like GPT-3 (175B parameters trained on only 300B tokens).
+    \item \textbf{Hoffmann et al. (2022)}: Corrected the learning rate schedule analysis, demonstrating that $N$ and $D$ should scale \textbf{equally} ($N \propto \sqrt{C}, D \propto \sqrt{C}$). A compute-optimal 70B model requires $\approx 1.4$ trillion tokens.
+\end{itemize}
+\end{examinsight}
+
+\begin{deepdive}[From GPT-3 to modern foundation models]
+Brown et al. \citep{brown2020} demonstrated that scaling pure autoregressive models yields striking few-shot and in-context learning capabilities without parameter updates. Modern open-weights foundation models adhere to Chinchilla scaling principles, training models for many more tokens beyond the compute-optimal frontier to optimize downstream inference efficiency.
+\end{deepdive}
+
+\end{document}
