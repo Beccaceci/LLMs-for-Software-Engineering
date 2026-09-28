@@ -135,23 +135,16 @@ The course bridges the gap between machine learning foundations and state-of-the
 │       ├── exam_2026-02-19/            # Winter Session II (23 pages PDF + TeX)
 │       ├── exam_2026-06-19/            # Summer Session I (22 pages PDF + TeX)
 │       └── exam_2026-08-31/            # Fall Session (26 pages PDF + TeX)
-├── STUDY_GUIDE/                        # Publication-grade LaTeX study guide sources
-│   ├── lectures/                       # Volume I: Theoretical Foundations (main.pdf - 96 pages)
-│   │   ├── chapters/                   # Modular syllabus chapters
-│   │   ├── frontmatter/                # Titlepage, preface, and notation index
-│   │   └── main.tex                    # Master LaTeX root document
-│   ├── laboratories/                   # Volume II: Laboratory Practicum (labs.pdf - 27 pages)
-│   │   ├── chapters/                   # Lab walkthroughs and exercises
-│   │   └── labs.tex                    # Laboratory LaTeX root document
-│   ├── shared/                         # Shared macros, styling (macros.sty), and references.bib
-│   └── tests/                          # 86 automated structural, syntax, and E2E compiler tests
-├── LABS/                               # 10 practical laboratory notebooks and exercises
-│   ├── lab01/                          # PyTorch Foundations & Autograd
-│   ├── lab02/                          # Word Embeddings & Semantic Vector Spaces
-│   ├── ...                             # Recurrent Models, Transformers, PEFT/LoRA, RAG
-│   └── lab10/                          # Multi-Agent Systems & Evaluation
-├── SLIDES/                             # Official lecture slides (01 to 04)
-└── TRANSCRIPTIONS/                     # Verbatim Whisper transcriptions of recorded lectures
+└── STUDY_GUIDE/                        # Publication-grade LaTeX study guide sources
+    ├── lectures/                       # Volume I: Theoretical Foundations (main.pdf - 96 pages)
+    │   ├── chapters/                   # Modular syllabus chapters
+    │   ├── frontmatter/                # Titlepage, preface, and notation index
+    │   └── main.tex                    # Master LaTeX root document
+    ├── laboratories/                   # Volume II: Laboratory Practicum (labs.pdf - 27 pages)
+    │   ├── chapters/                   # Lab walkthroughs and exercises
+    │   └── labs.tex                    # Laboratory LaTeX root document
+    ├── shared/                         # Shared macros, styling (macros.sty), and references.bib
+    └── tests/                          # 86 automated structural, syntax, and E2E compiler tests
 ```
 
 ---

@@ -57,15 +57,16 @@ htmlcov/
 .mypy_cache/
 
 # ==============================================================================
+# Course Materials Excluded from Repository (Only Study Guide & Exams published)
+# ==============================================================================
+LABS/
+SLIDES/
+TRANSCRIPTIONS/
+.agents/
+
+# ==============================================================================
 # Temporary Editor & Agent Scratch Files
 # ==============================================================================
-LABS/.git_backup/
 .vscode/
 .idea/
 .system_generated/
-.agents/orchestrator_*
-.agents/teamwork_preview_*
-.agents/worker_*
-.agents/explorer_*
-.agents/spec_miner_*
-.agents/test_writer_*
