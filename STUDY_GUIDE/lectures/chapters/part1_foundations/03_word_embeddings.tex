@@ -72,8 +72,222 @@ Under one-hot encoding, every pair of words is situated at exactly the same geom
 Syntactically and semantically related words are as completely separated as totally unrelated concepts. One-hot vectors form an orthogonal coordinate frame that cannot capture synonymy, hierarchy, or grammatical relatedness.
 \end{intuition}
 
+Figure~\ref{fig:onehot_orthogonality_geometry} provides a visual and matrix-algebraic demonstration of this geometric collapse.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[>=Stealth, scale=0.92, every node/.style={transform shape}]
+    % --------------------------------------------------------------------------
+    % LEFT PANEL: 3D Standard Basis Geometry
+    % --------------------------------------------------------------------------
+    \begin{scope}[shift={(0,0)}]
+        \coordinate (O) at (0,0);
+        \coordinate (E1) at (3.0, 0);          % x1-axis (cat)
+        \coordinate (E2) at (0, 3.0);          % x2-axis (dog)
+        \coordinate (E3) at (-1.8, -1.4);      % x3-axis (automobile)
+
+        % Shaded right triangles
+        \fill[politoNavy!10] (O) -- (E1) -- (E2) -- cycle;
+        \fill[steelBlue!8] (O) -- (E1) -- (E3) -- cycle;
+
+        % Axes extensions
+        \draw[->, gray!60, line width=0.8pt] (O) -- (3.6, 0) node[right, font=\small] {$x_1$ (\texttt{"cat"})};
+        \draw[->, gray!60, line width=0.8pt] (O) -- (0, 3.6) node[above, font=\small] {$x_2$ (\texttt{"dog"})};
+        \draw[->, gray!60, line width=0.8pt] (O) -- (-2.3, -1.8) node[below left, font=\small] {$x_3$ (\texttt{"automobile"})};
+
+        % Basis vectors
+        \draw[->, line width=1.8pt, color=politoNavy] (O) -- (E1) node[midway, below=3pt, font=\footnotesize] {$\|\ve_1\|_2 = 1$};
+        \draw[->, line width=1.8pt, color=politoNavy] (O) -- (E2) node[midway, left=3pt, font=\footnotesize] {$\|\ve_2\|_2 = 1$};
+        \draw[->, line width=1.8pt, color=steelBlue] (O) -- (E3) node[midway, above left=2pt, font=\footnotesize] {$\|\ve_3\|_2 = 1$};
+
+        % Vector endpoints
+        \fill[politoNavy] (E1) circle (2.2pt) node[below right, font=\footnotesize] {$\ve_1 = [1,0,0]^\top$};
+        \fill[politoNavy] (E2) circle (2.2pt) node[above left, font=\footnotesize] {$\ve_2 = [0,1,0]^\top$};
+        \fill[steelBlue] (E3) circle (2.2pt) node[below left, font=\footnotesize] {$\ve_3 = [0,0,1]^\top$};
+
+        % Orthogonality angle marker (Right angle at origin for E1, E2)
+        \draw[crimsonRed, thick] (0.35, 0) -- (0.35, 0.35) -- (0, 0.35);
+        \node[crimsonRed, font=\footnotesize, fill=white, inner sep=1pt] at (1.15, 0.55) {$\theta_{12} = 90^\circ \implies \cos = 0$};
+
+        % Orthogonality angle marker for E1, E3
+        \draw[steelBlue, thin] (0.3, 0) -- ($(0.3,0) + (-0.22, -0.17)$) -- (-0.22, -0.17);
+
+        % Euclidean Distance Chord: E1 to E2 (Cat to Dog)
+        \draw[dashed, line width=1.5pt, crimsonRed] (E1) -- (E2)
+            node[midway, above right=2pt, font=\footnotesize, fill=white, inner sep=1.5pt]
+            {$d_E(\ve_1, \ve_2) = \sqrt{1^2 + (-1)^2} = \sqrt{2} \approx 1.414$};
+
+        % Euclidean Distance Chord: E1 to E3 (Cat to Automobile)
+        \draw[dotted, line width=1.2pt, steelBlue] (E1) -- (E3)
+            node[midway, below=3pt, font=\footnotesize, fill=white, inner sep=1.5pt]
+            {$d_E(\ve_1, \ve_3) = \sqrt{2}$};
+
+        \node[font=\bfseries\small, color=politoNavy] at (0.8, -2.2) {(a) 3D standard basis orthogonal simplex};
+    \end{scope}
+
+    % --------------------------------------------------------------------------
+    % RIGHT PANEL: Matrix Collapse & Failure Mode Callout
+    % --------------------------------------------------------------------------
+    \begin{scope}[shift={(6.3, 0.2)}]
+        \node[draw=politoNavy!30, fill=gray!3, rounded corners=4pt, inner sep=8pt, text width=6.6cm, align=left] at (0, 0.8) {
+            {\bfseries\color{politoNavy} Pairwise metric equality matrices:}\\[4pt]
+            \footnotesize
+            $\bullet$ \textbf{Cosine similarity matrix} (Gramian $\mE^\top \mE = \mI_V$):
+            \[
+            \mS_{\cos} = \begin{pmatrix}
+            & \text{\scriptsize cat} & \text{\scriptsize dog} & \text{\scriptsize car} \\
+            \text{\scriptsize cat} & 1 & \mathbf{0} & \mathbf{0} \\
+            \text{\scriptsize dog} & \mathbf{0} & 1 & \mathbf{0} \\
+            \text{\scriptsize car} & \mathbf{0} & \mathbf{0} & 1
+            \end{pmatrix}
+            \]
+            $\bullet$ \textbf{Euclidean distance matrix} ($\mD_{ij} = \sqrt{2}(1 - \delta_{ij})$):
+            \[
+            \mD_{L_2} = \begin{pmatrix}
+            & \text{\scriptsize cat} & \text{\scriptsize dog} & \text{\scriptsize car} \\
+            \text{\scriptsize cat} & 0 & \boldsymbol{\sqrt{2}} & \boldsymbol{\sqrt{2}} \\
+            \text{\scriptsize dog} & \boldsymbol{\sqrt{2}} & 0 & \boldsymbol{\sqrt{2}} \\
+            \text{\scriptsize car} & \boldsymbol{\sqrt{2}} & \boldsymbol{\sqrt{2}} & 0
+            \end{pmatrix}
+            \]
+            \vspace{2pt}\hrule\vspace{4pt}
+            {\bfseries\color{crimsonRed} The geometric pathology:}\\
+            $\operatorname{dist}(\text{\texttt{"cat"}}, \text{\texttt{"dog"}}) = \operatorname{dist}(\text{\texttt{"cat"}}, \text{\texttt{"car"}}) = \sqrt{2}$\\[2pt]
+            $\cos(\text{\texttt{"cat"}}, \text{\texttt{"dog"}}) = \cos(\text{\texttt{"cat"}}, \text{\texttt{"car"}}) = 0$\\[3pt]
+            \textcolor{crimsonRed}{\bfseries All tokens are equidistant and mutually perpendicular, completely destroying semantic metric topology.}
+        };
+        \node[font=\bfseries\small, color=politoNavy] at (0, -2.4) {(b) Semantic metric collapse};
+    \end{scope}
+\end{tikzpicture}
+\caption{Visual proof of pairwise orthogonality and equidistance in one-hot vector representations. (a) In $V$-dimensional Euclidean space, each word is an orthogonal standard basis vector of unit norm ($\|\ve_i\|_2 = 1$). By the Pythagorean theorem, every distinct pair forms a right isosceles triangle with origin $\mathbf{0}$, yielding an identical Euclidean distance of $\sqrt{1^2 + 1^2} = \sqrt{2}$ and an inner product of $0$ ($\theta = 90^\circ$). (b) The resulting Gramian matrix is the identity $\mI_V$, treating related concepts like \texttt{"cat"} and \texttt{"dog"} with the exact same geometric distance as totally unrelated concepts like \texttt{"cat"} and \texttt{"automobile"}.}
+\label{fig:onehot_orthogonality_geometry}
+\end{figure}
+
+\subsection{Theoretical and practical implications: why one-hot equidistance cripples learning}
+\label{subsec:onehot_equidistance_implications}
+
+The pairwise orthogonality ($\cos(\ve_i, \ve_j) = 0$) and uniform Euclidean distance ($L_2(\ve_i, \ve_j) = \sqrt{2}$) demonstrated in Figure~\ref{fig:onehot_orthogonality_geometry} are not merely abstract geometric curiosities. They constitute a foundational mathematical failure mode that cripples both statistical inference and gradient-based neural learning. Below, we formalize the five primary dimensions of this breakdown.
+
+\subsubsection{1. Metric space collapse and topological blindness}
+In metric geometry, a meaningful representation space $(\mathcal{X}, d)$ should endow semantically related objects with a topological neighborhood structure where closeness in the metric space reflects functional similarity:
+\begin{equation}
+\label{eq:neighborhood_property}
+d(\vx_a, \vx_b) < d(\vx_a, \vx_c) \iff \text{similarity}(w_a, w_b) > \text{similarity}(w_a, w_c).
+\end{equation}
+Under one-hot encoding, however, the induced metric space $(\mathcal{W}, d_E)$ on the vocabulary is strictly homeomorphic to a \emph{discrete metric space}:
+\begin{equation}
+\label{eq:discrete_metric}
+d_E(\ve_i, \ve_j) = \sqrt{2}\,(1 - \delta_{ij}) = \begin{cases}
+0 & \text{if } i = j, \\
+\sqrt{2} & \text{if } i \ne j.
+\end{cases}
+\end{equation}
+In a discrete metric space, the open metric ball of radius $r$ centered at word $\ve_i$, defined as $B_r(\ve_i) = \{\ve \in \mathcal{W} \mid d_E(\ve, \ve_i) < r\}$, behaves degenerately:
+\begin{equation}
+\label{eq:open_ball_collapse}
+B_r(\ve_i) = \begin{cases}
+\emptyset & \text{if } r \le 0, \\
+\{\ve_i\} & \text{if } 0 < r \le \sqrt{2}, \\
+\mathcal{W} & \text{if } r > \sqrt{2}.
+\end{cases}
+\end{equation}
+There is no intermediate radius $r$ that groups related concepts into a local neighborhood. The representation space is topologically flat and blind: \texttt{"cat"} is geometrically as close to \texttt{"dog"} as it is to \texttt{"automobile"}, \texttt{"compiler"}, or \texttt{"banana"}. Any algorithm that relies on distance metrics, clustering (e.g., $k$-means), kernel density estimation, or continuous topological manifolds is fundamentally paralyzed.
+
+\subsubsection{2. The gradient isolation bottleneck: zero statistical parameter sharing}
+The most debilitating consequence for deep learning occurs during backpropagation. Consider a standard neural network layer where the input token $w_i$ (represented as one-hot vector $\ve_i \in \{0, 1\}^V$) is projected into a hidden embedding layer $\vh \in \R^d$ via a weight matrix $\mW_{\text{in}} \in \R^{V \times d}$:
+\begin{equation}
+\label{eq:input_projection_dense}
+\vh = \mW_{\text{in}}^\top \ve_i = \vw_i \in \R^d,
+\end{equation}
+where $\vw_i \in \R^d$ denotes the $i$-th row of $\mW_{\text{in}}$.
+
+Let $\Loss$ be a scalar objective function (such as cross-entropy loss) evaluated downstream. By the chain rule of matrix calculus, the gradient of the loss with respect to the input weight matrix $\mW_{\text{in}}$ is the outer product of the one-hot input vector and the upstream error gradient:
+\begin{equation}
+\label{eq:gradient_outer_product}
+\frac{\partial \Loss}{\partial \mW_{\text{in}}} = \ve_i \left( \frac{\partial \Loss}{\partial \vh} \right)^\top \in \R^{V \times d}.
+\end{equation}
+Expanding this outer product row by row for every index $k \in \{1, \dots, V\}$:
+\begin{equation}
+\label{eq:gradient_row_isolation}
+\left[ \frac{\partial \Loss}{\partial \mW_{\text{in}}} \right]_{k, :} = e_{ik} \left( \frac{\partial \Loss}{\partial \vh} \right)^\top = \begin{cases}
+\left( \frac{\partial \Loss}{\partial \vh} \right)^\top & \text{if } k = i, \\
+\mathbf{0}_{1 \times d} & \text{if } k \ne i.
+\end{cases}
+\end{equation}
+Under standard gradient descent with learning rate $\eta > 0$, the parameter update $\Delta \mW_{\text{in}} = -\eta \frac{\partial \Loss}{\partial \mW_{\text{in}}}$ yields:
+\begin{equation}
+\label{eq:weight_update_isolation}
+\Delta \vw_k = \begin{cases}
+-\eta \left( \frac{\partial \Loss}{\partial \vh} \right)^\top & \text{for } k = i, \\
+\mathbf{0}_{1 \times d} & \text{for all } k \ne i.
+\end{cases}
+\end{equation}
+\textbf{The zero-transfer pathology}:
+Equations~\eqref{eq:gradient_row_isolation} and \eqref{eq:weight_update_isolation} reveal an inescapable analytical limitation: the gradient update affects \emph{strictly and exclusively} the row corresponding to the active token $w_i$. All remaining $V-1$ rows receive an analytical gradient of exactly zero.
+
+Consequently, there is \textbf{zero statistical parameter sharing}. If a model is trained on a million sentences containing the word \texttt{"dog"} (e.g., \textit{``The dog ran across the yard''}), the parameter row $\vw_{\text{dog}}$ will be thoroughly optimized. However, the row for the exact synonym \texttt{"hound"} or \texttt{"canine"} will not receive a single infinitesimal gradient update. When the model encounters \texttt{"hound"} at inference time, it treats it with total amnesia as an unfamiliar, unoptimized token. To learn that \texttt{"hound"} behaves similarly to \texttt{"dog"}, the training corpus must contain an equally massive number of sentences explicitly containing \texttt{"hound"}. This creates an immense sample complexity bottleneck that renders training on rare or long-tail words impossible.
+
+\subsubsection{3. Ambient dimension explosion and absence of continuous manifolds}
+The $V$ standard basis vectors $\{\ve_1, \dots, \ve_V\}$ form the vertices of the standard $(V-1)$-simplex:
+\begin{equation}
+\label{eq:standard_simplex}
+\Delta^{V-1} = \left\{ \vx \in \R^V \;\middle|\; \sum_{i=1}^V x_i = 1, \; x_i \ge 0 \right\}.
+\end{equation}
+Every vocabulary item resides exclusively on an extreme vertex of this simplex. Natural language, however, is fundamentally compositional and continuous: semantic concepts lie on low-dimensional, smooth sub-manifolds $\mathcal{M} \subset \R^d$ where $d \ll V$ (typically $d \sim 10^2\text{--}10^3$ while $V \sim 10^5\text{--}10^7$).
+
+In one-hot space, no continuous manifold exists:
+\begin{itemize}
+    \item \textbf{Invalidity of interpolation}: A linear combination between two words $\vx_{\text{mix}} = \frac{1}{2}(\ve_1 + \ve_2) = [0.5, 0.5, 0, \dots, 0]^\top$ lies in the interior of the simplex and has no symbolic interpretation. Moreover, its Euclidean norm contracts to $\norm{\vx_{\text{mix}}}_2 = \sqrt{0.5^2 + 0.5^2} = \frac{1}{\sqrt{2}} \approx 0.707$, distorting its distance to all other basis vectors ($d_E(\vx_{\text{mix}}, \ve_3) = \sqrt{0.5^2 + 0.5^2 + 1^2} = \sqrt{1.5} \approx 1.22$).
+    \item \textbf{Impossibility of relational vector analogies}: Semantic algebra, such as the classic analogy $\vv_{\text{king}} - \vv_{\text{man}} + \vv_{\text{woman}} \approx \vv_{\text{queen}}$, requires continuous directional vectors that capture semantic shifts (e.g., gender or tense). Under one-hot representations:
+    \[
+    \ve_{\text{king}} - \ve_{\text{man}} + \ve_{\text{woman}} = [1, -1, 1, 0, \dots, 0]^\top,
+    \]
+    which possesses an $L_2$ distance of $\sqrt{1^2 + (-1)^2 + 1^2 + 1^2} = 2$ to $\ve_{\text{queen}}$ and to every other unrelated word in the vocabulary, destroying all linear relational structure.
+\end{itemize}
+
+\subsubsection{4. Computational and memory inefficiencies}
+From a systems engineering perspective, one-hot vectors introduce staggering memory and computation waste:
+\begin{itemize}
+    \item \textbf{VRAM memory blowout}: For a batch of $B = 64$ sequences of length $T = 512$ with vocabulary $V = 100{,}000$, storing the input tensor $\mX \in \{0, 1\}^{B \times T \times V}$ in standard 32-bit floating-point format requires:
+    \begin{equation}
+    \label{eq:vram_blowout}
+    \text{Memory} = 64 \times 512 \times 100{,}000 \times 4 \text{ bytes} \approx 1.31 \times 10^{10} \text{ bytes} \approx 13.11 \text{ GB},
+    \end{equation}
+    consuming a significant fraction of an enterprise GPU's memory just to store sparse zeros before executing a single matrix multiplication!
+    \item \textbf{FLOP waste}: Multiplying $\mW_{\text{in}}^\top \ve_i$ involves $V \cdot d$ multiplications and $(V-1) \cdot d$ additions. Because $V-1$ elements of $\ve_i$ are identically zero:
+    \begin{equation}
+    \label{eq:flop_waste}
+    \sum_{k=1}^V W_{kj} e_{ik} = W_{ij} \cdot 1 + \sum_{k \ne i} W_{kj} \cdot 0 = W_{ij}.
+    \end{equation}
+    More than $99.999\%$ of the arithmetic operations perform multiplications by zero and additions of zero. While practical deep learning frameworks bypass this via integer indexing ($\texttt{nn.Embedding}(V, d)$), the theoretical representation itself remains mathematically degenerate.
+\end{itemize}
+
+\subsubsection{5. The software engineering dimension: code identifier polymorphism and syntactic equidistance}
+In Software Engineering (LLM4SE), the equidistance pathology becomes even more catastrophic due to the nature of source code:
+\begin{itemize}
+    \item \textbf{Identifier naming polymorphism}: In real-world software systems, developers express identical conceptual entities through varying naming conventions across libraries and languages:
+    \begin{align*}
+    &\texttt{"user\_id"} \quad (\text{snake\_case}), \qquad &&\texttt{"userId"} \quad (\text{camelCase}), \\
+    &\texttt{"UserID"} \quad (\text{PascalCase}), \qquad &&\texttt{"getUserId()"} \quad (\text{getter method}).
+    \end{align*}
+    Under one-hot encoding, each variation is an orthogonal unit vector:
+    \begin{equation}
+    \label{eq:code_identifier_orthogonality}
+    d_E(\ve_{\texttt{user\_id}}, \ve_{\texttt{userId}}) = \sqrt{2}, \qquad \cos(\ve_{\texttt{user\_id}}, \ve_{\texttt{userId}}) = 0.
+    \end{equation}
+    A code completion or vulnerability detection model trained on a repository utilizing camelCase will exhibit total zero-shot failure when evaluated on a repository utilizing snake\_case, because the representation treats the identifiers as completely unrelated dimensions with zero parameter transfer.
+    \item \textbf{Type hierarchies and syntactic equidistance}: In object-oriented programming, classes like \texttt{ArrayList} and \texttt{LinkedList} share a common ancestor interface (\texttt{List}) and provide identical method contracts (\texttt{.add()}, \texttt{.get()}, \texttt{.size()}). Yet, under one-hot representations:
+    \begin{equation}
+    \label{eq:code_syntax_equidistance}
+    d_E(\ve_{\texttt{ArrayList}}, \ve_{\texttt{LinkedList}}) = d_E(\ve_{\texttt{ArrayList}}, \ve_{\texttt{while}}) = d_E(\ve_{\texttt{ArrayList}}, \ve_{\texttt{;}}) = \sqrt{2}.
+    \end{equation}
+    The geometry asserts that \texttt{ArrayList} is as semantically distant from \texttt{LinkedList} as it is from a control-flow keyword (\texttt{while}) or a punctuation delimiter (\texttt{;}). The representation cannot preserve subtype polymorphism, functional equivalence, or grammatical roles.
+\end{itemize}
+These five failure modes demonstrate why language and code processing had to abandon discrete one-hot coordinates in favor of dense, continuous distributed representations.
+
 \subsection{From discrete symbols to tokens: the mechanics and trade-offs of tokenization}
 \label{sec:tokenization_mechanisms}
+
 
 Before any mathematical model can map language into continuous vectors, raw textual strings must be segmented into atomic symbolic units known as \emph{tokens}. As emphasized by AI educator Enkk \cite{enkk2023embeddings}, the choice of tokenization scheme defines the foundational alphabet of the model and fundamentally dictates vocabulary size, sequence length, and generalization capability.
 
