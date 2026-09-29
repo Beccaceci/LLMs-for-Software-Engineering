@@ -4,26 +4,10 @@
 \chapter{Recurrent neural networks and sequence modeling}
 \label{ch:rnn_sequence_modeling}
 
-\section{Chapter overview and learning outcomes}
-In Chapter~\ref{ch:deep_learning_foundations}, we analyzed the artificial perceptron and multi-layer feedforward networks, while Chapter~\ref{ch:word_embeddings} introduced continuous distributed vector representations (Word2Vec and FastText). However, static feedforward architectures treat input tokens as unordered bags of words or rigid fixed-width vectors, fundamentally ignoring temporal order and sequential dependencies.
-
-This chapter formalizes the transition from static feedforward networks to recurrent sequential architectures. We examine why standard Fully-Connected Neural Networks (FCNNs) fail on unstructured sequential text, formulate the Recurrent Neural Network (RNN) cell, derive Backpropagation Through Time (BPTT), and provide the rigorous Jacobian product proof of vanishing and exploding gradients. We inspect the empirical training dynamics of an RNN on Arthur Conan Doyle's \textit{The Adventures of Sherlock Holmes}, trace the phase transitions across training epochs, and unpack the constant error carousel of Long Short-Term Memory (LSTM) networks \cite{hochreiter1997} and Gated Recurrent Units (GRU) \cite{cho2014}. Finally, we analyze Sequence-to-Sequence (Seq2Seq) Encoder-Decoder pipelines \cite{sutskever2014}, Teacher Forcing, and the information bottleneck that directly motivated the invention of the Transformer.
-
-Upon completing this chapter, you will be able to:
-\begin{itemize}
-    \item Identify the three fundamental architectural constraints of Fully-Connected Neural Networks on sequential unstructured data: fixed input dimensionality, lack of parameter sharing/translation invariance, and fixed output size.
-    \item Formulate the vanilla RNN cell forward equations ($\vh_t$, $\hat{\vy}_t$) with explicit tensor dimensionality tracking across input projection $\mW_{xh}$, recurrent transition $\mW_{hh}$, and output emission $\mW_{hy}$.
-    \item Unroll recurrent architectures across discrete time steps and explain the mechanics of temporal weight sharing.
-    \item Derive the full Jacobian product for Backpropagation Through Time (BPTT) and prove mathematically why the recurrent transition matrix spectral radius $\rho(\mW_{hh})$ causes exponential vanishing ($\lambda < 1$) or exploding ($\lambda > 1$) gradients.
-    \item Trace the epoch-by-epoch training dynamics of character-level RNNs, explaining the role of null-byte padding, identity passthrough, and causal lookahead blindness.
-    \item Derive the gating equations of the LSTM cell (forget gate $\mathbf{f}_t$, input gate $\mathbf{i}_t$, candidate cell $\tilde{\vc}_t$, additive highway $\vc_t$, and output gate $\mathbf{o}_t$) and prove the Constant Error Carousel ($\frac{\partial \vc_t}{\partial \vc_{t-1}} = \mathbf{f}_t$).
-    \item Contrast LSTM with the Gated Recurrent Unit (GRU), comparing parameter counts ($4 \times$ vs.~$3 \times$ vanilla weights) and structural trade-offs.
-    \item Explain the limitations of one-to-one sequence mappings on non-monotonic machine translation and formulate the Encoder-Decoder (Seq2Seq) architecture with Teacher Forcing.
-    \item Analyze the persistent information and recurrence bottlenecks that motivated Attention Mechanisms \cite{bahdanau2014} and Transformers \cite{vaswani2017}.
-\end{itemize}
-
 \section{Sequential data and constraints of feed-forward neural networks}
 \label{sec:fcnn_limits}
+
+In Chapters~\ref{ch:deep_learning_foundations} and~\ref{ch:word_embeddings}, we formulated the mathematical foundations of multi-layer feed-forward networks and continuous distributed word embeddings. As formalized at the conclusion of Chapter~\ref{ch:word_embeddings}, however, static embedding lookup matrices and feed-forward architectures treat input tokens as isolated vectors or unordered bags of words. They operate under a rigid, memoryless paradigm: they cannot retain dynamic state across variable-length temporal sequences, cannot enforce grammatical agreement across long horizons, and cannot dynamically adapt to variable-length inputs or outputs.
 
 In standard deep learning, a Fully-Connected Neural Network (FCNN) or Multi-Layer Perceptron is represented as a cascade of weight matrices interleaved with non-linear activation functions:
 \begin{equation}
@@ -191,18 +175,19 @@ The temporal transmission term $\frac{\partial \vh_t}{\partial \vh_k}$ represent
 We now derive the explicit single-step Jacobian and prove why vanilla RNNs suffer from vanishing and exploding gradients.
 
 \begin{theorem}{Jacobian product and spectral radius gradient decay}{jacobian_decay_proof}
-Let the recurrent state transition be $\vh_j = \tanhact(\vz_j)$ where $\vz_j = \mW_{hh} \vh_{j-1} + \mW_{xh} \vx_j + \vb_h$.
-The single-step temporal Jacobian $\mathbf{J}_j = \frac{\partial \vh_j}{\partial \vh_{j-1}} \in \R^{d_h \times d_h}$ is:
+Let the recurrent state transition be $\vh_j = \tanhact(\vz_j)$ where $\vz_j = \mW_{hh} \vh_{j-1} + \mW_{xh} \vx_j + \vb_h$ with $\vh_j \in \R^{d_h}$ and $\mW_{hh} \in \R^{d_h \times d_h}$.
+Under standard column-vector convention, the single-step forward temporal Jacobian $\mathbf{J}_j = \frac{\partial \vh_j}{\partial \vh_{j-1}} \in \R^{d_h \times d_h}$ is:
 \begin{equation}
 \label{eq:single_step_jacobian}
-\mathbf{J}_j = \frac{\partial \vh_j}{\partial \vh_{j-1}} = \operatorname{diag}\left( 1 - \vh_j^2 \right) \mW_{hh}^\top = \mathbf{D}_j \mW_{hh}^\top,
+\mathbf{J}_j = \frac{\partial \vh_j}{\partial \vh_{j-1}} = \operatorname{diag}\left( 1 - \vh_j^2 \right) \mW_{hh} = \mathbf{D}_j \mW_{hh},
 \end{equation}
-where $\mathbf{D}_j = \operatorname{diag}(1 - \tanh^2(\vz_j))$ is a diagonal matrix containing the local derivatives of the hyperbolic tangent function. Consequently, the multi-step gradient evaluates to:
+where $\mathbf{D}_j = \operatorname{diag}(1 - \tanh^2(\vz_j)) \in \R^{d_h \times d_h}$ is a diagonal matrix containing the local derivatives of the hyperbolic tangent function. Consequently, the multi-step temporal transmission evaluates to:
 \begin{equation}
 \label{eq:full_chain_product}
-\frac{\partial \vh_t}{\partial \vh_k} = \prod_{j=k+1}^t \mathbf{D}_j \mW_{hh}^\top.
+\frac{\partial \vh_t}{\partial \vh_k} = \prod_{j=k+1}^t \mathbf{D}_j \mW_{hh}.
 \end{equation}
-Let $\lambda_{\max}$ denote the spectral radius (maximum singular value) of $\mW_{hh}^\top$. The Euclidean norm of the transmitted gradient is bounded by:
+When transmitting the gradient of a scalar loss $\Loss_t$ backward through time, the column-vector gradient $\nabla_{\vh_{j-1}} \Loss_t \in \R^{d_h}$ satisfies the adjoint recurrence $\nabla_{\vh_{j-1}} \Loss_t = \mW_{hh}^\top \mathbf{D}_j \nabla_{\vh_j} \Loss_t$.
+Let $\lambda_{\max} = \|\mW_{hh}\|_2 = \sigma_{\max}(\mW_{hh})$ denote the spectral norm (maximum singular value) of $\mW_{hh}$. The Euclidean norm of the transmitted gradient is bounded by:
 \begin{equation}
 \label{eq:gradient_bound}
 \norm{\frac{\partial \Loss_t}{\partial \vh_k}} \le \norm{\frac{\partial \Loss_t}{\partial \vh_t}} \left( \lambda_{\max} \right)^{t-k}.
@@ -214,10 +199,11 @@ Differentiating the $i$-th component of $\vh_j$ with respect to the $m$-th compo
 \[
 \frac{\partial h_{j, i}}{\partial h_{j-1, m}} = \frac{\partial \tanh(z_{j, i})}{\partial z_{j, i}} \frac{\partial z_{j, i}}{\partial h_{j-1, m}} = (1 - h_{j, i}^2) W_{hh, i, m}.
 \]
-In matrix notation, this is $\frac{\partial \vh_j}{\partial \vh_{j-1}} = \operatorname{diag}(1 - \vh_j^2) \mW_{hh}^\top = \mathbf{D}_j \mW_{hh}^\top$.
-Because $|\tanh'(z)| = 1 - \tanh^2(z) \in [0, 1]$, the operator norm of each diagonal matrix satisfies $\|\mathbf{D}_j\|_2 \le 1$. Applying the sub-multiplicative property of matrix norms to Equation~\eqref{eq:full_chain_product}:
+In matrix notation, the entry in row $i$ and column $m$ of $\frac{\partial \vh_j}{\partial \vh_{j-1}}$ is $(1 - h_{j, i}^2) W_{hh, i, m} = (\mathbf{D}_j)_{ii} W_{hh, i, m}$, which corresponds exactly to the matrix product $\mathbf{D}_j \mW_{hh}$.
+Taking the transpose for backward column-vector gradient propagation yields $(\mathbf{D}_j \mW_{hh})^\top = \mW_{hh}^\top \mathbf{D}_j$, matching the backward adjoint arrows in Figure~\ref{fig:unrolled_rnn}.
+Because $|\tanh'(z)| = 1 - \tanh^2(z) \in [0, 1]$, the operator 2-norm of each diagonal matrix satisfies $\|\mathbf{D}_j\|_2 \le 1$. Applying the sub-multiplicative property of matrix norms to Equation~\eqref{eq:full_chain_product}:
 \begin{align*}
-\norm{\frac{\partial \vh_t}{\partial \vh_k}}_2 &= \norm{\prod_{j=k+1}^t \mathbf{D}_j \mW_{hh}^\top}_2 \le \prod_{j=k+1}^t \norm{\mathbf{D}_j}_2 \norm{\mW_{hh}^\top}_2 \\
+\norm{\frac{\partial \vh_t}{\partial \vh_k}}_2 &= \norm{\prod_{j=k+1}^t \mathbf{D}_j \mW_{hh}}_2 \le \prod_{j=k+1}^t \norm{\mathbf{D}_j}_2 \norm{\mW_{hh}}_2 \\
 &\le \prod_{j=k+1}^t 1 \cdot \lambda_{\max} = \left( \lambda_{\max} \right)^{t-k}.
 \end{align*}
 Multiplying by $\norm{\frac{\partial \Loss_t}{\partial \vh_t}}_2$ yields Equation~\eqref{eq:gradient_bound}.
@@ -461,6 +447,86 @@ At time step $t$, given input $\vx_t$ and prior state $\vh_{t-1}$:
 \end{align}
 \end{definition}
 
+\paragraph{Physical gate routing and dynamic memory modulation.}
+The GRU cell operates through two coupled mechanisms illustrated in Figure~\ref{fig:gru_cell}:
+\begin{enumerate}
+    \item \textbf{Reset Gate Modulation ($\mathbf{r}_t$)}: The reset gate vector $\mathbf{r}_t \in (0, 1)^{d_h}$ acts as a dynamic filter applied to the previous hidden state $\vh_{t-1}$ via Hadamard multiplication ($\mathbf{r}_t \odot \vh_{t-1}$). If $\mathbf{r}_t \approx \mathbf{0}$, the candidate state $\tilde{\vh}_t$ completely ignores past memory, resetting the representation to depend exclusively on the current token $\vx_t$ (e.g., at sentence boundaries or clause resets). If $\mathbf{r}_t \approx \mathbf{1}$, the full history flows into the candidate calculation.
+    \item \textbf{Update Gate Convex Interpolation ($\mathbf{z}_t$)}: Rather than using distinct input and forget gates like the LSTM, the GRU couples memory retention and candidate addition into a single convex combination:
+    \[
+    \vh_t = (1 - \mathbf{z}_t) \odot \vh_{t-1} + \mathbf{z}_t \odot \tilde{\vh}_t.
+    \]
+    When $\mathbf{z}_t \approx \mathbf{0}$, the unit passes the previous state $\vh_{t-1}$ forward unchanged ($1 \odot \vh_{t-1} + 0 \odot \tilde{\vh}_t = \vh_{t-1}$), establishing an unobstructed linear identity shortcut similar to the LSTM Constant Error Carousel. When $\mathbf{z}_t \approx \mathbf{1}$, the unit overwrites the state entirely with the newly proposed candidate $\tilde{\vh}_t$.
+\end{enumerate}
+
+\begin{figure}[htbp]
+\centering
+\resizebox{0.88\textwidth}{!}{%
+\begin{tikzpicture}[
+    box/.style={rectangle, rounded corners=3pt, draw=politoNavy, fill=skyBlue!20, thick, minimum width=15mm, minimum height=8mm, font=\small},
+    op/.style={circle, draw=porange, fill=examAmberBg, thick, inner sep=1.5pt, font=\small\bfseries},
+    inv/.style={rectangle, rounded corners=2pt, draw=deepdiveTeal, fill=deepdiveTealBg, thick, minimum width=12mm, minimum height=6mm, font=\scriptsize\bfseries},
+    arr/.style={-{Stealth[scale=1.1]}, thick, draw=bodyDark},
+    fork/.style={circle, fill=bodyDark, inner sep=1.2pt}
+]
+
+% Inputs
+\node (h_prev) at (-3.5, 2.6) {$\vh_{t-1}$};
+\node (x_curr) at (-3.5, -0.8) {$\vx_t$};
+
+% Horizontal highway for h_{t-1}
+\node[fork] (h_fork1) at (-2.0, 2.6) {};
+\node[op] (h_mult_past) at (1.8, 2.6) {$\odot$};
+\node[op] (h_add) at (4.6, 2.6) {$\oplus$};
+\node (h_next) at (6.2, 2.6) {$\vh_t$};
+
+\draw[arr] (h_prev) -- (h_mult_past);
+\draw[arr] (h_mult_past) -- (h_add);
+\draw[arr] (h_add) -- (h_next);
+
+% Input line x_t
+\node[fork] (x_fork) at (-2.0, -0.8) {};
+\draw[arr] (x_curr) -- (x_fork);
+
+% Gate nodes at bottom
+\node[box] (r_gate) at (-1.0, 0.4) {$\sigma$ ($\mathbf{r}_t$)};
+\node[box] (z_gate) at (0.8, 0.4) {$\sigma$ ($\mathbf{z}_t$)};
+\node[box] (h_cand) at (3.2, 0.4) {$\tanh$ ($\tilde{\vh}_t$)};
+
+% Reset multiplication
+\node[op] (r_mult) at (2.2, 1.4) {$\odot$};
+
+% Routing h_{t-1} into gates and reset
+\draw[arr] (h_fork1) |- (r_gate.160);
+\draw[arr] (h_fork1) |- (z_gate.160);
+\draw[arr] (h_fork1) |- (r_mult);
+
+% Routing x_t into gates and candidate
+\draw[arr] (x_fork) |- (r_gate.200);
+\draw[arr] (x_fork) |- (z_gate.200);
+\draw[arr] (x_fork) -| ($(h_cand.south)+(2mm,0)$);
+
+% Reset gate into r_mult, then into candidate
+\draw[arr] (r_gate) |- (r_mult);
+\draw[arr] (r_mult) -| ($(h_cand.north)-(2mm,0)$);
+
+% Update gate z_t routing
+\node[fork] (z_fork) at (0.8, 1.4) {};
+\node[inv] (inv_z) at (1.8, 1.8) {$1 - \mathbf{z}_t$};
+\node[op] (cand_mult) at (4.6, 1.4) {$\odot$};
+
+\draw[thick, draw=bodyDark] (z_gate) -- (z_fork);
+\draw[arr] (z_fork) |- (inv_z);
+\draw[arr] (inv_z) -- (h_mult_past);
+\draw[arr] (z_fork) -- (cand_mult);
+\draw[arr] (h_cand) -| (cand_mult);
+\draw[arr] (cand_mult) -- (h_add);
+
+\end{tikzpicture}%
+}
+\caption{The Gated Recurrent Unit (GRU) cell architecture. Reset gate $\mathbf{r}_t$ dynamically filters previous hidden state $\vh_{t-1}$ before constructing candidate state $\tilde{\vh}_t$. Update gate $\mathbf{z}_t$ controls the convex interpolation $(1 - \mathbf{z}_t) \odot \vh_{t-1} + \mathbf{z}_t \odot \tilde{\vh}_t$, unifying long- and short-term memory into a single state vector $\vh_t$.}
+\label{fig:gru_cell}
+\end{figure}
+
 \begin{examinsight}[Parameter counting: vanilla RNN vs.~LSTM vs.~GRU]
 A classic written examination question asks students to compare the exact parameter counts of recurrent cells for hidden dimension $d$ and input dimension $m$:
 \begin{itemize}
@@ -562,15 +628,59 @@ To stabilize and accelerate training, practitioners use \textbf{Teacher Forcing}
 \emph{Exposure Bias Warning}: While Teacher Forcing provides rapid convergence during training, it creates a discrepancy at inference time when ground-truth tokens are unavailable, causing models to be fragile when recovering from early generation mistakes.
 
 \subsection{Sherlock Holmes case correction revised: one-to-one vs.~encoder-decoder}
-Slides 35 and 36 evaluate the sentence:
+\label{subsec:sherlock_seq2seq_comparison}
+
+To empirically contrast the representational power of one-to-one recurrent mapping against the Sequence-to-Sequence Encoder-Decoder architecture, Slides 35 and 36 evaluate both models on an identical, challenging character casing sentence:
 \begin{center}
-Input: \texttt{"indeed i am sherlock holmes,"} $\implies$ Target: \texttt{"Indeed I am Sherlock Holmes,"}
+\textbf{Input Test Sequence}: \texttt{"indeed i am sherlock holmes,"} \\
+\textbf{Target Test Sequence}: \texttt{"Indeed I am Sherlock Holmes,"}
 \end{center}
-\begin{itemize}
-    \item \textbf{One-to-One Model}: Successfully capitalizes \texttt{"Indeed"} (after quote) and \texttt{"Holmes"} (preceded by \texttt{"sherlock"}). However, it completely fails on the pronoun \texttt{"I"} and the first name \texttt{"Sherlock"} because it cannot look ahead to see that \texttt{"i"} is a standalone word and \texttt{"s"} begins a proper noun.
-    \item \textbf{Encoder-Decoder Model}: Successfully capitalizes all four targets (\texttt{Indeed}, \texttt{I}, \texttt{Sherlock}, \texttt{Holmes}) because the encoder encodes the entire sequence before generation begins.
-    \item \textbf{Training Trade-off}: Convergence requires \textbf{1070 epochs} for Encoder-Decoder versus \textbf{10 epochs} for the one-to-one model, illustrating the optimization difficulty of learning unguided sequence-level alignment.
-\end{itemize}
+
+\paragraph{Theoretical expectations from architectural constraints (Slide 35).}
+This evaluation sentence contains four distinct capitalization targets, each testing a specific causal and temporal capacity:
+\begin{enumerate}
+    \item \textbf{\texttt{"I"} of \texttt{"Indeed"} (beginning of quote)}: Should be capitalized because it is immediately preceded by an opening quotation mark (\texttt{"}). A one-to-one model can easily learn this local transition, as the trigger character is already present in its past recurrent state $\vh_{t-1}$.
+    \item \textbf{\texttt{"I"} of \texttt{"I"} (standalone subject pronoun)}: Must be capitalized because it functions as the first-person singular pronoun. A one-to-one model is structurally blind here: when reading \texttt{'i'}, the network only knows that a word is beginning with \texttt{'i'}. It cannot determine whether this character is an isolated pronoun or the initial letter of common words like \texttt{"in"}, \texttt{"it"}, or \texttt{"into"} until the subsequent whitespace arrives at step $t+1$. Without future lookahead, capitalizing \texttt{'i'} at step $t$ is mathematically unsupported.
+    \item \textbf{\texttt{"S"} of \texttt{"Sherlock"} (proper noun first name)}: Must be capitalized because it begins the proper noun \textit{Sherlock}. When the one-to-one cell receives \texttt{'s'}, it only observes an arbitrary lowercase word beginning with \texttt{'s'}. It cannot anticipate that the subsequent characters will form the name \texttt{"herlock"}.
+    \item \textbf{\texttt{"H"} of \texttt{"Holmes"} (proper noun last name)}: After the model parses the preceding token sequence \texttt{"sherlock "}, its recurrent state $\vh_{t-1}$ retains the memory of the detective's first name. When an \texttt{'h'} arrives, the transition matrix $\mW_{hh}$ leverages the learned bigram association $\Prob(\text{\texttt{Holmes}} \mid \text{\texttt{Sherlock}})$ to correctly capitalize the last name.
+\end{enumerate}
+
+\paragraph{Empirical results across 1070 training epochs (Slide 36).}
+Table~\ref{tab:sherlock_seq2seq_comparison} documents the verbatim loss trajectories and generated outputs across training checkpoints from Epoch 1 to Epoch 1070.
+
+\begin{table}[htbp]
+\centering
+\footnotesize
+\caption{Empirical comparison of character casing dynamics on the Sherlock Holmes corpus (Slide 36): One-to-One Recurrent Mapping vs.~Sequence-to-Sequence Encoder-Decoder across training epochs 1 to 1070.}
+\label{tab:sherlock_seq2seq_comparison}
+\begin{tabularx}{\textwidth}{@{} c c >{\raggedright\arraybackslash}X c >{\raggedright\arraybackslash}X @{}}
+\toprule
+& \multicolumn{2}{c}{\textbf{One-to-One Mapping}} & \multicolumn{2}{c}{\textbf{Encoder-Decoder Architecture}} \\
+\cmidrule(lr){2-3} \cmidrule(lr){4-5}
+\textbf{Epoch} & \textbf{Loss} & \textbf{Generated Output} & \textbf{Loss} & \textbf{Generated Output} \\
+\midrule
+\textbf{0001} & 5.3212 & \texttt{XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX} & 5.4591 & \texttt{wwXXXXXXXXXXXXXXXXXXXXXXXXXXXX} \\
+\textbf{0002} & 3.7157 & \texttt{XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX} & 4.0161 & \texttt{aXXXXXXXXXXXXXXXXXXXXXXXXXXXXX} \\
+\textbf{0003} & 2.7964 & \texttt{XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX} & 2.8268 & \texttt{XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX} \\
+\textbf{0004} & 2.7981 & \texttt{XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX} & 2.7671 & \texttt{XXXXXXXXXXXXXXXXXXX} \\
+\midrule
+\textbf{0030} & 0.2264 & \texttt{"indeed i am sherlock holmes,"} & 0.2315 & \texttt{"indeed i am sherlock holmes,"} \\
+\textbf{0050} & 0.0802 & \texttt{"indeed i am sherlock holmes,"} & 0.0705 & \texttt{"indeed i am sherlock holmes,"} \\
+\midrule
+\textbf{0160} & 0.0301 & \texttt{"Indeed i am sherlock Holmes,"} & 0.0259 & \texttt{"Indeed i am sherlock Holmes,"} \\
+\textbf{0530} & 0.0224 & \texttt{"Indeed i am sherlock Holmes,"} & 0.0197 & \texttt{"Indeed I am sherlock Holmes,"} \\
+\textbf{1070} & 0.0232 & \texttt{"Indeed i am sherlock Holmes,"} & 0.0156 & \texttt{"Indeed I am Sherlock Holmes,"} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\paragraph{Analysis of qualitative phase transitions and convergence trade-offs.}
+The comparative trajectories in Table~\ref{tab:sherlock_seq2seq_comparison} reveal three fundamental pedagogical principles:
+\begin{enumerate}
+    \item \textbf{The Causal Barrier of One-to-One Recurrence}: The one-to-one model plateaus at Epoch 160 with loss $0.0301$ and cannot improve further through Epoch 1070 (loss $0.0232$). As predicted, it successfully capitalizes \texttt{"Indeed"} (from the quote mark) and \texttt{"Holmes"} (from the preceding \texttt{"sherlock"}), but remains permanently trapped producing lowercase \texttt{"i"} and \texttt{"sherlock"}. Because the lockstep recurrent cell must emit output $\hat{y}_t$ simultaneously with reading $x_t$, it suffers from irreversible causal lookahead blindness.
+    \item \textbf{Sequence-Level Information Integration in Seq2Seq}: The Encoder-Decoder model overcomes causal blindness by decoupling sequence ingestion from sequence emission. The encoder reads the entire string before generation begins. Consequently, the context vector $\vh_N$ encodes global contextual features: it ``remembers'' that \texttt{"i"} is bounded by whitespace on both sides (making it the isolated pronoun \texttt{"I"}) and that \texttt{"s"} begins the full proper name \texttt{"sherlock"}. By Epoch 530, the decoder resolves \texttt{"Indeed I am sherlock Holmes,"} (loss $0.0197$), and by Epoch 1070 it fully resolves all four capitalization targets: \texttt{"Indeed I am Sherlock Holmes,"} with superior loss $0.0156$.
+    \item \textbf{The Sample Complexity Trade-off ($100\times$ Training Epochs)}: Why does the Encoder-Decoder require 1070 epochs when the simple character model converged in 10 epochs? In one-to-one mapping, temporal alignment is strictly hardcoded: character $t$ at the input maps directly to character $t$ at the output. In Seq2Seq, the model is given zero alignment hints; it must simultaneously discover: (i) how to compress the entire sentence into vector $\vh_N$, (ii) how to decode variable-length autoregressive tokens, and (iii) how to align output positions with latent source semantics. Learning this unconstrained non-monotonic mapping from scratch drastically increases optimization difficulty and sample complexity.
+\end{enumerate}
 
 \section{Persistent bottlenecks of gated RNNs and the road to transformers}
 \label{sec:rnn_bottlenecks}
@@ -714,5 +824,22 @@ The lineage of sequence modeling represents one of the most intellectually cohes
     \item Simultaneously in 2014, Ilya Sutskever, Oriol Vinyals, and Quoc V.~Le \cite{sutskever2014} published \textit{``Sequence to Sequence Learning with Neural Networks''}, demonstrating that multi-layer deep LSTMs could map sentences across languages end-to-end. Crucially, Sutskever discovered that reversing the source sentence (\textit{``A B C $\to$ C B A''}) dramatically improved performance by shortening the initial temporal gradient distance between source and target tokens.
 \end{itemize}
 \end{deepdive}
+
+\subsection{Causal bridge to Chapter 5: the attention revolution and the elimination of recurrence}
+\label{subsec:bridge_to_chapter_5}
+
+Throughout this chapter, we have traced the linear evolutionary arc of sequential neural architectures:
+\begin{enumerate}
+    \item \textbf{Vanilla RNNs} introduced temporal weight sharing to eliminate the fixed-dimensional constraints of feedforward networks, but suffered from exponential vanishing gradients ($\mathbf{D}_j \mW_{hh}$) and recency amnesia.
+    \item \textbf{LSTMs and GRUs} resolved vanishing gradients along the temporal chain via the Constant Error Carousel ($\frac{\partial \vc_t}{\partial \vc_{t-1}} \approx \mathbf{I}$) and multiplicative gating highways, enabling gradient flow across hundreds of steps.
+    \item \textbf{Seq2Seq Encoder-Decoder Pipelines} overcame the causal lookahead blindness of one-to-one recurrent cells by reading entire input sequences into a context vector $\vh_N$ before generation.
+    \item \textbf{Bahdanau Additive Attention} shattered the single-vector bottleneck ($\vh_N \in \R^{d_h}$) by granting the decoder dynamic soft addressing across all encoder annotations ($\vc_i = \sum_j \alpha_{ij} \vh_j$).
+\end{enumerate}
+
+Despite these triumphs, an insurmountable physical and computational bottleneck remains: \textbf{the sequential computation wall}. Because every recurrent transition $\vh_t = f(\vh_{t-1}, \vx_t)$ strictly requires the prior state $\vh_{t-1}$, training an RNN over a sequence of length $T$ demands $\mathcal{O}(T)$ sequential operations. On modern tensor-parallel hardware (GPUs and TPUs), this prevents parallelization across time during training. Furthermore, despite gating and soft attention, information still traverses an unrolled graph of length $\mathcal{O}(T)$.
+
+This computational barrier prompts the revolutionary question that birthed modern foundation models: \emph{If dynamic attention provides direct, constant-time $\mathcal{O}(1)$ information routing between any two tokens in a sequence, why maintain recurrent connections at all?}
+
+In Chapter~5 (\emph{The Transformer Architecture}), we answer this question by introducing the architecture that discarded recurrence entirely: the \textbf{Transformer} \cite{vaswani2017}. By replacing sequential recurrence with Multi-Head Self-Attention and positional encodings, Transformers unlocked full GPU sequence parallelization, establishing the foundational architecture for all modern Large Language Models.
 
 \end{document}

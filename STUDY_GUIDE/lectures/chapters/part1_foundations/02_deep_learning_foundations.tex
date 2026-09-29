@@ -4,27 +4,10 @@
 \chapter{Deep learning foundations for NLP}
 \label{ch:deep_learning_foundations}
 
-\section{Chapter overview and learning outcomes}
-Having established the probabilistic formulation of language modeling and the combinatorial limitations of discrete symbol counting in Chapter~\ref{ch:intro_lms}, we now develop the neural computational foundations that allow language models to scale. In contemporary Natural Language Processing and AI-assisted Software Engineering, next-token prediction is reformulated as a high-dimensional, non-linear classification problem over a continuous vector space.
-
-This chapter develops the atomic units of deep learning from the ground up. Beginning with the biological abstraction of the perceptron, we formalize the affine projection and activation mechanism of artificial neurons. We prove rigorously why multi-layer linear networks collapse mathematically into a single linear transformation without non-linear activations, state the Universal Approximation Theorem with an intuitive bump-function derivation, and compare the major activation functions used across modern architectures. We examine concrete task formulations for Software Engineering (binary classification, multi-class classification, regression), unpack loss functions (MSE, BCE, CCE) with rigorous proofs of why MSE fails for classification, analyze iterative optimization via Gradient Descent and Adam, and conduct an exhaustive adjoint trace of backpropagation on a directed acyclic computational graph (DAG).
-
-Upon completing this chapter, you will be able to:
-\begin{itemize}
-    \item Formulate the artificial perceptron as an affine transformation followed by an activation function in scalar, vector, and matrix forms.
-    \item Visualize the 2D hyperplane decision boundary and calculate the orthogonal distance from the origin to the boundary.
-    \item Count neural network parameters rigorously across fully connected layers, distinguishing weights and biases.
-    \item Prove analytically why any cascade of linear layers without non-linear activations collapses into a single equivalent linear layer ($\vz = \mW'^\top \vx + \vb'$).
-    \item Analyze the properties, operating ranges, and gradient saturation pathologies of key activation functions ($\sigmoid$, $\tanhact$, $\relu$, Leaky $\relu$, $\gelu$, $\softmax$, and linear identity).
-    \item Explain the Universal Approximation Theorem \cite{cybenko1989,hornik1989,leshno1993} and reconstruct the intuitive bump-function derivation using opposing sigmoids.
-    \item Configure appropriate output activation heads and loss functions for binary classification, multi-class classification, and regression in software engineering contexts.
-    \item Prove mathematically why Mean Squared Error fails for classification and why Cross-Entropy provides linear, unsaturated gradients.
-    \item Trace forward intermediate values and backward adjoint gradients ($\partial \Loss / \partial \cdot$) across a computational DAG using the multivariate chain rule \cite{rumelhart1986}.
-    \item Explain the limitations of vanilla Gradient Descent in non-convex loss landscapes and the mechanics of Momentum and Adam optimizers \cite{kingma2014adam}.
-\end{itemize}
-
 \section{From biological neurons to the artificial perceptron}
 \label{sec:perceptron}
+
+Having established the probabilistic formulation of language modeling and the combinatorial limitations of discrete symbol counting in Chapter~\ref{ch:intro_lms}, we now develop the neural computational foundations that allow language models to scale. In contemporary Natural Language Processing and AI-assisted Software Engineering, next-token prediction is reformulated as a high-dimensional, non-linear classification problem over continuous vector spaces. Rather than storing astronomical tables of discrete counts, we parameterize language predictors as continuous functions whose weights are optimized via gradient descent.
 
 The foundational building block of modern deep learning is the \emph{perceptron}, originally inspired by biological neurons in the human nervous system. A biological neuron receives electrochemical signals from upstream cells through branching \emph{dendrites}, integrates these incoming potentials in its central cell body (\emph{soma}), and, when the accumulated electrical voltage exceeds a physiological threshold (the action potential), fires a spike through its \emph{axon} to downstream synapses.
 
@@ -61,91 +44,95 @@ Figure~\ref{fig:artificial_perceptron} illustrates the structural mechanics of t
 \node[inputnode] (x1) at (0, 1.2) {$x_1$};
 \node[inputnode] (x2) at (0, 0.0) {$x_2$};
 \node at (0, -0.9) {$\vdots$};
-\node[inputnode] (xn) at (0, -1.8) {$x_n$};
+\node[inputnode] (xn) at (0, -2.0) {$x_n$};
 
-% Summation node
-\node[opnode] (sum) at (4.0, 0.3) {$\Sigma$};
-\node[above=2pt of sum, font=\footnotesize\bfseries, text=deepdiveTeal] {Summation};
-\node[below=2pt of sum, font=\scriptsize, text=bodyGray] {$z = \vw^\top \vx$};
+% Summation Junction
+\node[opnode] (sum) at (4.0, 0.2) {$\Sigma$};
 
-% Activation node
-\node[actnode] (act) at (7.2, 0.3) {$f(z)$ \\[2pt] \tiny Activation};
+% Activation Function Box
+\node[actnode] (act) at (7.2, 0.2) {Activation\\$f(z)$};
 
-% Output node
-\node[outnode] (y) at (10.0, 0.3) {$y$};
+% Output Node
+\node[outnode] (y) at (10.2, 0.2) {$y$};
 
-% Arrows with weights
-\draw[arr] (x0) -- node[above, sloped, font=\footnotesize] {$w_0 = b$} (sum);
-\draw[arr] (x1) -- node[above, sloped, font=\footnotesize] {$w_1$} (sum);
-\draw[arr] (x2) -- node[above, sloped, font=\footnotesize] {$w_2$} (sum);
-\draw[arr] (xn) -- node[below, sloped, font=\footnotesize] {$w_n$} (sum);
+% Directed Connections with Weights
+\draw[arr] (x0) -- node[above, near start, font=\small] {$w_0$ (bias)} (sum);
+\draw[arr] (x1) -- node[above, near start, font=\small] {$w_1$} (sum);
+\draw[arr] (x2) -- node[above, near start, font=\small] {$w_2$} (sum);
+\draw[arr] (xn) -- node[below, near start, font=\small] {$w_n$} (sum);
 
-\draw[arr] (sum) -- node[above, font=\footnotesize] {$z$} (act);
-\draw[arr] (act) -- node[above, font=\footnotesize] {$y = f(z)$} (y);
+% Intermediate pre-activation connection
+\draw[arr] (sum) -- node[above, font=\small] {$z = \vw^\top \vx$} (act);
 
-% Surrounding group dashed boxes
-\begin{scope}[on background layer]
-    \node[draw=lightGrayLine, dashed, rounded corners=6pt, fill=codeBg, fit=(sum) (act), inner sep=10pt, label={[font=\scriptsize\bfseries, text=bodyGray]below:Artificial Neuron Body}] {};
-\end{scope}
+% Output connection
+\draw[arr] (act) -- node[above, font=\small] {$y = f(z)$} (y);
+
+% Surrounding Labels
+\node[above=4pt of sum, font=\footnotesize\bfseries, text=deepdiveTeal] {Summation Junction};
+\node[above=4pt of act, font=\footnotesize\bfseries, text=intuitionPurple] {Non-linear Mapping};
+\node[below=6pt of sum, font=\scriptsize, text=bodyGray] {Linear Pre-activation};
 
 \end{tikzpicture}
-\caption{Schematic diagram of the artificial perceptron. Synaptic inputs $x_i$ are scaled by parameter weights $w_i$, accumulated at the summation node with additive bias $w_0$, and transformed by the non-linear activation function $f(z)$ to produce the scalar activation $y$.}
+\caption{Architectural schematic of the artificial perceptron. Inputs $x_i$ are modulated by synaptic weights $w_i$, accumulated with bias $w_0$ at the summation junction $\Sigma$ to yield pre-activation $z = \vw^\top \vx$, and mapped through activation function $f(z)$ to produce scalar output $y$.}
 \label{fig:artificial_perceptron}
 \end{figure}
 
-\subsection{Geometric interpretation in two dimensions}
-When $n = 2$, the input feature vector resides in the Cartesian plane $\vx = [x_1, x_2]^\top$. The pre-activation affine combination:
+\subsection{The perceptron in two dimensions: linear decision hyperplane}
+To establish geometric intuition, consider a two-dimensional feature space $\vx = [x_1, x_2]^\top \in \R^2$ with weights $\vw = [w_1, w_2]^\top$ and bias $w_0$. The pre-activation value is:
 \begin{equation}
-\label{eq:decision_boundary_2d}
-z = w_1 x_1 + w_2 x_2 + w_0 = 0
+\label{eq:2d_linear_boundary}
+z(\vx) = w_1 x_1 + w_2 x_2 + w_0.
 \end{equation}
-defines a straight line in $\R^2$, acting as a linear \emph{decision boundary}. 
+When the perceptron acts as a binary classifier using a step or sign activation ($y = \text{sgn}(z)$), the decision boundary separating the two output classes is precisely the set of points where the pre-activation vanishes:
+\begin{equation}
+\label{eq:hyperplane_equation}
+\mathcal{H} = \left\{ \vx \in \R^2 \mid w_1 x_1 + w_2 x_2 + w_0 = 0 \right\}.
+\end{equation}
 
-\paragraph{Hyperplane properties.}
+\paragraph{Geometric interpretation of weights and bias.}
+In two dimensions, Equation~\eqref{eq:hyperplane_equation} defines a straight line in the $(x_1, x_2)$ Cartesian plane:
 \begin{itemize}
-    \item \textbf{Normal Vector $\vw$}: The parameter vector $\vw_{1:2} = [w_1, w_2]^\top$ is strictly orthogonal (perpendicular) to the decision boundary line. It points in the direction of the positive half-space ($z > 0$).
-    \item \textbf{Half-Space Partitioning}: The line partitions $\R^2$ into two disjoint open half-spaces:
+    \item \textbf{Normal Vector}: The weight vector $\vw = [w_1, w_2]^\top$ is strictly perpendicular (orthogonal) to the separating line $\mathcal{H}$. For any two points $\vx_a, \vx_b \in \mathcal{H}$:
     \[
-    \mathcal{H}^+ = \{(x_1, x_2) \mid w_1 x_1 + w_2 x_2 + w_0 > 0\}, \quad \mathcal{H}^- = \{(x_1, x_2) \mid w_1 x_1 + w_2 x_2 + w_0 < 0\}.
+    \vw^\top \vx_a + w_0 = 0 \quad \text{and} \quad \vw^\top \vx_b + w_0 = 0 \implies \vw^\top (\vx_a - \vx_b) = 0.
     \]
-    \item \textbf{Perpendicular Distance from Origin}: The shortest Euclidean distance from the origin $(0, 0)$ to the hyperplane is:
+    The vector $\vw$ points directly into the positive decision region ($z > 0$).
+    \item \textbf{Orthogonal Distance to Origin}: The shortest Euclidean distance from the origin $\mathbf{0} = [0, 0]^\top$ to the separating hyperplane $\mathcal{H}$ is:
     \begin{equation}
-    \label{eq:distance_origin}
-    d = \frac{|w_0|}{\norm{\vw_{1:2}}_2} = \frac{|w_0|}{\sqrt{w_1^2 + w_2^2}}.
+    \label{eq:hyperplane_distance}
+    d = \frac{|w_0|}{\|\vw\|_2} = \frac{|w_0|}{\sqrt{w_1^2 + w_2^2}}.
     \end{equation}
-    If $w_0 = 0$, the decision boundary passes directly through the origin. The bias $w_0$ shifts the hyperplane along the direction of $\vw$.
+    The bias $w_0$ shifts the hyperplane parallel to itself: if $w_0 = 0$, the decision boundary passes exactly through the origin; adjusting $w_0$ translates the boundary without altering its orientation.
 \end{itemize}
 
-Figure~\ref{fig:perceptron_hyperplane} illustrates this 2D geometry, showing how the weight vector $\vw$ governs boundary orientation while bias $w_0$ controls spatial offset.
+Figure~\ref{fig:perceptron_hyperplane} diagrams this geometric relationship in $\R^2$.
 
 \begin{figure}[htbp]
 \centering
-\begin{tikzpicture}[scale=0.9]
+\begin{tikzpicture}[scale=0.95]
 \begin{axis}[
+    width=8.5cm, height=6.5cm,
     axis lines=middle,
-    xlabel={$x_1$},
-    ylabel={$x_2$},
-    xmin=-3, xmax=4,
-    ymin=-3, ymax=4,
-    grid=both,
-    grid style={line width=.1pt, draw=gray!25},
-    width=9.5cm,
-    height=8cm,
-    axis line style={-{Stealth[scale=0.8]}, thick, color=bodyDark},
-    tick label style={font=\footnotesize},
-    xlabel style={at={(ticklabel* cs:1)}, anchor=west, font=\small\bfseries},
-    ylabel style={at={(ticklabel* cs:1)}, anchor=south, font=\small\bfseries}
+    xmin=-3.5, xmax=3.5,
+    ymin=-3.5, ymax=3.5,
+    xlabel={$x_1$}, ylabel={$x_2$},
+    xlabel style={anchor=west, font=\small\bfseries},
+    ylabel style={anchor=south, font=\small\bfseries},
+    grid=both, grid style={line width=0.2pt, draw=bodyGray!25},
+    tick label style={font=\tiny},
+    enlarge x limits=false,
+    enlarge y limits=false
 ]
 
-% Decision Boundary: w1 x1 + w2 x2 + w0 = 0 => 2 x1 + 1.5 x2 - 1.5 = 0 => x2 = (1.5 - 2 x1) / 1.5 = 1 - 1.333 x1
-\addplot[domain=-2.5:3.5, samples=50, ultra thick, color=politoNavy] {1 - (4/3)*x};
-\node[text=politoNavy, font=\footnotesize\bfseries] at (axis cs: 1.8, -1.8) [rotate=-53] {$w_1 x_1 + w_2 x_2 + w_0 = 0$};
+% Decision Boundary: 1.5*x1 + 1.0*x2 - 0.5 = 0 => x2 = -1.5*x1 + 0.5
+\addplot[thick, color=politoNavy, domain=-2.5:2.5] {-1.5*x + 0.5};
+\node[text=politoNavy, font=\footnotesize\bfseries, rotate=-56] at (axis cs: -1.2, 2.5) {$\mathcal{H}: w_1 x_1 + w_2 x_2 + w_0 = 0$};
 
-% Normal vector w from boundary point (0, 1) in direction (2, 1.5) scaled
-\draw[-{Stealth[scale=1.2]}, very thick, color=examAmber] (axis cs: 0, 1) -- (axis cs: 1.2, 1.9) node[above right, font=\small\bfseries, text=examAmber] {$\vw = [w_1, w_2]^\top$};
+% Normal Vector w from boundary at (0.2, 0.2)
+\draw[-{Stealth[scale=1.2]}, very thick, color=deepdiveTeal] (axis cs: 0.2, 0.2) -- node[above right, font=\footnotesize\bfseries] {$\vw = [w_1, w_2]^\top$} (axis cs: 1.7, 1.2);
 
-% Orthogonal distance line from origin to boundary
-\draw[thick, dashed, color=deepdiveTeal] (axis cs: 0, 0) -- (axis cs: 0.48, 0.36) node[midway, below right, font=\scriptsize\bfseries, text=deepdiveTeal] {$d = \frac{|w_0|}{\norm{\vw}}$};
+% Orthogonal projection from origin to boundary
+\draw[dashed, thick, color=examAmber] (axis cs: 0, 0) -- node[below left, font=\scriptsize\bfseries] {$d = \frac{|w_0|}{\|\vw\|_2}$} (axis cs: 0.23, 0.15);
 
 % Positive Half-Space Data Points (z > 0)
 \addplot[only marks, mark=*, mark size=3pt, color=steelBlue] coordinates {
@@ -180,18 +167,112 @@ The artificial perceptron unifies two foundational statistical models studied in
     predicting the posterior Bernoulli probability of belonging to the positive class.
 \end{itemize}
 
-\section{Activation functions and the proof of linear stacking collapse}
-\label{sec:activations_collapse}
+\subsection{The fatal barrier of single-layer perceptrons: XOR linear inseparability}
+\label{subsec:xor_inseparability}
 
-Activation functions serve three indispensable architectural roles in deep neural networks:
-\begin{enumerate}
-    \item \textbf{Output Range Bounding}: Restricting network outputs to mathematically valid intervals (e.g., $(0, 1)$ via $\sigmoid$ for Bernoulli probabilities, or the unit probability simplex $\Delta^{C-1}$ via $\softmax$ for categorical distributions).
-    \item \textbf{Topological Space Folding}: Introducing non-linear operations that fold and bend the coordinate space, enabling networks to separate linearly inseparable manifolds (such as the XOR problem).
-    \item \textbf{Gradient Flow Regulation}: Facilitating stable gradient backpropagation without numerical saturation or catastrophic vanishing.
-\end{enumerate}
+Despite its mathematical elegance, the single-layer perceptron suffers from a fatal representational barrier that brought artificial intelligence research to a virtual standstill for over a decade. In their seminal 1969 monograph \textit{``Perceptrons''}, Marvin Minsky and Seymour Papert demonstrated that a single-layer perceptron cannot compute the basic \emph{exclusive-or} ($\text{XOR}$) logical function.
+
+\paragraph{The XOR truth table and linear system.}
+Consider the XOR logic function over binary inputs $x_1, x_2 \in \{0, 1\}$:
+\begin{center}
+\begin{tabular}{cc|c}
+\toprule
+$x_1$ & $x_2$ & Target $y = x_1 \oplus x_2$ \\
+\midrule
+0 & 0 & 0 \\
+0 & 1 & 1 \\
+1 & 0 & 1 \\
+1 & 1 & 0 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+For a single-layer perceptron with weights $w_1, w_2$ and bias $w_0$ to compute this function, there must exist parameters such that the linear boundary $w_1 x_1 + w_2 x_2 + w_0$ outputs positive values ($z \ge 0$) for target $1$ and negative values ($z < 0$) for target $0$. Substituting the four input pairs yields the system of linear inequalities:
+\begin{align}
+(x_1 = 0, x_2 = 0) \implies &w_0 < 0, \label{eq:xor_ineq1} \\
+(x_1 = 1, x_2 = 0) \implies &w_1 + w_0 \ge 0, \label{eq:xor_ineq2} \\
+(x_1 = 0, x_2 = 1) \implies &w_2 + w_0 \ge 0, \label{eq:xor_ineq3} \\
+(x_1 = 1, x_2 = 1) \implies &w_1 + w_2 + w_0 < 0. \label{eq:xor_ineq4}
+\end{align}
+
+\paragraph{Proof by mathematical contradiction.}
+Summing inequalities~\eqref{eq:xor_ineq2} and \eqref{eq:xor_ineq3}:
+\begin{equation}
+\label{eq:xor_sum}
+(w_1 + w_0) + (w_2 + w_0) \ge 0 \implies w_1 + w_2 + 2w_0 \ge 0 \implies w_1 + w_2 \ge -2w_0.
+\end{equation}
+Now examine inequality~\eqref{eq:xor_ineq4}:
+\begin{equation}
+\label{eq:xor_bound}
+w_1 + w_2 + w_0 < 0 \implies w_1 + w_2 < -w_0.
+\end{equation}
+Combining inequalities~\eqref{eq:xor_sum} and \eqref{eq:xor_bound} yields:
+\[
+-2w_0 \le w_1 + w_2 < -w_0 \implies -2w_0 < -w_0.
+\]
+Adding $2w_0$ to both sides yields:
+\[
+0 < w_0 \implies w_0 > 0.
+\]
+However, inequality~\eqref{eq:xor_ineq1} strictly demands that $w_0 < 0$. The assumption that a single linear hyperplane can compute XOR produces a direct mathematical contradiction ($w_0 > 0$ and $w_0 < 0$). \hfill $\blacksquare$
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[scale=1.1]
+\begin{axis}[
+    width=8.5cm, height=6.5cm,
+    axis lines=middle,
+    xmin=-0.4, xmax=1.6,
+    ymin=-0.4, ymax=1.6,
+    xlabel={$x_1$}, ylabel={$x_2$},
+    xlabel style={anchor=west, font=\small\bfseries},
+    ylabel style={anchor=south, font=\small\bfseries},
+    grid=both, grid style={line width=0.2pt, draw=bodyGray!25},
+    xtick={0, 1}, ytick={0, 1},
+    tick label style={font=\footnotesize},
+    enlarge x limits=false,
+    enlarge y limits=false
+]
+
+% Class 0 points: (0,0) and (1,1)
+\addplot[only marks, mark=square*, mark size=4pt, color=red!75!black] coordinates {
+    (0, 0) (1, 1)
+};
+\node[text=red!75!black, font=\footnotesize\bfseries, anchor=north east] at (axis cs: -0.05, -0.05) {$(0,0) \to 0$};
+\node[text=red!75!black, font=\footnotesize\bfseries, anchor=south west] at (axis cs: 1.05, 1.05) {$(1,1) \to 0$};
+
+% Class 1 points: (0,1) and (1,0)
+\addplot[only marks, mark=*, mark size=4pt, color=steelBlue] coordinates {
+    (0, 1) (1, 0)
+};
+\node[text=steelBlue, font=\footnotesize\bfseries, anchor=south east] at (axis cs: -0.05, 1.05) {$(0,1) \to 1$};
+\node[text=steelBlue, font=\footnotesize\bfseries, anchor=north west] at (axis cs: 1.05, -0.05) {$(1,0) \to 1$};
+
+% Candidate linear hyperplane 1 (fails)
+\addplot[thick, dashed, color=examAmber, domain=-0.3:1.4] {0.6 - x};
+\node[text=examAmber, font=\scriptsize\bfseries, rotate=-45] at (axis cs: 0.8, -0.1) {Candidate Boundary 1};
+
+% Candidate linear hyperplane 2 (fails)
+\addplot[thick, dashed, color=intuitionPurple, domain=-0.3:1.4] {1.4 - x};
+\node[text=intuitionPurple, font=\scriptsize\bfseries, rotate=-45] at (axis cs: 0.85, 0.6) {Candidate Boundary 2};
+
+\end{axis}
+\end{tikzpicture}
+\caption{The XOR linear inseparability barrier (Minsky \& Papert 1969). Class 1 points $(0,1)$ and $(1,0)$ (blue circles) cannot be separated from Class 0 points $(0,0)$ and $(1,1)$ (red squares) by any single linear hyperplane $w_1 x_1 + w_2 x_2 + w_0 = 0$. Any single line either isolates $(0,0)$ or $(1,1)$, but cannot simultaneously group both off-diagonal points.}
+\label{fig:xor_inseparability}
+\end{figure}
+
+As visualized in Figure~\ref{fig:xor_inseparability}, no straight line can separate the diagonal pairs. Because natural language and software engineering phenomena are riddled with non-linear relationships (e.g., mutually dependent programming idioms, nested conditional scopes), single-layer linear perceptrons are fundamentally inadequate.
+
+\paragraph{The causal question.}
+How can we overcome this linear inseparability barrier? An immediate intuitive engineering hypothesis presents itself: \emph{If one linear perceptron can draw one line, can we solve non-linear problems simply by cascading multiple linear perceptrons into a multi-layer network?} We test this hypothesis next.
+
+
+\section{Stacking linear layers and the proof of linear stacking collapse}
+\label{sec:linear_stacking_collapse}
 
 \subsection{Fully connected linear layers (dense layers)}
-In modern deep learning architectures, individual perceptrons do not operate in isolation; instead, multiple neurons run concurrently across a shared input vector $\vx \in \R^{d_{\text{in}}}$, forming a \emph{dense layer} (or fully connected layer).
+In multi-layer architectures, individual perceptrons do not operate in isolation; instead, multiple neurons run concurrently across a shared input vector $\vx \in \R^{d_{\text{in}}}$, forming a \emph{dense layer} (or fully connected layer).
 
 Let $d_{\text{in}}$ denote the input feature dimensionality and $d_{\text{out}}$ denote the number of hidden or output units. Stacking the individual weight vectors $\vw_j \in \R^{d_{\text{in}}}$ as columns of a weight matrix $\mW \in \R^{d_{\text{in}} \times d_{\text{out}}}$ and collecting the scalar biases $b_j$ into a bias vector $\vb \in \R^{d_{\text{out}}}$, the layer computation expresses compactly in matrix notation:
 \begin{equation}
@@ -275,7 +356,7 @@ Neglecting bias terms during parameter inventory counts is a frequent source of 
 \end{examinsight}
 
 \subsection{The mathematical proof of linear stacking collapse}
-A student encountering neural networks for the first time might ask: \emph{Why can we not simply stack dozens of linear layers without activation functions to build a deep model?}
+Now we return to our hypothesis: \emph{Can we solve XOR and non-linear problems simply by cascading multiple linear layers without activation functions?}
 
 The following theorem demonstrates that without non-linear activations, stacking arbitrary numbers of linear layers provides zero additional representational power over a single-layer linear model.
 
@@ -290,13 +371,13 @@ The composite function $\vz = f_2(f_1(\vx))$ collapses identically to a single a
 \vz &= \mW_2^\top \left( \mW_1^\top \vx + \vb_1 \right) + \vb_2 \notag \\
 &= \mW_2^\top \mW_1^\top \vx + \mW_2^\top \vb_1 + \vb_2 \notag \\
 &= \left( \mW_1 \mW_2 \right)^\top \vx + \left( \mW_2^\top \vb_1 + \vb_2 \right) \notag \\
-&= \mW'^\top \vx + \vb', \label{eq:collapse_final}
+&= \mW_{\text{net}}^\top \vx + \vb_{\text{net}}, \label{eq:collapse_final}
 \end{align}
-where $\mW' = \mW_1 \mW_2 \in \R^{n \times k}$ and $\vb' = \mW_2^\top \vb_1 + \vb_2 \in \R^k$.
+where $\mW_{\text{net}} = \mW_1 \mW_2 \in \R^{n \times k}$ and $\vb_{\text{net}} = \mW_2^\top \vb_1 + \vb_2 \in \R^k$.
 \end{theorem}
 
 \paragraph{Proof by mathematical induction.}
-Matrix multiplication is associative and closed under composition. The product of two matrices $\mW_1 \in \R^{n \times m}$ and $\mW_2 \in \R^{m \times k}$ is simply a single matrix $\mW' \in \R^{n \times k}$. Likewise, the affine transformation of bias vector $\vb_1$ by $\mW_2^\top$ added to $\vb_2$ is simply a single constant vector $\vb' \in \R^k$. 
+Matrix multiplication is associative and closed under composition. The product of two matrices $\mW_1 \in \R^{n \times m}$ and $\mW_2 \in \R^{m \times k}$ is simply a single matrix $\mW_{\text{net}} \in \R^{n \times k}$. Likewise, the affine transformation of bias vector $\vb_1$ by $\mW_2^\top$ added to $\vb_2$ is simply a single constant vector $\vb_{\text{net}} \in \R^k$. 
 
 By mathematical induction, for any cascade of $L$ linear layers:
 \begin{equation}
@@ -307,257 +388,15 @@ where:
 \begin{equation}
 \mW_{\text{net}} = \prod_{l=1}^L \mW_l \in \R^{d_{\text{in}} \times d_{\text{out}}}, \quad \vb_{\text{net}} = \vb_L + \sum_{l=1}^{L-1} \left( \prod_{j=l+1}^L \mW_j \right)^\top \vb_l.
 \end{equation}
-The composite mapping is strictly linear. Stacking 100 purely linear layers introduces millions of redundant matrix multiplications while learning nothing beyond standard linear regression. \hfill $\blacksquare$
+The composite mapping is strictly linear. Stacking 100 purely linear layers introduces millions of redundant matrix multiplications while learning nothing beyond standard linear regression. It strictly cannot compute XOR or any non-linear function. \hfill $\blacksquare$
 
-\begin{intuition}[Why non-linearity bends space: the XOR problem]
-Linear transformations can only rotate, reflect, scale, and shear Euclidean space; they preserve parallel lines and planar flat manifolds. 
+\paragraph{The fundamental takeaway.}
+\textbf{Non-linear activation functions are strictly and mathematically mandatory.} Without non-linearity between layers, deep networks collapse into trivial shallow affine mappings. Non-linear activations warp and fold coordinate space, transforming linearly inseparable data manifolds into representations where classes can be cleanly separated.
 
-In their famous 1969 critique, Marvin Minsky and Seymour Papert proved that a single linear perceptron cannot compute the basic exclusive-or ($\text{XOR}$) logical function:
-\begin{center}
-$(0, 0) \to 0, \quad (1, 1) \to 0, \quad (0, 1) \to 1, \quad (1, 0) \to 1.$
-\end{center}
-Plotting these four points reveals that no single line in $\R^2$ can separate $(0,1)$ and $(1,0)$ from $(0,0)$ and $(1,1)$. Non-linear activation functions act as topological ``folds'' and ``creases'' on the input space. By warping the coordinate system, intermediate hidden layers map entangled data manifolds into new representations where they become linearly separable.
-\end{intuition}
+\subsection{Universal approximation theorem and bump-function synthesis}
+\label{subsec:uat_derivation}
 
-\subsection{Taxonomy of neural activation functions}
-Modern neural NLP architectures deploy diverse activation functions tailored to hidden representations and output heads. Figure~\ref{fig:activation_functions_pgfplots} presents exact mathematical plots and derivatives for the primary activation functions.
-
-\begin{figure}[htbp]
-\centering
-\begin{subfigure}[b]{0.48\textwidth}
-\centering
-\begin{tikzpicture}
-\begin{axis}[
-    width=6.8cm, height=4.5cm,
-    axis lines=middle,
-    xmin=-5, xmax=5, ymin=-0.2, ymax=1.1,
-    xlabel={$z$}, ylabel={$y$},
-    grid=both, grid style={line width=.1pt, draw=gray!25},
-    legend style={at={(0.05,0.92)}, anchor=north west, font=\tiny},
-    tick label style={font=\tiny}
-]
-\addplot[domain=-5:5, samples=80, thick, color=politoNavy] {1 / (1 + exp(-x))};
-\addlegendentry{$\sigma(z)$}
-\addplot[domain=-5:5, samples=80, thick, dashed, color=examAmber] {exp(-x) / ((1 + exp(-x))^2)};
-\addlegendentry{$\sigma'(z)$}
-\end{axis}
-\end{tikzpicture}
-\caption{Logistic Sigmoid ($\sigma$) \& Derivative ($\sigma'$)}
-\label{fig:sub_sigmoid_plot}
-\end{subfigure}
-\hfill
-\begin{subfigure}[b]{0.48\textwidth}
-\centering
-\begin{tikzpicture}
-\begin{axis}[
-    width=6.8cm, height=4.5cm,
-    axis lines=middle,
-    xmin=-4, xmax=4, ymin=-1.2, ymax=1.2,
-    xlabel={$z$}, ylabel={$y$},
-    grid=both, grid style={line width=.1pt, draw=gray!25},
-    legend style={at={(0.05,0.92)}, anchor=north west, font=\tiny},
-    tick label style={font=\tiny}
-]
-\addplot[domain=-4:4, samples=80, thick, color=deepdiveTeal] {tanh(x)};
-\addlegendentry{$\tanh(z)$}
-\addplot[domain=-4:4, samples=80, thick, dashed, color=examAmber] {1 - (tanh(x))^2};
-\addlegendentry{$\tanh'(z)$}
-\end{axis}
-\end{tikzpicture}
-\caption{Hyperbolic Tangent ($\tanh$) \& Derivative}
-\label{fig:sub_tanh_plot}
-\end{subfigure}
-
-\vspace{0.4cm}
-
-\begin{subfigure}[b]{0.48\textwidth}
-\centering
-\begin{tikzpicture}
-\begin{axis}[
-    width=6.8cm, height=4.5cm,
-    axis lines=middle,
-    xmin=-4, xmax=4, ymin=-0.5, ymax=3.5,
-    xlabel={$z$}, ylabel={$y$},
-    grid=both, grid style={line width=.1pt, draw=gray!25},
-    legend style={at={(0.05,0.92)}, anchor=north west, font=\tiny},
-    tick label style={font=\tiny}
-]
-\addplot[domain=-4:0, thick, color=politoNavy] {0};
-\addplot[domain=0:4, samples=50, thick, color=politoNavy] {x};
-\addlegendentry{$\relu(z)$}
-\addplot[domain=-4:0, thick, dashed, color=examAmber] {0};
-\addplot[domain=0:4, samples=50, thick, dashed, color=examAmber] {1};
-\addlegendentry{$\relu'(z)$}
-\end{axis}
-\end{tikzpicture}
-\caption{Rectified Linear Unit (ReLU) \& Subgradient}
-\label{fig:sub_relu_plot}
-\end{subfigure}
-\hfill
-\begin{subfigure}[b]{0.48\textwidth}
-\centering
-\begin{tikzpicture}
-\begin{axis}[
-    width=6.8cm, height=4.5cm,
-    axis lines=middle,
-    xmin=-4, xmax=4, ymin=-0.8, ymax=3.5,
-    xlabel={$z$}, ylabel={$y$},
-    grid=both, grid style={line width=.1pt, draw=gray!25},
-    legend style={at={(0.05,0.92)}, anchor=north west, font=\tiny},
-    tick label style={font=\tiny}
-]
-\addplot[domain=-4:0, samples=50, thick, color=intuitionPurple] {0.1 * x};
-\addplot[domain=0:4, samples=50, thick, color=intuitionPurple] {x};
-\addlegendentry{LeakyReLU ($\alpha=0.1$)}
-\addplot[domain=-4:0, thick, dashed, color=examAmber] {0.1};
-\addplot[domain=0:4, samples=50, thick, dashed, color=examAmber] {1.0};
-\addlegendentry{Derivative}
-\end{axis}
-\end{tikzpicture}
-\caption{Leaky ReLU ($\alpha = 0.1$) \& Derivative}
-\label{fig:sub_leaky_relu_plot}
-\end{subfigure}
-
-\vspace{0.4cm}
-
-\begin{subfigure}[b]{0.48\textwidth}
-\centering
-\begin{tikzpicture}
-\begin{axis}[
-    width=6.8cm, height=4.5cm,
-    axis lines=middle,
-    xmin=-4, xmax=4, ymin=-0.5, ymax=3.5,
-    xlabel={$z$}, ylabel={$y$},
-    grid=both, grid style={line width=.1pt, draw=gray!25},
-    legend style={at={(0.05,0.92)}, anchor=north west, font=\tiny},
-    tick label style={font=\tiny}
-]
-\addplot[domain=-4:4, samples=100, thick, color=politoNavy] {0.5 * x * (1 + tanh(0.79788456 * (x + 0.044715 * x^3)))};
-\addlegendentry{$\gelu(z)$}
-\addplot[domain=-4:0, samples=40, thick, dotted, color=bodyGray] {0};
-\addplot[domain=0:4, samples=40, thick, dotted, color=bodyGray] {x};
-\addlegendentry{Standard ReLU}
-\end{axis}
-\end{tikzpicture}
-\caption{Gaussian Error Linear Unit (GELU) vs ReLU}
-\label{fig:sub_gelu_plot}
-\end{subfigure}
-\hfill
-\begin{subfigure}[b]{0.48\textwidth}
-\centering
-\begin{tikzpicture}[
-    scale=0.85,
-    vecnode/.style={rectangle, draw=politoNavy, fill=skyBlue!30, thick, minimum width=2.4cm, minimum height=0.6cm, font=\scriptsize\bfseries},
-    expnode/.style={rectangle, draw=examAmber, fill=examAmberBg, thick, minimum width=2.4cm, minimum height=0.6cm, font=\scriptsize\bfseries},
-    probnode/.style={rectangle, draw=deepdiveTeal, fill=deepdiveTealBg, thick, minimum width=2.4cm, minimum height=0.6cm, font=\scriptsize\bfseries},
-    arr/.style={-{Stealth[scale=1.0]}, thick, draw=bodyDark}
-]
-
-\node[vecnode] (z) at (0, 2.4) {$\vz = [2.0, 1.0, 0.1]^\top$};
-\node[above=1pt of z, font=\tiny\bfseries, text=politoNavy] {Raw Logits $\vz \in \R^3$};
-
-\node[expnode] (expz) at (0, 1.2) {$e^\vz = [7.39, 2.72, 1.11]^\top$};
-\node[right=2pt of expz, font=\tiny, text=examAmber] {$\sum e^{z_j} = 11.22$};
-
-\node[probnode] (p) at (0, 0.0) {$\hat{\vy} = [0.66, 0.24, 0.10]^\top$};
-\node[below=1pt of p, font=\tiny\bfseries, text=deepdiveTeal] {Simplex $\sum \hat{y}_i = 1.0$};
-
-\draw[arr] (z) -- node[right, font=\tiny] {$\exp(\cdot)$} (expz);
-\draw[arr] (expz) -- node[right, font=\tiny] {$\div \sum e^{z_j}$} (p);
-
-\end{tikzpicture}
-\caption{Softmax Vector Mapping onto Simplex $\Delta^2$}
-\label{fig:sub_softmax_diagram}
-\end{subfigure}
-
-\caption{Exact mathematical function profiles of primary neural activation functions. (a) Logistic sigmoid squashes to $(0, 1)$ with maximum derivative $0.25$; (b) Tanh is zero-centered with maximum derivative $1.0$; (c) ReLU eliminates vanishing gradients for $z > 0$ but suffers from dead neurons for $z < 0$; (d) Leaky ReLU preserves a slight gradient $\alpha$ in the negative regime; (e) GELU provides smooth, non-monotonic probabilistic gating; (f) Softmax exponentiates and normalizes raw logit vectors into valid categorical probability distributions.}
-\label{fig:activation_functions_pgfplots}
-\end{figure}
-
-\paragraph{1. Logistic sigmoid.}
-Squashes real-valued inputs $\R$ into the bounded probability interval $(0, 1)$:
-\begin{equation}
-\label{eq:sigmoid_formula}
-\sigma(z) = \frac{1}{1 + e^{-z}}.
-\end{equation}
-Its derivative expresses neatly in terms of the function itself:
-\begin{equation}
-\label{eq:sigmoid_derivative}
-\sigma'(z) = \sigma(z)(1 - \sigma(z)).
-\end{equation}
-The maximum derivative occurs at the inflection point $z = 0$, where $\sigma'(0) = 0.5 \times 0.5 = 0.25$. For $|z| \gg 0$, $\sigma'(z) \to 0$, causing severe \textbf{gradient saturation} that halts backpropagation in deep feedforward stacks.
-
-\paragraph{2. Hyperbolic tangent ($\tanh$).}
-Squashes real inputs into the zero-centered symmetric interval $(-1, 1)$:
-\begin{equation}
-\label{eq:tanh_formula}
-\tanh(z) = \frac{e^z - e^{-z}}{e^z + e^{-z}} = 2\sigma(2z) - 1.
-\end{equation}
-Its derivative is $\tanh'(z) = 1 - \tanh^2(z)$, with maximum value $\tanh'(0) = 1.0$. Because it is zero-centered, its expected gradient does not systematically bias weight updates in a single direction, making it vastly superior to sigmoid in recurrent hidden state transitions.
-
-\paragraph{3. Rectified linear unit (ReLU).}
-Introduced to mitigate vanishing gradients in deep networks:
-\begin{equation}
-\label{eq:relu_formula}
-\relu(z) = \max(0, z).
-\end{equation}
-Its subgradient is a piecewise step function: $\relu'(z) = 1$ if $z > 0$, and $\relu'(z) = 0$ if $z < 0$. It is scale-invariant and computationally cheap, but susceptible to the \textbf{dying ReLU} pathology: if a large gradient updates weights such that a neuron outputs $z < 0$ across the entire dataset, its gradient is permanently $0$, rendering the neuron permanently inactive.
-
-\paragraph{4. Leaky ReLU.}
-Prevents dying neurons by introducing a small non-zero slope $\alpha \approx 0.01$ (or $0.1$) in the negative regime:
-\begin{equation}
-\label{eq:leaky_relu_formula}
-\text{LeakyReLU}(z) = \max(\alpha z, z) = \begin{cases} z & \text{if } z > 0 \\ \alpha z & \text{if } z \le 0 \end{cases}.
-\end{equation}
-
-\paragraph{5. Gaussian error linear unit (GELU).}
-The standard activation function in modern Transformers (BERT, GPT-2, GPT-3, LLaMA) \cite{radford2019,devlin2019,hendrycks2016gelu}:
-\begin{equation}
-\label{eq:gelu_formula}
-\gelu(z) = z \cdot \Phi(z) = z \cdot \Prob(X \le z), \quad X \sim \mathcal{N}(0, 1).
-\end{equation}
-GELU weights inputs by their percentile value under a standard Gaussian cumulative distribution. It is smooth, non-monotonic (exhibiting a small negative dip near $z \approx -0.75$), and approximated in deep learning libraries as:
-\begin{equation}
-\label{eq:gelu_approx}
-\gelu(z) \approx 0.5 z \left( 1 + \tanh\left( \sqrt{\frac{2}{\pi}} \left( z + 0.044715 z^3 \right) \right) \right).
-\end{equation}
-
-\paragraph{6. Softmax.}
-Maps an unnormalized $C$-dimensional logit vector $\vz \in \R^C$ to the probability simplex:
-\begin{equation}
-\label{eq:softmax_formula}
-\softmax(\vz)_i = \frac{e^{z_i}}{\sum_{j=1}^C e^{z_j}}, \quad \text{guaranteeing } \softmax(\vz)_i \in [0, 1] \text{ and } \sum_{i=1}^C \softmax(\vz)_i = 1.
-\end{equation}
-
-\paragraph{7. Linear identity activation.}
-Defined as $f(z) = z$. Used exclusively in continuous regression output heads where the predicted target is an unbounded real scalar.
-
-Table~\ref{tab:activation_comparison} provides a comprehensive comparative summary of these activation functions.
-
-\begin{table}[htbp]
-\centering
-\small
-\caption{Comprehensive taxonomy and characteristics of neural activation functions.}
-\label{tab:activation_comparison}
-\begin{tabularx}{\textwidth}{l c c c >{\raggedright\arraybackslash}X}
-\toprule
-\textbf{Function} & \textbf{Domain} & \textbf{Range} & \textbf{Max Derivative} & \textbf{Primary NLP Usage \& Key Features} \\
-\midrule
-Sigmoid ($\sigma$) & $\R$ & $(0, 1)$ & $0.25$ ($z=0$) & Binary classification output head; severe saturation plateaus for $|z| > 4$. \\
-Tanh & $\R$ & $(-1, 1)$ & $1.00$ ($z=0$) & Recurrent state gating (LSTM/GRU); zero-centered symmetric output. \\
-ReLU & $\R$ & $[0, \infty)$ & $1.00$ ($z>0$) & Feedforward layers in early architectures; prone to dying neurons ($z<0$). \\
-Leaky ReLU & $\R$ & $\R$ & $1.00$ ($z>0$) & Robust feedforward variant; retains small negative slope $\alpha$ to prevent neuron death. \\
-GELU & $\R$ & $[-0.17, \infty)$ & $\approx 1.08$ & Canonical Transformer activation (GPT, BERT); smooth, probabilistic gating. \\
-Softmax & $\R^C$ & $\Delta^{C-1}$ & Matrix Jacobian & Next-token prediction vocabulary head; maps logits to discrete probability simplex. \\
-Identity & $\R$ & $\R$ & $1.00$ ($\forall z$) & Regression output head; unbounded linear prediction. \\
-\bottomrule
-\end{tabularx}
-\end{table}
-
-\section{Universal approximation theorem}
-\label{sec:uat}
-
-The theoretical foundation validating neural networks as general-purpose function approximators is the \emph{Universal Approximation Theorem}.
+Given that non-linear activation functions prevent linear collapse, what family of functions can a non-linear neural network represent? The theoretical foundation validating neural networks as general-purpose function approximators is the \emph{Universal Approximation Theorem}.
 
 \begin{theorem}{Universal approximation theorem}{uat}
 Let $\sigma: \R \to \R$ be any continuous, non-constant, bounded, and monotonically increasing activation function (e.g., sigmoid) \cite{cybenko1989}. Let $I_n \subset \R^n$ denote a compact (closed and bounded) subset of $n$-dimensional Euclidean space, and let $C(I_n)$ denote the space of continuous real-valued functions on $I_n$. Then, for any target continuous function $g \in C(I_n)$ and any arbitrary error tolerance $\epsilon > 0$, there exist a finite integer $M \in \N$, parameter weights $\vw_j \in \R^n$, outer weights $\alpha_j \in \R$, and biases $b_j \in \R$ such that the single-hidden-layer feedforward network:
@@ -574,8 +413,8 @@ satisfies uniform approximation error:
 
 Originally proved by George Cybenko \cite{cybenko1989} for sigmoidal activations and generalized by Kurt Hornik et al.~\cite{hornik1989} and Moshe Leshno et al.~\cite{leshno1993} to arbitrary continuous non-polynomial activations, this theorem guarantees that a feedforward network with a single hidden layer has the mathematical capacity to approximate any continuous function.
 
-\subsection{Intuitive geometric derivation: bump-function synthesis}
-To understand intuitively why a single hidden layer can approximate any arbitrary continuous curve, consider a 1D function $g(x): [a, b] \to \R$.
+\paragraph{Intuitive geometric derivation: bump-function synthesis.}
+To understand intuitively why a single hidden layer can approximate any continuous curve, consider a 1D function $g(x): [a, b] \to \R$.
 
 \paragraph{Step 1: Constructing a localized rectangular bump.}
 Consider two sigmoid neurons with very high slope $w \gg 0$ located at spatial offsets $x_1$ and $x_2$ (with $x_1 < x_2$). As $w \to \infty$, the sigmoid $\sigma(w(x - x_1))$ converges to a Heaviside step function $H(x - x_1)$. 
@@ -662,121 +501,321 @@ If a single hidden layer can approximate any function, why does modern deep lear
     \item \textbf{Hierarchical Compositionality}: Deep networks factorize functions into hierarchical abstractions: early layers learn low-level primitives (subwords, syntax), intermediate layers learn grammatical structure, and deep layers capture long-range semantic discourse. Deep networks achieve equal approximation power with exponentially fewer parameters than shallow networks.
 \end{enumerate}
 
+
+\section{Taxonomy of neural activation functions}
+\label{sec:activations_taxonomy}
+
+Modern neural NLP architectures deploy diverse activation functions tailored to hidden representations and output heads. Figure~\ref{fig:activation_functions_pgfplots} presents exact mathematical plots and derivatives for the primary activation functions.
+
+\begin{figure}[htbp]
+\centering
+\begin{subfigure}[b]{0.48\textwidth}
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    width=6.8cm, height=4.2cm,
+    axis lines=middle,
+    xmin=-5, xmax=5, ymin=-0.1, ymax=1.1,
+    xlabel={$z$}, ylabel={$y$},
+    grid=both, grid style={line width=.1pt, draw=gray!25},
+    legend style={at={(0.05,0.92)}, anchor=north west, font=\tiny},
+    tick label style={font=\tiny}
+]
+\addplot[domain=-5:5, samples=100, very thick, color=politoNavy] {1 / (1 + exp(-x))};
+\addlegendentry{$\sigma(z) = \frac{1}{1 + e^{-z}}$}
+\addplot[domain=-5:5, samples=100, thick, color=red!75!black, dashed] {(1 / (1 + exp(-x))) * (1 - (1 / (1 + exp(-x))))};
+\addlegendentry{$\sigma'(z) = \sigma(z)(1 - \sigma(z))$}
+\end{axis}
+\end{tikzpicture}
+\caption{Sigmoid (Logistic)}
+\label{fig:sub_sigmoid}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.48\textwidth}
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    width=6.8cm, height=4.2cm,
+    axis lines=middle,
+    xmin=-4, xmax=4, ymin=-1.15, ymax=1.15,
+    xlabel={$z$}, ylabel={$y$},
+    grid=both, grid style={line width=.1pt, draw=gray!25},
+    legend style={at={(0.05,0.92)}, anchor=north west, font=\tiny},
+    tick label style={font=\tiny}
+]
+\addplot[domain=-4:4, samples=100, very thick, color=deepdiveTeal] {tanh(x)};
+\addlegendentry{$\tanh(z) = \frac{e^z - e^{-z}}{e^z + e^{-z}}$}
+\addplot[domain=-4:4, samples=100, thick, color=red!75!black, dashed] {1 - (tanh(x))^2};
+\addlegendentry{$\tanh'(z) = 1 - \tanh^2(z)$}
+\end{axis}
+\end{tikzpicture}
+\caption{Hyperbolic Tangent ($\tanh$)}
+\label{fig:sub_tanh}
+\end{subfigure}
+
+\vspace{0.4cm}
+
+\begin{subfigure}[b]{0.48\textwidth}
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    width=6.8cm, height=4.2cm,
+    axis lines=middle,
+    xmin=-4, xmax=4, ymin=-0.5, ymax=4.2,
+    xlabel={$z$}, ylabel={$y$},
+    grid=both, grid style={line width=.1pt, draw=gray!25},
+    legend style={at={(0.05,0.92)}, anchor=north west, font=\tiny},
+    tick label style={font=\tiny}
+]
+\addplot[domain=-4:0, samples=20, very thick, color=intuitionPurple] {0};
+\addplot[domain=0:4, samples=20, very thick, color=intuitionPurple] {x};
+\addlegendentry{$\relu(z) = \max(0, z)$}
+\addplot[domain=-4:0, samples=20, thick, color=red!75!black, dashed] {0};
+\addplot[domain=0:4, samples=20, thick, color=red!75!black, dashed] {1};
+\addlegendentry{$\relu'(z) \in \{0, 1\}$}
+\end{axis}
+\end{tikzpicture}
+\caption{Rectified Linear Unit (ReLU)}
+\label{fig:sub_relu}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.48\textwidth}
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    width=6.8cm, height=4.2cm,
+    axis lines=middle,
+    xmin=-4, xmax=4, ymin=-0.8, ymax=4.2,
+    xlabel={$z$}, ylabel={$y$},
+    grid=both, grid style={line width=.1pt, draw=gray!25},
+    legend style={at={(0.05,0.92)}, anchor=north west, font=\tiny},
+    tick label style={font=\tiny}
+]
+\addplot[domain=-4:0, samples=20, very thick, color=examAmber] {0.1*x};
+\addplot[domain=0:4, samples=20, very thick, color=examAmber] {x};
+\addlegendentry{$\text{LReLU}(z) = \max(0.1z, z)$}
+\addplot[domain=-4:0, samples=20, thick, color=red!75!black, dashed] {0.1};
+\addplot[domain=0:4, samples=20, thick, color=red!75!black, dashed] {1};
+\addlegendentry{$\text{LReLU}'(z) \in \{0.1, 1\}$}
+\end{axis}
+\end{tikzpicture}
+\caption{Leaky ReLU ($\alpha = 0.1$)}
+\label{fig:sub_leaky_relu}
+\end{subfigure}
+
+\vspace{0.4cm}
+
+\begin{subfigure}[b]{0.48\textwidth}
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    width=6.8cm, height=4.2cm,
+    axis lines=middle,
+    xmin=-4, xmax=4, ymin=-0.5, ymax=4.2,
+    xlabel={$z$}, ylabel={$y$},
+    grid=both, grid style={line width=.1pt, draw=gray!25},
+    legend style={at={(0.05,0.92)}, anchor=north west, font=\tiny},
+    tick label style={font=\tiny}
+]
+% Approximation of GELU: 0.5 * x * (1 + tanh(sqrt(2/pi) * (x + 0.044715 * x^3)))
+\addplot[domain=-4:4, samples=120, very thick, color=thmGreen] {0.5*x*(1 + tanh(0.79788456*(x + 0.044715*x^3)))};
+\addlegendentry{$\gelu(z) \approx 0.5z(1 + \tanh(\dots))$}
+\node[font=\tiny, text=thmGreen] at (axis cs: -1.7, -0.32) {Dip: $-0.17$};
+\end{axis}
+\end{tikzpicture}
+\caption{Gaussian Error Linear Unit (GELU)}
+\label{fig:sub_gelu}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.48\textwidth}
+\centering
+\begin{tikzpicture}[scale=0.85]
+% 3D Bar chart representing Softmax projection from logits to probability simplex
+\draw[-{Stealth[scale=1.0]}, thick] (0, 0) -- (5.2, 0) node[right, font=\scriptsize\bfseries] {Class Index $i$};
+\draw[-{Stealth[scale=1.0]}, thick] (0, 0) -- (0, 3.4) node[above, font=\scriptsize\bfseries] {$\Prob(Y = i)$};
+
+% Logits annotations
+\node[font=\tiny\ttfamily] at (0.8, -0.35) {$\vz_1=2.1$};
+\node[font=\tiny\ttfamily] at (2.2, -0.35) {$\vz_2=1.0$};
+\node[font=\tiny\ttfamily] at (3.6, -0.35) {$\vz_3=-0.5$};
+
+% Normalized probability bars
+\fill[steelBlue!75] (0.4, 0) rectangle (1.2, 2.38);
+\node[font=\scriptsize\bfseries, text=politoNavy] at (0.8, 2.58) {$0.672$};
+
+\fill[deepdiveTeal!75] (1.8, 0) rectangle (2.6, 0.79);
+\node[font=\scriptsize\bfseries, text=deepdiveTeal] at (2.2, 0.99) {$0.224$};
+
+\fill[examAmber!75] (3.2, 0) rectangle (4.0, 0.37);
+\node[font=\scriptsize\bfseries, text=examAmber] at (3.6, 0.57) {$0.104$};
+
+\draw[dashed, red!75!black, thick] (0, 2.38) -- (0.4, 2.38);
+\node[font=\tiny\bfseries, text=red!75!black, anchor=east] at (0, 2.38) {$\softmax$};
+\node[font=\tiny\bfseries] at (2.5, 3.1) {$\sum_{i=1}^3 \Prob(Y = i) = 1.000$};
+
+\end{tikzpicture}
+\caption{Softmax Simplex Mapping ($\R^3 \to \Delta^2$)}
+\label{fig:sub_softmax}
+\end{subfigure}
+\caption{Taxonomy of primary neural activation functions plotted across their operating ranges: (a) Sigmoid $\sigma(z)$ with peak derivative $0.25$; (b) Zero-centered $\tanh(z)$ with peak derivative $1.0$; (c) Piecewise linear $\relu(z)$; (d) Leaky ReLU preventing dead units; (e) Non-monotonic $\gelu(z)$ used in modern Transformers; (f) Multi-class Softmax mapping logits to the probability simplex.}
+\label{fig:activation_functions_pgfplots}
+\end{figure}
+
+\paragraph{1. The logistic sigmoid ($\sigmoid$).}
+\begin{equation}
+\label{eq:sigmoid_def}
+\sigmoid(z) = \frac{1}{1 + e^{-z}}, \quad \text{Range: } (0, 1), \quad \sigmoid'(z) = \sigmoid(z)(1 - \sigmoid(z)).
+\end{equation}
+The derivative attains its global maximum of $\sigmoid'(0) = 0.25$ at the origin. For large positive or negative inputs ($|z| \ge 4$), $\sigmoid'(z) \to 0$, causing severe \emph{vanishing gradients} in deep networks.
+
+\paragraph{2. Hyperbolic tangent ($\tanhact$).}
+\begin{equation}
+\label{eq:tanh_def}
+\tanhact(z) = \frac{e^z - e^{-z}}{e^z + e^{-z}} = 2\sigmoid(2z) - 1, \quad \text{Range: } (-1, 1), \quad \tanhact'(z) = 1 - \tanhact^2(z).
+\end{equation}
+The hyperbolic tangent is strictly zero-centered, possessing average activation values near zero, which accelerates gradient descent compared to non-negative sigmoids. However, it still saturates for $|z| \ge 3$, yielding vanishing gradients.
+
+\paragraph{3. Rectified linear unit ($\relu$).}
+\begin{equation}
+\label{eq:relu_def}
+\relu(z) = \max(0, z), \quad \text{Range: } [0, \infty), \quad \relu'(z) = \begin{cases} 1 & \text{if } z > 0 \\ 0 & \text{if } z < 0 \end{cases}.
+\end{equation}
+ReLU completely eliminates gradient vanishing for positive pre-activations ($z > 0$). However, if a large gradient update shifts a neuron's weights such that $z \le 0$ across all training samples, its activation and derivative permanently collapse to zero ($\relu'(z) = 0$), a pathology known as the \emph{dying ReLU problem}.
+
+\paragraph{4. Leaky ReLU ($\text{LReLU}$).}
+\begin{equation}
+\label{eq:leaky_relu_def}
+\text{LReLU}(z) = \max(\alpha z, z) \quad \text{with } 0 < \alpha \ll 1, \quad \text{Range: } (-\infty, \infty), \quad \text{LReLU}'(z) = \begin{cases} 1 & \text{if } z > 0 \\ \alpha & \text{if } z \le 0 \end{cases}.
+\end{equation}
+By maintaining a small constant slope $\alpha$ (typically $\alpha = 0.01$) in the negative half-plane, Leaky ReLU guarantees that a non-zero gradient always backpropagates, preventing dead neurons.
+
+\paragraph{5. Gaussian error linear unit ($\gelu$).}
+Introduced by Dan Hendrycks and Kevin Gimpel, GELU scales the input by its cumulative standard normal probability $\Phi(z)$:
+\begin{equation}
+\label{eq:gelu_def}
+\gelu(z) = z \cdot \Phi(z) = z \cdot \frac{1}{2} \left[ 1 + \text{erf}\left( \frac{z}{\sqrt{2}} \right) \right] \approx 0.5z \left( 1 + \tanh\left( \sqrt{\frac{2}{\pi}} \left( z + 0.044715 z^3 \right) \right) \right).
+\end{equation}
+GELU is smooth, differentiable everywhere, and non-monotonic, dipping to a global minimum of $\approx -0.17$ at $z \approx -0.75$. This smoothness provides curvature information during optimization, making GELU the default activation in Transformer language models (GPT-2, GPT-3, BERT, RoBERTa).
+
+\paragraph{6. Softmax.}
+For categorical multi-class predictions over $C$ mutually exclusive classes, Softmax normalizes a real-valued logit vector $\vz = [z_1, \dots, z_C]^\top \in \R^C$ onto the unit probability simplex $\Delta^{C-1}$:
+\begin{equation}
+\label{eq:softmax_def}
+\hat{y}_i = \softmax(\vz)_i = \frac{e^{z_i}}{\sum_{j=1}^C e^{z_j}} \quad \text{such that } \hat{y}_i \in (0, 1) \quad \text{and} \quad \sum_{i=1}^C \hat{y}_i = 1.
+\end{equation}
+Softmax forms the standard vocabulary output head of modern autoregressive language models, computing next-token probability distributions across vocabulary $\vocab$.
+
+Table~\ref{tab:activations_taxonomy} provides a comparative reference summarizing the mathematical properties of each activation function.
+
+\begin{table}[htbp]
+\centering
+\small
+\caption{Comprehensive taxonomy of neural activation functions, mathematical formulations, operating bounds, and architectural domains.}
+\label{tab:activations_taxonomy}
+\begin{tabularx}{\textwidth}{l c c c >{\raggedright\arraybackslash}X}
+\toprule
+\textbf{Activation} & \textbf{Domain} & \textbf{Range} & \textbf{Peak Gradient} & \textbf{Primary Use Case in Language Modeling} \\
+\midrule
+Sigmoid ($\sigma$) & $\R$ & $(0, 1)$ & $0.25$ ($z=0$) & Binary classification output heads; gating mechanisms in LSTM/GRU highways. \\
+Tanh & $\R$ & $(-1, 1)$ & $1.00$ ($z=0$) & Recurrent hidden state candidate generation; zero-centered coordinate representations. \\
+ReLU & $\R$ & $[0, \infty)$ & $1.00$ ($z > 0$) & Classical deep feedforward networks; compute-efficient linear regions. \\
+Leaky ReLU & $\R$ & $\R$ & $1.00$ ($z > 0$), $\alpha$ ($z \le 0$) & Prevents dying neuron syndrome; robust discriminator networks. \\
+GELU & $\R$ & $[-0.17, \infty)$ & $\approx 1.08$ & Canonical Transformer activation (GPT, BERT); smooth, probabilistic gating. \\
+Softmax & $\R^C$ & $\Delta^{C-1}$ & Matrix Jacobian & Next-token prediction vocabulary head; maps logits to discrete probability simplex. \\
+Identity & $\R$ & $\R$ & $1.00$ ($\forall z$) & Regression output head; unbounded linear prediction. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+
 \section{Architectural task formulations and software engineering case studies}
 \label{sec:task_formulations_se}
 
 In machine learning applications for software engineering, task formulations map specific software artifacts (commits, ASTs, bug reports, source code tokens) into continuous predictions. Three primary architectural heads dominate:
 
 \subsection{1. Binary classification: automated vulnerability detection}
-\paragraph{Mathematical formulation.}
-The model projects the final hidden state $\vh \in \R^d$ to a single scalar logit $z \in \R$. The sigmoid activation maps $z$ to predicted probability $\hat{y} = \sigma(z) \in [0, 1]$. The decision rule uses a threshold $\tau = 0.5$:
-\begin{equation}
-\label{eq:binary_decision_rule}
-\hat{C} = \begin{cases} 1 & \text{if } \hat{y} \ge 0.5 \; (z \ge 0) \\ 0 & \text{if } \hat{y} < 0.5 \; (z < 0) \end{cases}.
-\end{equation}
-
-\paragraph{Software engineering case study.}
-Consider \textbf{Just-In-Time (JIT) Vulnerability Prediction}: predicting whether an incoming Git commit introduces a security vulnerability ($y=1$) or is clean ($y=0$). Features include:
+Consider predicting whether a proposed code commit contains a security vulnerability (e.g., buffer overflow, SQL injection).
 \begin{itemize}
-    \item $x_1$: Code Churn (total lines of code added plus modified).
-    \item $x_2$: Cyclomatic Complexity delta ($\Delta \text{CC}$).
+    \item \textbf{Input Vector}: $\vx \in \R^{d}$ (extracted code embeddings or static analysis metrics).
+    \item \textbf{Output Layer}: A single linear neuron producing logit $z = \vw^\top \vh + b \in \R$.
+    \item \textbf{Activation}: Logistic Sigmoid $\hat{y} = \sigma(z) = \Prob(\text{Vulnerable} = 1 \mid \vx) \in [0, 1]$.
+    \item \textbf{Decision Rule}: Flag for manual audit if $\hat{y} \ge \tau$ (where $\tau = 0.5$ by default, tuned to optimize recall).
 \end{itemize}
-Figure~\ref{fig:se_tasks_diagrams}(a) illustrates the 2D feature plane where a trained linear perceptron separates high-churn, complex vulnerable commits from standard maintenance commits.
+Figure~\ref{fig:se_tasks_diagrams}(a) illustrates the resulting separating hyperplane in feature space.
 
-\subsection{2. Multi-class classification: defect category prediction}
-\paragraph{Mathematical formulation.}
-For $C$ mutually exclusive classes, the model projects $\vh \in \R^d$ to a logit vector $\vz = [z_1, \dots, z_C]^\top \in \R^C$. Softmax converts logits into a normalized categorical distribution:
-\begin{equation}
-\label{eq:multiclass_decision_rule}
-\hat{y}_i = \Prob(Y = c_i \mid \vx) = \frac{e^{z_i}}{\sum_{j=1}^C e^{z_j}}, \quad \hat{C} = \argmax_{i \in \{1, \dots, C\}} \hat{y}_i.
-\end{equation}
+\subsection{2. Multi-class classification: automated AST node type prediction}
+In program repair and neural compiler optimization, models classify Abstract Syntax Tree (AST) nodes into $C$ discrete syntactic types (e.g., \texttt{MethodDeclaration}, \texttt{VariableDeclaration}, \texttt{IfStatement}, \texttt{WhileStatement}).
+\begin{itemize}
+    \item \textbf{Output Layer}: $C$ parallel linear neurons producing logit vector $\vz = \mW^\top \vh + \vb \in \R^C$.
+    \item \textbf{Activation}: Softmax operator $\hat{\vy} = \softmax(\vz) \in \Delta^{C-1}$.
+    \item \textbf{Decision Rule}: Predicted AST type $\hat{c} = \argmax_{i} \hat{y}_i$.
+\end{itemize}
+Figure~\ref{fig:se_tasks_diagrams}(b) diagrams the resulting Voronoi-like partitioned multi-class decision space.
 
-\paragraph{Software engineering case study.}
-Consider \textbf{Automated Bug Report Triage}: classifying an unassigned software defect into $C = 4$ mutually exclusive failure categories:
-\[
-\mathcal{C} = \{\text{NullPointerException}, \text{ResourceLeak}, \text{ConcurrencyDeadlock}, \text{SyntaxError}\}.
-\]
-Figure~\ref{fig:se_tasks_diagrams}(b) diagrams the 2D feature space partitioned into multi-class decision regions alongside the resulting softmax probability distribution.
-
-\subsection{3. Regression: code review effort prediction}
-\paragraph{Mathematical formulation.}
-For unbounded continuous numeric quantities, the output head applies the linear identity activation $f(z) = z$:
-\begin{equation}
-\label{eq:regression_formula}
-\hat{y} = \vw_{\text{out}}^\top \vh + b_{\text{out}} \in \R.
-\end{equation}
-
-\paragraph{Software engineering case study.}
-Consider \textbf{Pull Request Review Time Estimation}: predicting the expected developer-hours ($\hat{y} \in \R^+$) required to review and merge a pull request based on the number of modified files and author repository experience. Figure~\ref{fig:se_tasks_diagrams}(c) displays a fitted regression line through empirical software engineering data points with residual errors.
+\subsection{3. Regression: pull request review effort estimation}
+Engineering managers must predict continuous quantities, such as the estimated review time (in hours) required for an incoming pull request based on code churn, changed files, and author experience.
+\begin{itemize}
+    \item \textbf{Output Layer}: A single linear neuron producing scalar $z = \vw^\top \vh + b$.
+    \item \textbf{Activation}: Linear Identity function $f(z) = z \in \R$.
+    \item \textbf{Prediction}: $\hat{y} = z \in \R$ (continuous unbounded prediction).
+\end{itemize}
+Figure~\ref{fig:se_tasks_diagrams}(c) illustrates continuous line fitting through software engineering observation points.
 
 \begin{figure}[htbp]
 \centering
 \begin{subfigure}[b]{0.32\textwidth}
 \centering
-\begin{tikzpicture}[scale=0.68]
+\begin{tikzpicture}[scale=0.7]
 \begin{axis}[
+    width=5.0cm, height=4.2cm,
     axis lines=middle,
-    xlabel={Churn ($x_1$)}, ylabel={$\Delta \text{CC}$ ($x_2$)},
-    xmin=0, xmax=5, ymin=0, ymax=5,
-    grid=both, grid style={line width=.1pt, draw=gray!25},
-    tick label style={font=\tiny},
-    xlabel style={font=\tiny\bfseries}, ylabel style={font=\tiny\bfseries}
+    xmin=0, xmax=4, ymin=0, ymax=4,
+    xlabel={$x_1$}, ylabel={$x_2$},
+    tick label style={font=\tiny}
 ]
-\addplot[domain=0.5:4.5, thick, color=politoNavy] {5 - 1.1*x};
-\addplot[only marks, mark=*, mark size=2.5pt, color=red!75!black] coordinates {
-    (3, 3) (4, 2.5) (3.5, 4) (2.5, 3.5) (4.5, 4.5)
-};
-\addplot[only marks, mark=square*, mark size=2.5pt, color=steelBlue] coordinates {
-    (1, 1) (1.5, 2) (2, 0.5) (0.5, 2.5) (2, 1.5)
-};
+\addplot[thick, color=politoNavy, domain=0.5:3.5] {4 - x};
+\addplot[only marks, mark=*, mark size=2pt, color=steelBlue] coordinates {(1, 3.5) (2, 2.5) (3, 2)};
+\addplot[only marks, mark=square*, mark size=2pt, color=red!75!black] coordinates {(1, 1.5) (2, 1) (0.5, 2)};
 \end{axis}
 \end{tikzpicture}
-\caption{Binary: Vulnerability}
+\caption{Binary: Defect Detection}
 \label{fig:sub_se_binary}
 \end{subfigure}
 \hfill
 \begin{subfigure}[b]{0.32\textwidth}
 \centering
-\begin{tikzpicture}[scale=0.68]
+\begin{tikzpicture}[scale=0.7]
 \begin{axis}[
+    width=5.0cm, height=4.2cm,
     axis lines=middle,
+    xmin=0, xmax=4, ymin=0, ymax=4,
     xlabel={$x_1$}, ylabel={$x_2$},
-    xmin=-3, xmax=3, ymin=-3, ymax=3,
-    grid=both, grid style={line width=.1pt, draw=gray!25},
-    tick label style={font=\tiny},
-    xlabel style={font=\tiny\bfseries}, ylabel style={font=\tiny\bfseries}
+    tick label style={font=\tiny}
 ]
-% Decision boundaries (rays from origin)
-\draw[thick, color=bodyDark] (axis cs: 0, 0) -- (axis cs: 0, 3);
-\draw[thick, color=bodyDark] (axis cs: 0, 0) -- (axis cs: 2.6, -1.5);
-\draw[thick, color=bodyDark] (axis cs: 0, 0) -- (axis cs: -2.6, -1.5);
-
-\addplot[only marks, mark=*, mark size=2.2pt, color=red!75!black] coordinates {(1.5, 1.5) (1, 2) (2, 1)};
-\addplot[only marks, mark=triangle*, mark size=2.5pt, color=deepdiveTeal] coordinates {(-1.5, 1.5) (-1, 2) (-2, 0.5)};
-\addplot[only marks, mark=square*, mark size=2.2pt, color=examAmber] coordinates {(0, -1.5) (1, -2) (-1, -2)};
+\draw[thick, color=bodyGray] (axis cs: 2, 2) -- (axis cs: 0, 0);
+\draw[thick, color=bodyGray] (axis cs: 2, 2) -- (axis cs: 2, 4);
+\draw[thick, color=bodyGray] (axis cs: 2, 2) -- (axis cs: 4, 1);
+\addplot[only marks, mark=*, mark size=2pt, color=steelBlue] coordinates {(0.8, 2.5) (1.2, 3)};
+\addplot[only marks, mark=triangle*, mark size=2pt, color=deepdiveTeal] coordinates {(3, 2.5) (3.5, 3)};
+\addplot[only marks, mark=square*, mark size=2pt, color=examAmber] coordinates {(2.5, 0.8) (1.5, 0.5)};
 \end{axis}
 \end{tikzpicture}
-\caption{Multi-Class: Defect Triage}
+\caption{Multi-class: AST Type}
 \label{fig:sub_se_multiclass}
 \end{subfigure}
 \hfill
 \begin{subfigure}[b]{0.32\textwidth}
 \centering
-\begin{tikzpicture}[scale=0.68]
+\begin{tikzpicture}[scale=0.7]
 \begin{axis}[
+    width=5.0cm, height=4.2cm,
     axis lines=middle,
-    xlabel={Lines ($x$)}, ylabel={Hours ($\hat{y}$)},
-    xmin=0, xmax=5, ymin=0, ymax=5,
-    grid=both, grid style={line width=.1pt, draw=gray!25},
-    tick label style={font=\tiny},
-    xlabel style={font=\tiny\bfseries}, ylabel style={font=\tiny\bfseries}
+    xmin=0, xmax=4, ymin=0, ymax=4,
+    xlabel={Code Churn}, ylabel={Review Hrs},
+    tick label style={font=\tiny}
 ]
-\addplot[domain=0.5:4.5, thick, color=politoNavy] {0.5 + 0.85*x};
-\addplot[only marks, mark=*, mark size=2.5pt, color=intuitionPurple] coordinates {
-    (1, 1.2) (2, 2.5) (2.5, 2.3) (3.5, 3.8) (4, 3.6)
-};
-\draw[dashed, color=red!75!black] (axis cs: 2, 2.5) -- (axis cs: 2, 2.2);
-\draw[dashed, color=red!75!black] (axis cs: 4, 3.6) -- (axis cs: 4, 3.9);
+\addplot[domain=0.5:3.5, samples=20, very thick, color=politoNavy] {0.8*x + 0.4};
+\addplot[only marks, mark=*, mark size=2pt, color=deepdiveTeal] coordinates {(1, 1.1) (1.5, 1.8) (2, 1.9) (2.5, 2.6) (3, 2.7) (3.2, 3.1)};
 \end{axis}
 \end{tikzpicture}
 \caption{Regression: PR Review Effort}
@@ -785,6 +824,7 @@ Consider \textbf{Pull Request Review Time Estimation}: predicting the expected d
 \caption{Task formulations across Software Engineering workflows: (a) Binary vulnerability detection with separating hyperplane; (b) Multi-class defect categorization with partitioned decision regions; (c) Continuous PR review effort regression with residual errors.}
 \label{fig:se_tasks_diagrams}
 \end{figure}
+
 
 \section{Loss function formulations and optimization landscapes}
 \label{sec:output_loss_opt}
@@ -860,9 +900,7 @@ Figure~\ref{fig:loss_functions_pgfplots} compares the mathematical profiles of M
 \end{figure}
 
 \subsection{Rigorous proof: why MSE fails for classification}
-A fundamental question in deep learning is: \emph{Why do we never use Mean Squared Error with sigmoid activation for classification?}
-
-The answer lies in gradient saturation and non-convexity.
+A fundamental theoretical question is: \emph{Why do we never use Mean Squared Error with sigmoid activation for classification?} The answer lies in gradient saturation and non-convexity.
 
 \begin{theorem}{Gradient saturation of MSE under sigmoid activation}{mse_failure_proof}
 Let a binary classification model predict $\hat{y} = \sigma(z) = \frac{1}{1 + e^{-z}}$ with ground-truth target $y \in \{0, 1\}$. Under the quadratic loss $\Loss_{\text{MSE}} = \frac{1}{2}(y - \hat{y})^2$, the gradient with respect to the pre-activation logit $z$ is:
@@ -968,6 +1006,7 @@ In deep neural architectures, vanilla Gradient Descent struggles with:
     \end{align}
     Adam scales learning rates adaptively per parameter, making it the standard optimizer across LLM pre-training and fine-tuning pipelines.
 \end{itemize}
+
 
 \section{Computational graphs and exact adjoint backpropagation}
 \label{sec:backprop_computational_graph}
@@ -1097,7 +1136,172 @@ def __mul__(self, other):
     out._backward = _backward
     return out
 \end{lstlisting}
-When calling \texttt{loss.backward()}, the engine performs a \textbf{topological sort} on the DAG to establish reverse dependency ordering, sets \texttt{loss.grad = 1.0}, and executes \texttt{node.\_backward()} across all parent nodes in reverse topological order. Modern deep learning frameworks like PyTorch execute this exact process on multi-dimensional GPU tensors.
+When calling \texttt{loss.backward()}, the engine performs a \textbf{topological sort} on the DAG to establish reverse dependency ordering, sets \texttt{loss.grad = 1.0}, and executes \texttt{node.\_backward()} across all parent nodes in reverse topological order.
 \end{deepdive}
+
+\subsection{Vectorized matrix adjoint backpropagation for dense layers}
+\label{subsec:vectorized_backprop}
+
+While scalar computational graphs illustrate the chain rule clearly, production deep learning libraries execute backpropagation via \emph{vectorized matrix calculus} across high-dimensional tensors. We now derive the exact vectorized matrix adjoint equations for fully connected layers with explicit tensor dimensions.
+
+\paragraph{Layer formulation and forward variables.}
+Consider a fully connected dense layer mapping an input vector $\vx \in \R^{d_{\text{in}}}$ through weight matrix $\mW \in \R^{d_{\text{in}} \times d_{\text{out}}}$ and bias $\vb \in \R^{d_{\text{out}}}$ to pre-activation $\vz \in \R^{d_{\text{out}}}$ and activation $\vy \in \R^{d_{\text{out}}}$:
+\begin{align}
+\vz &= \mW^\top \vx + \vb \in \R^{d_{\text{out}}}, \label{eq:vec_fwd_z} \\
+\vy &= f(\vz) \in \R^{d_{\text{out}}}, \label{eq:vec_fwd_y}
+\end{align}
+where scalar component $z_j$ expands as:
+\begin{equation}
+z_j = \sum_{i=1}^{d_{\text{in}}} W_{ij} x_i + b_j.
+\end{equation}
+The layer output $\vy$ propagates downstream to contribute to a final scalar objective loss $\Loss \in \R$.
+
+\paragraph{Adjoint definition.}
+Assume downstream backpropagation has computed the loss gradient with respect to layer pre-activation $\vz$. We define the adjoint error vector $\bm{\delta} \in \R^{d_{\text{out}}}$:
+\begin{equation}
+\label{eq:delta_adjoint_def}
+\bm{\delta} \triangleq \frac{\partial \Loss}{\partial \vz} = \frac{\partial \Loss}{\partial \vy} \odot f'(\vz) \in \R^{d_{\text{out}}},
+\end{equation}
+where $\odot$ denotes the elementwise Hadamard product.
+
+\paragraph{1. Weight matrix adjoint derivation ($\frac{\partial \Loss}{\partial \mW}$).}
+To compute the derivative of scalar loss $\Loss$ with respect to individual matrix element $W_{ij}$, we apply the multivariate chain rule across all output pre-activations $z_k$:
+\begin{equation}
+\frac{\partial \Loss}{\partial W_{ij}} = \sum_{k=1}^{d_{\text{out}}} \frac{\partial \Loss}{\partial z_k} \frac{\partial z_k}{\partial W_{ij}}.
+\end{equation}
+Because $z_k = \sum_{l=1}^{d_{\text{in}}} W_{lk} x_l + b_k$, the partial derivative is non-zero only when $k = j$:
+\begin{equation}
+\frac{\partial z_k}{\partial W_{ij}} = \begin{cases} x_i & \text{if } k = j \\ 0 & \text{if } k \ne j \end{cases}.
+\end{equation}
+Substituting this back:
+\begin{equation}
+\frac{\partial \Loss}{\partial W_{ij}} = \frac{\partial \Loss}{\partial z_j} x_i = \delta_j x_i = x_i \delta_j.
+\end{equation}
+Collecting all elements $W_{ij}$ into matrix form reveals that the weight gradient is identically the \textbf{outer product} of the upstream input vector $\vx \in \R^{d_{\text{in}}}$ and the adjoint error vector $\bm{\delta} \in \R^{d_{\text{out}}}$:
+\begin{equation}
+\label{eq:weight_matrix_gradient}
+\frac{\partial \Loss}{\partial \mW} = \vx \bm{\delta}^\top \in \R^{d_{\text{in}} \times d_{\text{out}}}.
+\end{equation}
+
+\paragraph{2. Bias vector adjoint derivation ($\frac{\partial \Loss}{\partial \vb}$).}
+For each scalar bias component $b_j$:
+\begin{equation}
+\frac{\partial \Loss}{\partial b_j} = \sum_{k=1}^{d_{\text{out}}} \frac{\partial \Loss}{\partial z_k} \frac{\partial z_k}{\partial b_j} = \delta_j \cdot 1 = \delta_j.
+\end{equation}
+In vector notation:
+\begin{equation}
+\label{eq:bias_vector_gradient}
+\frac{\partial \Loss}{\partial \vb} = \bm{\delta} \in \R^{d_{\text{out}}}.
+\end{equation}
+
+\paragraph{3. Upstream input adjoint derivation ($\frac{\partial \Loss}{\partial \vx}$).}
+To propagate error signals back to previous layers in a deep neural network, we must evaluate the gradient of loss $\Loss$ with respect to the input feature vector $\vx \in \R^{d_{\text{in}}}$. Applying the chain rule to input component $x_i$:
+\begin{equation}
+\frac{\partial \Loss}{\partial x_i} = \sum_{k=1}^{d_{\text{out}}} \frac{\partial \Loss}{\partial z_k} \frac{\partial z_k}{\partial x_i} = \sum_{k=1}^{d_{\text{out}}} \delta_k W_{ik} = \sum_{k=1}^{d_{\text{out}}} W_{ik} \delta_k.
+\end{equation}
+Recognizing this sum as the $i$-th element of the matrix-vector multiplication between weight matrix $\mW \in \R^{d_{\text{in}} \times d_{\text{out}}}$ and adjoint vector $\bm{\delta} \in \R^{d_{\text{out}}}$:
+\begin{equation}
+\label{eq:input_vector_gradient}
+\frac{\partial \Loss}{\partial \vx} = \mW \bm{\delta} \in \R^{d_{\text{in}}}.
+\end{equation}
+
+Figure~\ref{fig:vectorized_backprop_block} diagrams this vectorized adjoint error propagation across the dense layer.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    scale=0.9, transform shape,
+    block/.style={rectangle, draw=politoNavy, fill=skyBlue!25, thick, rounded corners=4pt, minimum height=1.6cm, minimum width=2.8cm, align=center, font=\small\sffamily},
+    actblock/.style={rectangle, draw=deepdiveTeal, fill=deepdiveTealBg, thick, rounded corners=4pt, minimum height=1.6cm, minimum width=2.5cm, align=center, font=\small\sffamily},
+    lossblock/.style={rectangle, draw=intuitionPurple, fill=intuitionPurpleBg, very thick, rounded corners=4pt, minimum height=1.6cm, minimum width=2.2cm, align=center, font=\small\sffamily},
+    fwd/.style={-{Stealth[scale=1.1]}, very thick, draw=politoNavy},
+    bwd/.style={-{Stealth[scale=1.1]}, very thick, dashed, draw=red!75!black},
+    dimlabel/.style={font=\scriptsize\ttfamily, text=bodyGray}
+]
+
+% Blocks
+\node[block] (affine) at (0, 0) {\textbf{Affine Projection}\\[2pt]$\vz = \mW^\top \vx + \vb$};
+\node[actblock] (act) at (4.6, 0) {\textbf{Activation}\\[2pt]$\vy = f(\vz)$};
+\node[lossblock] (loss) at (8.8, 0) {\textbf{Objective}\\[2pt]$\Loss(\vy, \vy^*)$};
+
+% Forward connections
+\draw[fwd] (-3.2, 0.4) -- node[above, font=\small\bfseries] {$\vx$} node[below, dimlabel] {$d_{\text{in}} \times 1$} (affine.west |- 0, 0.4);
+\draw[fwd] (affine.east |- 0, 0.4) -- node[above, font=\small\bfseries] {$\vz$} node[below, dimlabel] {$d_{\text{out}} \times 1$} (act.west |- 0, 0.4);
+\draw[fwd] (act.east |- 0, 0.4) -- node[above, font=\small\bfseries] {$\vy$} node[below, dimlabel] {$d_{\text{out}} \times 1$} (loss.west |- 0, 0.4);
+
+% Parameters entering affine
+\draw[fwd] (0, 2.2) -- node[right, font=\small\bfseries] {$\mW \in \R^{d_{\text{in}} \times d_{\text{out}}}, \; \vb \in \R^{d_{\text{out}}}$} (affine.north);
+
+% Backward adjoint connections
+\draw[bwd] (loss.west |- 0, -0.4) -- node[below, font=\small\bfseries, text=red!75!black] {$\frac{\partial \Loss}{\partial \vy}$} (act.east |- 0, -0.4);
+\draw[bwd] (act.west |- 0, -0.4) -- node[below, font=\small\bfseries, text=red!75!black] {$\bm{\delta} = \frac{\partial \Loss}{\partial \vz}$} node[above, dimlabel, text=red!75!black] {$\frac{\partial \Loss}{\partial \vy} \odot f'(\vz)$} (affine.east |- 0, -0.4);
+\draw[bwd] (affine.west |- 0, -0.4) -- node[below, font=\small\bfseries, text=red!75!black] {$\frac{\partial \Loss}{\partial \vx} = \mW \bm{\delta}$} node[above, dimlabel, text=red!75!black] {$d_{\text{in}} \times 1$} (-3.2, -0.4);
+
+% Parameter gradients
+\draw[bwd] (affine.south) -- ++(0, -1.0) node[below, font=\small\bfseries, text=red!75!black, align=center] {$\frac{\partial \Loss}{\partial \mW} = \vx \bm{\delta}^\top \in \R^{d_{\text{in}} \times d_{\text{out}}}$\\[2pt]$\frac{\partial \Loss}{\partial \vb} = \bm{\delta} \in \R^{d_{\text{out}}}$};
+
+\end{tikzpicture}
+\caption{Vectorized matrix adjoint backpropagation across a fully connected dense layer. Solid navy arrows trace forward execution mapping input $\vx \in \R^{d_{\text{in}}}$ to output $\vy \in \R^{d_{\text{out}}}$; dashed red arrows trace reverse-mode adjoint error propagation ($\bm{\delta} \in \R^{d_{\text{out}}}$), yielding parameter updates $\frac{\partial \Loss}{\partial \mW} = \vx \bm{\delta}^\top$, $\frac{\partial \Loss}{\partial \vb} = \bm{\delta}$, and upstream gradient $\frac{\partial \Loss}{\partial \vx} = \mW \bm{\delta}$.}
+\label{fig:vectorized_backprop_block}
+\end{figure}
+
+\paragraph{Mini-batch matrix generalization.}
+In GPU implementations, $B$ samples are grouped into a batch data matrix $\mX \in \R^{B \times d_{\text{in}}}$. The layer computes:
+\begin{equation}
+\mZ = \mX \mW + \mathbf{1}_B \vb^\top \in \R^{B \times d_{\text{out}}}, \quad \mY = f(\mZ) \in \R^{B \times d_{\text{out}}}.
+\end{equation}
+Defining batch adjoint matrix $\bm{\Delta} = \frac{\partial \Loss}{\partial \mZ} \in \R^{B \times d_{\text{out}}}$, the gradient equations generalize to highly efficient Basic Linear Algebra Subprograms (BLAS) matrix multiplications:
+\begin{align}
+\frac{\partial \Loss}{\partial \mW} &= \mX^\top \bm{\Delta} \in \R^{d_{\text{in}} \times d_{\text{out}}}, \label{eq:batch_grad_W} \\
+\frac{\partial \Loss}{\partial \vb} &= \bm{\Delta}^\top \mathbf{1}_B \in \R^{d_{\text{out}}}, \label{eq:batch_grad_b} \\
+\frac{\partial \Loss}{\partial \mX} &= \bm{\Delta} \mW^\top \in \R^{B \times d_{\text{in}}}. \label{eq:batch_grad_X}
+\end{align}
+These matrix equations form the computational workhorse executed across billions of parameters in modern GPU training clusters.
+
+
+\section{The continuous-discrete representation impasse: bridge to word embeddings}
+\label{sec:bridge_to_ch03}
+
+In this chapter, we have developed the atomic foundations of deep learning:
+\begin{enumerate}
+    \item \textbf{Continuous Units}: The artificial perceptron computes weighted inner products over real-valued vectors.
+    \item \textbf{Non-Linearity}: Non-linear activations ($\sigma, \tanh, \relu, \gelu$) prevent multi-layer linear stacking collapse, folding space to solve linearly inseparable problems like XOR and enabling universal function approximation.
+    \item \textbf{Principled Optimization}: Cross-entropy objective functions provide linear error signals without gradient saturation, and backpropagation calculates matrix adjoints across computational DAGs via vectorized matrix calculus.
+\end{enumerate}
+
+\paragraph{The representation impasse.}
+However, applying this continuous machinery to natural language and software source code exposes an immediate, fundamental impasse:
+\[
+\text{Deep neural networks are \textbf{differentiable continuous operators}: } f(\vx; \bm{\theta}) = \mW^\top \vx + \vb \quad (\vx \in \R^d).
+\]
+In stark contrast, human natural language and software source code are sequences of \textbf{discrete, categorical text symbols}:
+\[
+W = (w_1, w_2, \dots, w_N), \quad w_t \in \vocab = \{\text{\texttt{public}, \texttt{class}, \texttt{static}, \texttt{void}, \dots}\}.
+\]
+We cannot compute inner products $\vw^\top \vx$, calculate derivatives, or execute backpropagation on raw ASCII or Unicode strings.
+
+\paragraph{Why naive numerical encodings fail.}
+Two obvious baseline approaches fail catastrophically:
+\begin{itemize}
+    \item \textbf{Scalar Integer Indexing}: Mapping each vocabulary word to a scalar integer ($w_t \in \{1, 2, \dots, |\vocab|\}$) imposes an arbitrary, fictitious metric:
+    \[
+    \text{\texttt{class}} \to 42, \quad \text{\texttt{interface}} \to 43, \quad \text{\texttt{int}} \to 840.
+    \]
+    This forces the model to assume that $\text{\texttt{interface}}$ is geometrically adjacent to $\text{\texttt{class}}$ ($|43 - 42| = 1$), while $\text{\texttt{int}}$ is vastly distant ($|840 - 42| = 798$), corrupting optimization.
+    \item \textbf{Local One-Hot Encodings}: Representing each word as an indicator vector $\mathbf{e}_i \in \{0, 1\}^{|\vocab|}$ creates sparse vectors of massive dimensionality ($|\vocab| \ge 50{,}000$). Crucially, standard basis vectors are mutually orthogonal:
+    \[
+    \mathbf{e}_i^\top \mathbf{e}_j = 0 \quad \forall i \ne j, \quad d_E(\mathbf{e}_i, \mathbf{e}_j) = \sqrt{2}.
+    \]
+    Every word is equidistant from every other word, providing zero semantic similarity, zero parameter sharing during backpropagation, and crippling data efficiency.
+\end{itemize}
+
+\paragraph{The path forward.}
+To bridge this chasm between discrete symbolic languages and continuous neural operators, we must construct a dense, continuous, differentiable mapping:
+\[
+\phi: \vocab \longrightarrow \R^d \quad (d \ll |\vocab|),
+\]
+that maps discrete words into low-dimensional semantic vector spaces where geometric distance preserves syntactic and semantic relationships.
+
+This challenge leads directly to Chapter~\ref{ch:word_embeddings}: \emph{Distributed Word Representations and Word2Vec}.
 
 \end{document}
