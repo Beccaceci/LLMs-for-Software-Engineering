@@ -1060,7 +1060,7 @@ class TestTier4RealWorldScenarios(unittest.TestCase):
 
         # Use latexmk or pdflatex with halt-on-error to fail-fast on TeX errors without hanging
         if shutil.which("latexmk") is not None:
-            cmd = ["latexmk", "-pdf", "-interaction=nonstopmode", "-synctex=1", "main.tex"]
+            cmd = ["latexmk", "-pdf", "-interaction=nonstopmode", "main.tex"]
         else:
             cmd = ["pdflatex", "-interaction=nonstopmode", "-halt-on-error", "main.tex"]
 
@@ -1150,7 +1150,7 @@ class TestTier4RealWorldScenarios(unittest.TestCase):
         ch1_pdf = ch1_dir / "01_language_models_intro.pdf"
         self.assertTrue(ch1_pdf.exists(), "Standalone chapter PDF must be produced")
 
-    def test_realworld_build_clean_target(self):
+    def test_realworld_z_build_clean_target(self):
         """Tier 4.5: Makefile clean target preserves .tex and .bib sources while removing build temp files."""
         # Touch dummy temporary files
         aux_test = STUDY_GUIDE_DIR / "test_dummy.aux"

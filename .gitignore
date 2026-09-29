@@ -12,11 +12,18 @@ Thumbs.db
 # ==============================================================================
 # Large External Sources (>50MB Welch book, copyrighted Raschka epub, recordings)
 # ==============================================================================
+STUDY_GUIDE/sources/**/*.pdf
+STUDY_GUIDE/sources/**/*.epub
+STUDY_GUIDE/sources/**/*.m4a
+STUDY_GUIDE/sources/**/*.mp4
+STUDY_GUIDE/sources/**/*.zip
+STUDY_GUIDE/sources/**/*.ipynb
 STUDY_GUIDE/sources/*.pdf
 STUDY_GUIDE/sources/*.epub
 STUDY_GUIDE/sources/*.m4a
 STUDY_GUIDE/sources/*.mp4
 STUDY_GUIDE/sources/*.zip
+STUDY_GUIDE/sources/*.ipynb
 past_exams_2025_2026.zip
 
 # ==============================================================================

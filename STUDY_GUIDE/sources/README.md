@@ -1,47 +1,48 @@
-# Supplementary Research & Source Materials
+# Study Guide Source Materials Architecture
 
-This directory stores authoritative textbooks, academic papers, multimedia lecture transcripts, and reference materials used to deepen and enrich the study guide for *Large Language Models for Software Engineering* at Politecnico di Torino (taught by Prof. Flavio Giobergia and Prof. Riccardo Coppola).
+To guarantee completeness, zero omission, and rigorous pedagogical grounding, all source materials are strictly partitioned into a structured hierarchy prior to chapter or laboratory authoring:
 
-## Primary Course Materials
-- **Slides**: Located in `/SLIDES/`
-  - `01-Language-Models-Intro.pdf`: Probabilistic language modeling, $n$-grams, Markov assumptions, evaluation metrics (cross-entropy, perplexity).
-  - `02-DL-Intro.pdf`: Neural network foundations, perceptrons, activation functions, backpropagation, computational graphs, optimization landscapes.
-  - `03-WordEmbeddings.pdf`: Distributed representations, CBOW, Skip-Gram, negative sampling, FastText.
-  - `04-RNN.pdf`: Recurrence mechanisms, vanishing gradients, LSTM, GRU, seq2seq.
-- **Transcriptions**: Located in `/LECTURE_TRANSCRIPTIONS/`
-  - `01-Language-Models-Intro.md`: Full verbatim transcription of Prof. Giobergia's introductory lecture.
+```
+STUDY_GUIDE/sources/
+├── shared/                              # Common materials across all chapters and labs
+│   ├── books/                           # Reference textbooks (Raschka, Welch, Xiao & Zhu)
+│   ├── papers/                          # Multi-chapter foundational papers (Shannon, Vaswani)
+│   └── multimedia/                      # Channel-wide lecture notes & breakdowns
+├── lectures/                            # Volume I: Lectures source materials
+│   ├── shared/                          # Cross-cutting lecture resources
+│   ├── chapter_01/                      # Chapter 01: Introduction to Language Models
+│   │   ├── slides/                      # Symlink to SLIDES/01-Language-Models-Intro.pdf
+│   │   ├── transcriptions/              # Symlink to TRANSCRIPTIONS/LECTURES/01-...
+│   │   ├── papers/                      # Shannon 1948, Kneser-Ney 1995, Bengio 2003
+│   │   └── multimedia/                  # Karpathy makemore Part 1, StatQuest
+│   ├── chapter_02/                      # Chapter 02: Deep Learning Foundations
+│   │   ├── slides/                      # Symlink to SLIDES/02-DL-Intro.pdf
+│   │   ├── papers/                      # Cybenko 1989, Hornik 1989, Rosenblatt 1958
+│   │   └── multimedia/                  # Karpathy micrograd, 3B1B Neural Networks
+│   ├── chapter_03/                      # Chapter 03: Word Representations & Word2Vec
+│   │   ├── slides/                      # Symlink to SLIDES/03-WordEmbeddings.pdf
+│   │   ├── transcriptions/              # Symlink to TRANSCRIPTIONS/LECTURES/03-04-...
+│   │   ├── books/                       # Raschka Chapter 2 summary notes
+│   │   ├── papers/                      # Mikolov 2013a/b, Bojanowski 2017, Morin 2005
+│   │   └── multimedia/                  # Enkk 2023 embeddings video, Karpathy makemore
+│   ├── chapter_04/                      # Chapter 04: Recurrent Neural Networks
+│   │   ├── slides/                      # Symlink to SLIDES/04-RNN.pdf
+│   │   ├── transcriptions/              # Symlink to TRANSCRIPTIONS/LECTURES/03-04-...
+│   │   ├── papers/                      # Hochreiter 1997, Cho 2014, Sutskever 2014
+│   │   └── multimedia/                  # Karpathy Unreasonable Effectiveness of RNNs
+│   └── chapter_05/ ... chapter_16/      # Scaffolded directories for syllabus modules
+└── laboratories/                        # Volume II: Laboratories source materials
+    ├── shared/                          # PyTorch environments & autograd cheatsheets
+    ├── lab_01/                          # Laboratory 01: PyTorch Foundations
+    │   ├── notebooks/                   # Symlink to LABS/lab01/text.ipynb
+    │   ├── transcriptions/              # Symlink to TRANSCRIPTIONS/LABORATORIES/Lab01-...
+    │   └── references/                  # PyTorch official tensor & autograd documentation
+    └── lab_02/ ... lab_10/              # Scaffolded directories for each practical lab
+```
 
-## Authoritative Reference Textbooks & Monographs
-1. **Sebastian Raschka (2024)**: *Build a Large Language Model (from Scratch)*, Manning Publications.
-   - File: `Build a Large Language Model from scratch (Sebastian Raschka).epub`
-   - Key topics: Tokenization, attention mechanisms from scratch, pre-training, instruction fine-tuning, evaluation.
-2. **Welch (2024)**: *The Illustrated Guide to AI*.
-   - File: `2024-welch-illustrated-guide-to-ai.pdf`
-   - Key topics: Visual intuitions for deep learning, backpropagation, and foundation models.
-3. **Xiao & Zhu (2025)**: *Foundations of Large Language Models*.
-   - File: `2025-xiao-zhu-foundations-of-large-language-models.pdf`
-   - Key topics: Theoretical scaling laws, statistical language modeling, architectural variants.
-4. **Daniel Jurafsky and James H. Martin (2024)**: *Speech and Language Processing (3rd ed. draft)*.
-   - Key topics: $n$-gram language models, Markov models, maximum likelihood estimation, smoothing, cross-entropy, perplexity.
-
-## Foundational Papers
-- Shannon, C. E. (1948). *A Mathematical Theory of Communication*. Bell System Technical Journal.
-- McCulloch, W. S., & Pitts, W. (1943). *A logical calculus of the ideas immanent in nervous activity*. Bulletin of Mathematical Biophysics.
-- Rosenblatt, F. (1958). *The Perceptron: A Probabilistic Model for Information Storage and Organization in the Brain*. Psychological Review.
-- Rumelhart, D. E., Hinton, G. E., & Williams, R. J. (1986). *Learning representations by back-propagating errors*. Nature.
-- Cybenko, G. (1989). *Approximation by superpositions of a sigmoidal function*. Mathematics of Control, Signals, and Systems.
-- Hornik, K., Stinchcombe, M., & White, H. (1989). *Multilayer feedforward networks are universal approximators*. Neural Networks.
-- Leshno, M., Lin, V. Y., Pinkus, A., & Schocken, S. (1993). *Multilayer feedforward networks with a nonpolynomial activation function can approximate any function*. Neural Networks.
-- Bengio, Y., Ducharme, R., Vincent, P., & Jauvin, C. (2003). *A Neural Probabilistic Language Model*. JMLR.
-- Hendrycks, D., & Gimpel, K. (2016). *Gaussian Error Linear Units (GELUs)*. arXiv:1606.08415.
-- Vaswani, A., et al. (2017). *Attention Is All You Need*. NeurIPS.
-- Radford, A., et al. (2019). *Language Models are Unsupervised Multitask Learners*. OpenAI.
-- Hoffmann, J., et al. (2022). *Training Compute-Optimal Large Language Models (Chinchilla)*. NeurIPS.
-
-## Pedagogical Multimedia References
-- **3Blue1Brown (Grant Sanderson)**:
-  - Neural Networks & Deep Learning Series (geometric backpropagation, activation manifolds, probability decision trees).
-- **Andrej Karpathy**:
-  - *Neural Networks: Zero to Hero* (Makemore, Micrograd DAG autograd, bigram models to transformers).
-- **StatQuest (Josh Starmer)**:
-  - Cross-Entropy and Maximum Likelihood Estimation visual step-by-step guides.
+## Duplication & File Handling Protocol
+1. **Zero-Byte Deduplication via Relative Symlinks**:
+   - Course slides (`SLIDES/*.pdf`), lecture audio transcriptions (`TRANSCRIPTIONS/LECTURES/*.md`), and laboratory notebooks (`LABS/labXX/*.ipynb`) are linked using relative symlinks (`ln -sf`).
+   - This prevents storage bloat while guaranteeing that any updates to primary slides or transcripts are immediately available in the corresponding chapter's source folder.
+2. **Git Tracking & Large Binaries**:
+   - As enforced by `.gitignore`, large proprietary or external binaries (`*.pdf`, `*.epub`, `*.mp4`, `*.m4a`) are excluded from Git commits to keep the repository compact, while all Markdown indices (`README.md`, notes, summaries) are tracked.

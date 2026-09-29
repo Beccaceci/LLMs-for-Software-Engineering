@@ -1,78 +1,163 @@
 \documentclass[../../main.tex]{subfiles}
+
 \begin{document}
 
 \chapter{Distributed word representations and Word2Vec}
 \label{ch:word_embeddings}
 
-\section{Chapter overview and learning outcomes}
-In Chapter~\ref{ch:intro_lms}, we analyzed how classical statistical language models struggle under the combinatorial curse of dimensionality ($V^n$) and the complete lack of semantic overlap between distinct vocabulary symbols. In Chapter~\ref{ch:deep_learning_foundations}, we proved that neural networks can serve as universal function approximators when provided with continuous vector inputs and non-linear activations.
+\section{The representation problem: why continuous embeddings are mandatory}
+\label{sec:representation_problem}
 
-This chapter bridges the gap between discrete linguistic symbols and continuous neural architectures. We examine the geometric failure modes of traditional one-hot encodings, formalize the Distributional Hypothesis, and construct distributed vector representations. We present the complete mathematical matrix formulation of Continuous Bag-of-Words (CBOW) and Continuous Skip-Gram \cite{mikolov2013efficient}, derive the computational bottlenecks of full Softmax, and provide step-by-step gradient derivations for Hierarchical Softmax and Skip-Gram Negative Sampling (SGNS) \cite{mikolov2013distributed}. We analyze the subword morphology mechanics of FastText \cite{bojanowski2017} for out-of-vocabulary (OOV) tokens and explore the geometric structure of semantic vector spaces via Principal Component Analysis (PCA) and linear relational translations.
+Natural language and software engineering source code are fundamentally composed of discrete, symbolic tokens. In written English or in source files, programs and sentences present themselves as strings of alphanumeric characters: words such as \texttt{"compiler"}, \texttt{"optimizer"}, \texttt{"gradient"}, and keywords such as \texttt{"class"}, \texttt{"def"}, \texttt{"return"}.
 
-Upon completing this chapter, you will be able to:
-\begin{itemize}
-    \item Quantify the geometric pathologies of one-hot vectors: extreme sparsity, curse of dimensionality, pairwise orthogonality ($\cos = 0$), and uniform Euclidean distance ($L_2 = \sqrt{2}$).
-    \item Explain the paradigm shift from local to distributed representations and articulate the Distributional Hypothesis (Harris, 1954; Firth, 1957).
-    \item Formalize the self-supervised cloze prediction task and trace the 7-step embedding training loop.
-    \item Formulate CBOW mathematically using input projection matrix $\mW_{\text{in}}$, output matrix $\mW_{\text{out}}$, binary context presence vector $\ve$, hidden state $\vh$, and softmax logits.
-    \item Derive the computational complexity of standard Softmax ($\mathcal{O}(V)$) and contrast it with Hierarchical Softmax ($\mathcal{O}(\log_2 V)$) and Negative Sampling ($\mathcal{O}(K)$).
-    \item Derive the analytical gradients of the Skip-Gram Negative Sampling (SGNS) loss with respect to center word, context word, and noise vectors.
-    \item Explain the mathematical motivation behind the unigram noise distribution exponent $\frac{3}{4} = 0.75$.
-    \item Break down the character $n$-gram subword composition of FastText and explain how it solves Out-of-Vocabulary (OOV) tokens and captures morphology.
-    \item Interpret vector arithmetic in continuous semantic spaces (e.g., $\vec{v}_{\text{Germany}} - \vec{v}_{\text{Berlin}} \approx \vec{v}_{\text{capital\_of}}$).
-\end{itemize}
-
-\section{The geometry of one-hot representations}
-\label{sec:onehot_geometry}
-
-In traditional computational linguistics and categorical modeling, a discrete vocabulary $\mathcal{W}$ containing $|\mathcal{W}| = V$ unique words establishes an arbitrary lexicographic index:
+Conversely, modern artificial neural networks are continuous, differentiable mathematical operators. An $L$-layer deep neural network $\mathcal{F}(\vx; \Theta)$ computes outputs through compositions of parameterized linear projections and non-linear activation functions:
 \begin{equation}
-\mathcal{W} = \{w_1, w_2, \dots, w_V\}.
+\label{eq:neural_operator}
+\mathcal{F}(\vx; \Theta) = \sigma_L \Big( \mW_L \, \sigma_{L-1}\big( \cdots \sigma_1(\mW_1 \vx + \vb_1) \cdots \big) + \vb_L \Big),
 \end{equation}
-For example, consider a toy vocabulary of $|\mathcal{W}| = 5$ tokens:
+where $\mW_l \in \R^{d_l \times d_{l-1}}$ and $\vb_l \in \R^{d_l}$. Such architectures rely fundamentally on the continuous mathematics of vector spaces $\R^d$, multivariable calculus, and gradient-based backpropagation. The optimization algorithm minimizes an empirical risk loss $\Loss(\Theta)$ by iteratively updating weight tensors along the negative gradient direction:
 \begin{equation}
-\mathcal{W} = \{\text{dog}, \text{cat}, \text{fish}, \text{pen}, \text{pencil}\}.
+\label{eq:gradient_update_rule}
+\Theta \leftarrow \Theta - \eta \, \nabla_\Theta \Loss(\Theta).
 \end{equation}
-Under \emph{one-hot encoding}, each word $w_i \in \mathcal{W}$ is mapped to an independent standard basis vector $\ve_i \in \{0, 1\}^V$ in $V$-dimensional Euclidean space $\R^V$, where the $i$-th entry is $1$ and all remaining $V-1$ entries are $0$:
-\begin{align*}
-\text{1. dog} &\implies \ve_1 = [1, 0, 0, 0, 0]^\top \\
-\text{2. cat} &\implies \ve_2 = [0, 1, 0, 0, 0]^\top \\
-\text{3. fish} &\implies \ve_3 = [0, 0, 1, 0, 0]^\top \\
-\text{4. pen} &\implies \ve_4 = [0, 0, 0, 1, 0]^\top \\
-\text{5. pencil} &\implies \ve_5 = [0, 0, 0, 0, 1]^\top
-\end{align*}
+This mathematical reality creates an immediate, fundamental impasse: \textbf{discrete text strings cannot be differentiated}. The partial derivative of a scalar loss with respect to a raw string literal, $\frac{\partial \Loss}{\partial \text{\texttt{"cat"}}}$, is mathematically undefined. Discrete symbols possess no notion of infinitesimal perturbation, tangent spaces, or linear vector combinations. One cannot add \texttt{"cat"} to \texttt{"dog"}, nor compute an inner product between \texttt{"while"} and \texttt{"for"}.
 
-\subsection{Pathologies and failure modes of one-hot vectors}
-While one-hot encoding provides a straightforward numeric representation, it introduces severe mathematical pathologies that cripple neural optimization:
+To bridge this chasm between discrete symbolic communication and continuous gradient-based computation, we must establish a formal mapping from the discrete vocabulary into a continuous vector space.
 
-\paragraph{1. Extreme sparsity and the curse of dimensionality.}
-In practical NLP, a realistic vocabulary contains $V \ge 50{,}000$ to $100{,}000$ words. Storing a single token requires a 50,000-dimensional vector. For each vector, $V-1 = 49{,}999$ coordinates are zero, meaning over $99.99\%$ of the memory represents uninformative empty space. The representation does not scale to large corpora.
-
-\paragraph{2. Strict pairwise orthogonality and equidistance.}
-The most fatal limitation of one-hot representations is their complete geometric neutrality.
-
-\begin{theorem}{Pairwise orthogonality and equidistance of one-hot vectors}{onehot_orthogonality}
-Let $\ve_i, \ve_j \in \{0, 1\}^V$ be the one-hot representations of any two distinct words $w_i, w_j \in \mathcal{W}$ with $i \ne j$. Their cosine similarity is identically zero:
+\begin{definition}{Continuous word embedding}{continuous_embedding}
+Let $\vocab = \{w_1, w_2, \dots, w_V\}$ denote a finite vocabulary of $V = |\vocab|$ distinct discrete symbolic tokens. A \textbf{continuous word embedding} is an injective mapping:
 \begin{equation}
-\label{eq:onehot_cosine}
-\cos(\ve_i, \ve_j) = \frac{\inner{\ve_i, \ve_j}}{\norm{\ve_i}_2 \norm{\ve_j}_2} = \frac{\sum_{k=1}^V e_{ik} e_{jk}}{\sqrt{1} \sqrt{1}} = 0, \quad \forall i \ne j.
+\label{eq:embedding_mapping_def}
+\phi: \vocab \longrightarrow \R^d, \quad \text{with } d \ll V,
 \end{equation}
-Furthermore, their pairwise Euclidean distance is identically $\sqrt{2}$:
+that maps each discrete symbol $w_i \in \vocab$ to a low-dimensional, dense continuous vector $\vv_i = \phi(w_i) \in \R^d$. The target vector space $(\R^d, \|\cdot\|, \inner{\cdot, \cdot})$ is a continuous metric space equipped with an inner product, where geometric distance $D(\vv_i, \vv_j)$ and angular orientation $\cos(\vv_i, \vv_j)$ preserve semantic and syntactic relationships.
+\end{definition}
+
+In typical natural language and software engineering applications, vocabulary sizes range from $V \approx 30{,}000$ to upwards of $V = 1{,}000{,}000$ unique tokens, while the latent embedding dimension is chosen to be compact: $d \in [100, 1024]$ (e.g., $d = 300$ in classical Word2Vec and FastText; $d = 768$ in standard Transformer baselines). By mapping discrete words into $\R^d$, language tokens become continuous variables that participate directly in matrix algebra, linear transformations, and gradient backpropagation.
+
+To understand why dense continuous representations are indispensable, we must first examine the standard categorical baseline: local one-hot encoding. While intuitive and trivial to construct, one-hot vectors suffer from severe geometric and computational pathologies that fundamentally incapacitate neural learning.
+
+\section{The baseline approach: local one-hot encodings and why they fail}
+\label{sec:onehot_baseline}
+
+The most straightforward, historical baseline for converting discrete categorical symbols into numeric vectors is \textbf{one-hot encoding}. Under this local representational scheme, every word $w_i \in \vocab$ is mapped to a standard basis coordinate vector $\ve_i$ in a $V$-dimensional Euclidean space $\R^V$:
 \begin{equation}
-\label{eq:onehot_l2}
-L_2(\ve_i, \ve_j) = \norm{\ve_i - \ve_j}_2 = \sqrt{\sum_{k=1}^V (e_{ik} - e_{jk})^2} = \sqrt{1^2 + (-1)^2} = \sqrt{2}, \quad \forall i \ne j.
+\label{eq:onehot_def}
+\ve_i = [\underbrace{0, \dots, 0}_{i-1\text{ zeros}}, 1, \underbrace{0, \dots, 0}_{V-i\text{ zeros}}]^\top \in \{0, 1\}^V, \quad \text{where } (\ve_i)_k = \delta_{ik} = \begin{cases} 1 & \text{if } k = i, \\ 0 & \text{if } k \neq i. \end{cases}
+\end{equation}
+
+For example, consider a toy vocabulary of $V=5$ tokens from Prof.~Flavio Giobergia's lecture slides:
+\begin{equation}
+\label{eq:toy_vocab}
+\vocab = \{\text{\texttt{"dog"}}, \, \text{\texttt{"cat"}}, \, \text{\texttt{"fish"}}, \, \text{\texttt{"pen"}}, \, \text{\texttt{"pencil"}}\}.
+\end{equation}
+Under one-hot encoding, each word is assigned an isolated Cartesian coordinate axis:
+\begin{equation}
+\label{eq:toy_onehots}
+\ve_{\text{dog}} = \begin{bmatrix} 1 \\ 0 \\ 0 \\ 0 \\ 0 \end{bmatrix}, \quad
+\ve_{\text{cat}} = \begin{bmatrix} 0 \\ 1 \\ 0 \\ 0 \\ 0 \end{bmatrix}, \quad
+\ve_{\text{fish}} = \begin{bmatrix} 0 \\ 0 \\ 1 \\ 0 \\ 0 \end{bmatrix}, \quad
+\ve_{\text{pen}} = \begin{bmatrix} 0 \\ 0 \\ 0 \\ 1 \\ 0 \end{bmatrix}, \quad
+\ve_{\text{pencil}} = \begin{bmatrix} 0 \\ 0 \\ 0 \\ 0 \\ 1 \end{bmatrix}.
+\end{equation}
+
+\subsection{Algebraic equivalence: one-hot matrix multiplication as embedding lookup}
+\label{subsec:onehot_lookup_proof}
+
+In his foundational textbook \emph{Build a Large Language Model from Scratch} \cite{raschka2024llm}, Sebastian Raschka proves that feeding a one-hot vector into a dense linear layer is algebraically identical to retrieving a specific row or column from a weight lookup table.
+
+\begin{theorem}{Embedding lookup equivalence}{embedding_lookup_equiv}
+Let $\vocab$ be a vocabulary of size $V$, and let token $w_i \in \vocab$ be encoded as the standard basis vector $\ve_i \in \{0, 1\}^V$.
+
+\noindent\textbf{Case 1: Column-Vector Orientation (Lecture Slide Convention).}  
+Let $\mW_{\text{in}} \in \R^{d \times V}$ be the embedding matrix whose $k$-th column corresponds to the $d$-dimensional embedding vector $\vw_k = (\mW_{\text{in}})_{:, k} \in \R^d$:
+\begin{equation}
+\label{eq:win_column_blocks}
+\mW_{\text{in}} = \begin{bmatrix} \vert & \vert & & \vert \\ \vw_1 & \vw_2 & \cdots & \vw_V \\ \vert & \vert & & \vert \end{bmatrix}.
+\end{equation}
+Multiplying $\mW_{\text{in}}$ by the one-hot column vector $\ve_i$ extracts the $i$-th column of $\mW_{\text{in}}$:
+\begin{equation}
+\label{eq:column_lookup_proof}
+\vh = \mW_{\text{in}} \ve_i = \sum_{k=1}^V (\ve_i)_k (\mW_{\text{in}})_{:, k} = 1 \cdot (\mW_{\text{in}})_{:, i} + \sum_{k \neq i} 0 \cdot (\mW_{\text{in}})_{:, k} = \vw_i \in \R^d.
+\end{equation}
+
+\noindent\textbf{Case 2: Row-Vector Orientation (PyTorch and Raschka Convention).}  
+Let $\mW \in \R^{V \times d}$ be an embedding table whose $k$-th row contains the embedding vector $\vw_k^\top = \mW_{k, :} \in \R^{1 \times d}$. Multiplying the one-hot row vector $\ve_i^\top$ by $\mW$ extracts the $i$-th row of $\mW$:
+\begin{equation}
+\label{eq:row_lookup_proof}
+\ve_i^\top \mW = \sum_{k=1}^V (\ve_i)_k \mW_{k, :} = 1 \cdot \mW_{i, :} + \sum_{k \neq i} 0 \cdot \mW_{k, :} = \mW_{i, :} = \vw_i^\top \in \R^{1 \times d}.
+\end{equation}
+Hence, matrix multiplication of an embedding weight matrix by a one-hot indicator vector is identical to an indexed memory table lookup:
+\begin{equation}
+\label{eq:lookup_linear_identity}
+\mW_{\text{in}} \ve_i \equiv \text{\texttt{lookup}}(\mW_{\text{in}}, i).
 \end{equation}
 \end{theorem}
 
-\begin{intuition}[The semantic blindness of orthogonal space]
-Under one-hot encoding, every pair of words is situated at exactly the same geometric distance ($L_2 = \sqrt{2}$) and oriented at a right angle ($\theta = 90^\circ$). The representation asserts that:
-\[
-\text{distance}(\text{pen}, \text{pencil}) = \text{distance}(\text{pen}, \text{dog}) = \sqrt{2}.
-\]
-Syntactically and semantically related words are as completely separated as totally unrelated concepts. One-hot vectors form an orthogonal coordinate frame that cannot capture synonymy, hierarchy, or grammatical relatedness.
-\end{intuition}
+\subsection{Systems-level justification: why frameworks use dedicated embedding lookups}
+\label{subsec:systems_embedding_justification}
 
-Figure~\ref{fig:onehot_orthogonality_geometry} provides a visual and matrix-algebraic demonstration of this geometric collapse.
+Although dense matrix multiplication $\ve_i^\top \mW$ and table indexing $\text{\texttt{lookup}}(\mW, i)$ are algebraically equivalent, no modern deep learning framework (PyTorch, TensorFlow, JAX) ever implements word embeddings as a dense matrix multiplication. Deep learning frameworks provide specialized lookup modules, such as \texttt{torch.nn.Embedding(num\_embeddings=V, embedding\_dim=d)}, for three decisive systems engineering reasons:
+
+\begin{enumerate}
+    \item \textbf{Elimination of $\mathcal{O}(V \cdot d)$ Wasted FLOPs}:
+    Evaluating the matrix multiplication $\ve_i^\top \mW$ requires executing $V \cdot d$ floating-point multiplications and $(V-1) \cdot d$ additions. In a standard language model with vocabulary $V = 50{,}257$ (GPT-2 tokenizer) and hidden dimension $d = 768$, computing the input projection for a single token via dense matrix multiplication requires:
+    \begin{equation}
+    \label{eq:flops_wasted}
+    50{,}257 \times 768 \approx 3.86 \times 10^7 \text{ arithmetic operations per token}.
+    \end{equation}
+    Of these $38.6$ million operations, exactly $99.998\%$ evaluate $0 \times W_{k, j} = 0$. By contrast, \texttt{torch.nn.Embedding} accepts integer token IDs $i \in \{0, \dots, V-1\}$ and performs direct $\mathcal{O}(1)$ pointer arithmetic into physical GPU/CPU memory:
+    \begin{equation}
+    \label{eq:pointer_arithmetic}
+    \text{address}(\vw_i) = \text{base\_pointer} + i \times d \times \text{\texttt{sizeof}}(\text{float32}),
+    \end{equation}
+    retrieving the $d$-dimensional embedding slice in $\mathcal{O}(1)$ time with exactly zero arithmetic FLOPs.
+
+    \item \textbf{Massive VRAM Savings ($25{,}000\times$ Memory Reduction)}:
+    Consider a standard training batch with batch size $B = 64$ and sequence context length $T = 1{,}024$. If input sequences were materialized as dense one-hot tensors, the input tensor $\mX_{\text{onehot}}$ would have shape $(B, T, V) = (64, 1{,}024, 50{,}257)$. Storing this tensor in single-precision floating point (\texttt{float32}, 4 bytes per element) would require:
+    \begin{equation}
+    \label{eq:vram_blowout}
+    \text{VRAM}_{\text{one-hot}} = 64 \times 1{,}024 \times 50{,}257 \times 4 \text{ bytes} \approx 13{,}175{,}095{,}296 \text{ bytes} \approx 13.18\,\text{GB of VRAM},
+    \end{equation}
+    simply to hold the input batch before computing a single activation.
+    Conversely, storing sequences as integer token IDs produces an \texttt{int64} tensor of shape $(B, T) = (64, 1{,}024)$, requiring:
+    \begin{equation}
+    \label{eq:vram_compact}
+    \text{VRAM}_{\text{indices}} = 64 \times 1{,}024 \times 8 \text{ bytes} = 524{,}288 \text{ bytes} \approx 524\,\text{KB of VRAM}.
+    \end{equation}
+    This constitutes a memory bandwidth reduction factor of $\frac{13.18\,\text{GB}}{524\,\text{KB}} \approx \mathbf{25{,}128\times}$, entirely preventing Out-Of-Memory (OOM) GPU crashes.
+
+    \item \textbf{Sparse Gradient Backpropagation}:
+    Under dense matrix multiplication $\vy = \ve_i^\top \mW$, the backpropagation adjoint with respect to the weight matrix is the outer product:
+    \begin{equation}
+    \label{eq:gradient_outer_product}
+    \frac{\partial \Loss}{\partial \mW} = \ve_i \left( \frac{\partial \Loss}{\partial \vy} \right) \in \R^{V \times d}.
+    \end{equation}
+    This gradient matrix is massive ($V \times d$) and strictly sparse: only row $i$ contains non-zero values, while the remaining $V-1$ rows are populated entirely by zeros. Synchronizing such dense gradient tensors across multi-GPU distributed clusters saturates PCIe and NVLink bandwidth. \texttt{torch.nn.Embedding} executes sparse indexed gradient accumulation (\texttt{index\_add\_}), routing the upstream vector $\frac{\partial \Loss}{\partial \vy} \in \R^d$ directly into the $i$-th row of $\mW$.
+\end{enumerate}
+
+\subsection{The 5 structural failure modes of one-hot representations}
+\label{subsec:five_failure_modes}
+
+While the lookup table implementation rescues computational throughput, local one-hot representations fail catastrophically as semantic representations. They suffer from five fatal pathologies:
+
+\paragraph{1. Extreme Sparsity and Curse of Dimensionality.}
+As vocabulary size scales to web scale ($V \ge 50{,}000$ to $10^6$), one-hot vectors become astronomical sparse vectors where $99.998\%$ of entries are zero. The dimensionality of the vector space equals the number of distinct words. Under this curse of dimensionality, the volume of the enclosing space grows exponentially, leaving data points isolated at the extreme vertices of independent axes.
+
+\paragraph{2. Metric Collapse and Semantic Orthogonality ($\cos = 0, d_E = \sqrt{2}$).}
+Because one-hot vectors form the standard Cartesian basis of $\R^V$, every pair of distinct words $w_i \neq w_j$ is mutually perpendicular and equidistant:
+\begin{align}
+\label{eq:onehot_cosine}
+\cos(\ve_i, \ve_j) &= \frac{\ve_i^\top \ve_j}{\|\ve_i\|_2 \|\ve_j\|_2} = \frac{0}{1 \cdot 1} = 0, \quad \forall i \neq j, \\
+\label{eq:onehot_l2}
+d_E(\ve_i, \ve_j) &= \|\ve_i - \ve_j\|_2 = \sqrt{(1)^2 + (-1)^2 + \sum_{k \neq i, j} 0^2} = \sqrt{2} \approx 1.414, \quad \forall i \neq j.
+\end{align}
+Under one-hot encoding, every word is orthogonal and equidistant to every other word:
+\begin{equation}
+\label{eq:equidistance_paradox}
+d_E(\text{\texttt{"pen"}}, \text{\texttt{"pencil"}}) = d_E(\text{\texttt{"pen"}}, \text{\texttt{"crocodile"}}) = \sqrt{2}.
+\end{equation}
+The underlying metric space collapses into a degenerate topology where open balls $B_r(\ve_i) = \{\vx \in \vocab : d_E(\ve_i, \vx) < r\}$ contain only $\{\ve_i\}$ for $r \le \sqrt{2}$, and immediately engulf the entire universe of vocabulary tokens for $r > \sqrt{2}$. There is zero geometric capacity to reflect semantic proximity, synonymy, or grammatical category.
 
 \begin{figure}[htbp]
 \centering
@@ -163,343 +248,376 @@ Figure~\ref{fig:onehot_orthogonality_geometry} provides a visual and matrix-alge
 \label{fig:onehot_orthogonality_geometry}
 \end{figure}
 
-\subsection{Theoretical and practical implications: why one-hot equidistance cripples learning}
-\label{subsec:onehot_equidistance_implications}
-
-The pairwise orthogonality ($\cos(\ve_i, \ve_j) = 0$) and uniform Euclidean distance ($L_2(\ve_i, \ve_j) = \sqrt{2}$) demonstrated in Figure~\ref{fig:onehot_orthogonality_geometry} are not merely abstract geometric curiosities. They constitute a foundational mathematical failure mode that cripples both statistical inference and gradient-based neural learning. Below, we formalize the five primary dimensions of this breakdown.
-
-\subsubsection{1. Metric space collapse and topological blindness}
-In metric geometry, a meaningful representation space $(\mathcal{X}, d)$ should endow semantically related objects with a topological neighborhood structure where closeness in the metric space reflects functional similarity:
-\begin{equation}
-\label{eq:neighborhood_property}
-d(\vx_a, \vx_b) < d(\vx_a, \vx_c) \iff \text{similarity}(w_a, w_b) > \text{similarity}(w_a, w_c).
-\end{equation}
-Under one-hot encoding, however, the induced metric space $(\mathcal{W}, d_E)$ on the vocabulary is strictly homeomorphic to a \emph{discrete metric space}:
-\begin{equation}
-\label{eq:discrete_metric}
-d_E(\ve_i, \ve_j) = \sqrt{2}\,(1 - \delta_{ij}) = \begin{cases}
-0 & \text{if } i = j, \\
-\sqrt{2} & \text{if } i \ne j.
-\end{cases}
-\end{equation}
-In a discrete metric space, the open metric ball of radius $r$ centered at word $\ve_i$, defined as $B_r(\ve_i) = \{\ve \in \mathcal{W} \mid d_E(\ve, \ve_i) < r\}$, behaves degenerately:
-\begin{equation}
-\label{eq:open_ball_collapse}
-B_r(\ve_i) = \begin{cases}
-\emptyset & \text{if } r \le 0, \\
-\{\ve_i\} & \text{if } 0 < r \le \sqrt{2}, \\
-\mathcal{W} & \text{if } r > \sqrt{2}.
-\end{cases}
-\end{equation}
-There is no intermediate radius $r$ that groups related concepts into a local neighborhood. The representation space is topologically flat and blind: \texttt{"cat"} is geometrically as close to \texttt{"dog"} as it is to \texttt{"automobile"}, \texttt{"compiler"}, or \texttt{"banana"}. Any algorithm that relies on distance metrics, clustering (e.g., $k$-means), kernel density estimation, or continuous topological manifolds is fundamentally paralyzed.
-
-\subsubsection{2. The gradient isolation bottleneck: zero statistical parameter sharing}
-The most debilitating consequence for deep learning occurs during backpropagation. Consider a standard neural network layer where the input token $w_i$ (represented as one-hot vector $\ve_i \in \{0, 1\}^V$) is projected into a hidden embedding layer $\vh \in \R^d$ via a weight matrix $\mW_{\text{in}} \in \R^{V \times d}$:
-\begin{equation}
-\label{eq:input_projection_dense}
-\vh = \mW_{\text{in}}^\top \ve_i = \vw_i \in \R^d,
-\end{equation}
-where $\vw_i \in \R^d$ denotes the $i$-th row of $\mW_{\text{in}}$.
-
-Let $\Loss$ be a scalar objective function (such as cross-entropy loss) evaluated downstream. By the chain rule of matrix calculus, the gradient of the loss with respect to the input weight matrix $\mW_{\text{in}}$ is the outer product of the one-hot input vector and the upstream error gradient:
-\begin{equation}
-\label{eq:gradient_outer_product}
-\frac{\partial \Loss}{\partial \mW_{\text{in}}} = \ve_i \left( \frac{\partial \Loss}{\partial \vh} \right)^\top \in \R^{V \times d}.
-\end{equation}
-Expanding this outer product row by row for every index $k \in \{1, \dots, V\}$:
-\begin{equation}
-\label{eq:gradient_row_isolation}
-\left[ \frac{\partial \Loss}{\partial \mW_{\text{in}}} \right]_{k, :} = e_{ik} \left( \frac{\partial \Loss}{\partial \vh} \right)^\top = \begin{cases}
-\left( \frac{\partial \Loss}{\partial \vh} \right)^\top & \text{if } k = i, \\
-\mathbf{0}_{1 \times d} & \text{if } k \ne i.
-\end{cases}
-\end{equation}
-Under standard gradient descent with learning rate $\eta > 0$, the parameter update $\Delta \mW_{\text{in}} = -\eta \frac{\partial \Loss}{\partial \mW_{\text{in}}}$ yields:
+\paragraph{3. Zero Gradient Parameter Sharing During Backpropagation.}
+Because one-hot vectors activate strictly disjoint coordinates, training a neural network on an occurrence of token $w_i$ produces gradients exclusively for the parameters associated with index $i$:
 \begin{equation}
 \label{eq:weight_update_isolation}
-\Delta \vw_k = \begin{cases}
--\eta \left( \frac{\partial \Loss}{\partial \vh} \right)^\top & \text{for } k = i, \\
-\mathbf{0}_{1 \times d} & \text{for all } k \ne i.
-\end{cases}
+\frac{\partial \Loss}{\partial \mW_{k, :}} = \mathbf{0}, \quad \forall k \neq i.
 \end{equation}
-\textbf{The zero-transfer pathology}:
-Equations~\eqref{eq:gradient_row_isolation} and \eqref{eq:weight_update_isolation} reveal an inescapable analytical limitation: the gradient update affects \emph{strictly and exclusively} the row corresponding to the active token $w_i$. All remaining $V-1$ rows receive an analytical gradient of exactly zero.
+If a model updates its weights upon observing the sentence \emph{``The feline climbed the tree''}, the parameters associated with \texttt{"feline"} receive gradient updates, but the parameters for \texttt{"cat"}, \texttt{"kitten"}, or \texttt{"leopard"} remain completely unchanged. The model cannot transfer statistical strength across semantically synonymous or related words; it must encounter every word hundreds of times independently in every grammatical context.
 
-Consequently, there is \textbf{zero statistical parameter sharing}. If a model is trained on a million sentences containing the word \texttt{"dog"} (e.g., \textit{``The dog ran across the yard''}), the parameter row $\vw_{\text{dog}}$ will be thoroughly optimized. However, the row for the exact synonym \texttt{"hound"} or \texttt{"canine"} will not receive a single infinitesimal gradient update. When the model encounters \texttt{"hound"} at inference time, it treats it with total amnesia as an unfamiliar, unoptimized token. To learn that \texttt{"hound"} behaves similarly to \texttt{"dog"}, the training corpus must contain an equally massive number of sentences explicitly containing \texttt{"hound"}. This creates an immense sample complexity bottleneck that renders training on rare or long-tail words impossible.
-
-\subsubsection{3. Ambient dimension explosion and absence of continuous manifolds}
-The $V$ standard basis vectors $\{\ve_1, \dots, \ve_V\}$ form the vertices of the standard $(V-1)$-simplex:
+\paragraph{4. Simplex Confinement and Absence of Latent Manifolds.}
+One-hot vectors are confined strictly to the $V$ extreme vertices of the standard $(V-1)$-dimensional probability simplex:
 \begin{equation}
 \label{eq:standard_simplex}
-\Delta^{V-1} = \left\{ \vx \in \R^V \;\middle|\; \sum_{i=1}^V x_i = 1, \; x_i \ge 0 \right\}.
+\Delta^{V-1} = \left\{ \vx \in \R^V : \sum_{i=1}^V x_i = 1, \; x_i \ge 0 \right\}.
 \end{equation}
-Every vocabulary item resides exclusively on an extreme vertex of this simplex. Natural language, however, is fundamentally compositional and continuous: semantic concepts lie on low-dimensional, smooth sub-manifolds $\mathcal{M} \subset \R^d$ where $d \ll V$ (typically $d \sim 10^2\text{--}10^3$ while $V \sim 10^5\text{--}10^7$).
+The interior and edges of the simplex correspond to fractional probabilistic mixtures, but distinct words themselves inhabit isolated, non-overlapping boundary corners. Words cannot reside on smooth, lower-dimensional semantic submanifolds, nor can they support linear translation arithmetic ($\vw_{\text{king}} - \vw_{\text{man}} + \vw_{\text{woman}} \approx \vw_{\text{queen}}$).
 
-In one-hot space, no continuous manifold exists:
+\paragraph{5. Software Engineering Identifier Polymorphism.}
+In software engineering source code, developers routinely express identical semantic intents through differing lexical notations, identifier casings, and API conventions:
 \begin{itemize}
-    \item \textbf{Invalidity of interpolation}: A linear combination between two words $\vx_{\text{mix}} = \frac{1}{2}(\ve_1 + \ve_2) = [0.5, 0.5, 0, \dots, 0]^\top$ lies in the interior of the simplex and has no symbolic interpretation. Moreover, its Euclidean norm contracts to $\norm{\vx_{\text{mix}}}_2 = \sqrt{0.5^2 + 0.5^2} = \frac{1}{\sqrt{2}} \approx 0.707$, distorting its distance to all other basis vectors ($d_E(\vx_{\text{mix}}, \ve_3) = \sqrt{0.5^2 + 0.5^2 + 1^2} = \sqrt{1.5} \approx 1.22$).
-    \item \textbf{Impossibility of relational vector analogies}: Semantic algebra, such as the classic analogy $\vv_{\text{king}} - \vv_{\text{man}} + \vv_{\text{woman}} \approx \vv_{\text{queen}}$, requires continuous directional vectors that capture semantic shifts (e.g., gender or tense). Under one-hot representations:
-    \[
-    \ve_{\text{king}} - \ve_{\text{man}} + \ve_{\text{woman}} = [1, -1, 1, 0, \dots, 0]^\top,
-    \]
-    which possesses an $L_2$ distance of $\sqrt{1^2 + (-1)^2 + 1^2 + 1^2} = 2$ to $\ve_{\text{queen}}$ and to every other unrelated word in the vocabulary, destroying all linear relational structure.
+    \item \textbf{Casing variants}: \texttt{getUserById} vs.~\texttt{get\_user\_by\_id} vs.~\texttt{GetUserById}.
+    \item \textbf{API synonyms}: \texttt{push()} vs.~\texttt{append()} vs.~\texttt{add()} vs.~\texttt{enqueue()}.
+    \item \textbf{Syntactic equivalents}: Type references such as \texttt{ArrayList} and \texttt{LinkedList} vs.~unrelated punctuation symbols like \texttt{";"}.
 \end{itemize}
+Under one-hot encoding, each casing variation and API synonym is assigned a totally independent, mutually orthogonal basis vector. To a one-hot model:
+\begin{equation}
+\label{eq:code_syntax_equidistance}
+\cos(\ve_{\text{\texttt{get\_user\_by\_id}}}, \ve_{\text{\texttt{getUserById}}}) = 0, \quad d_E(\ve_{\text{\texttt{ArrayList}}}, \ve_{\text{\texttt{LinkedList}}}) = d_E(\ve_{\text{\texttt{ArrayList}}}, \ve_{\text{\texttt{";"}}}) = \sqrt{2}.
+\end{equation}
+This lexical fragmentation completely prevents code-intelligence models from transferring refactoring patterns, bug-fix templates, or type semantics across codebases.
 
-\subsubsection{4. Computational and memory inefficiencies}
-From a systems engineering perspective, one-hot vectors introduce staggering memory and computation waste:
-\begin{itemize}
-    \item \textbf{VRAM memory blowout}: For a batch of $B = 64$ sequences of length $T = 512$ with vocabulary $V = 100{,}000$, storing the input tensor $\mX \in \{0, 1\}^{B \times T \times V}$ in standard 32-bit floating-point format requires:
-    \begin{equation}
-    \label{eq:vram_blowout}
-    \text{Memory} = 64 \times 512 \times 100{,}000 \times 4 \text{ bytes} \approx 1.31 \times 10^{10} \text{ bytes} \approx 13.11 \text{ GB},
-    \end{equation}
-    consuming a significant fraction of an enterprise GPU's memory just to store sparse zeros before executing a single matrix multiplication!
-    \item \textbf{FLOP waste}: Multiplying $\mW_{\text{in}}^\top \ve_i$ involves $V \cdot d$ multiplications and $(V-1) \cdot d$ additions. Because $V-1$ elements of $\ve_i$ are identically zero:
-    \begin{equation}
-    \label{eq:flop_waste}
-    \sum_{k=1}^V W_{kj} e_{ik} = W_{ij} \cdot 1 + \sum_{k \ne i} W_{kj} \cdot 0 = W_{ij}.
-    \end{equation}
-    More than $99.999\%$ of the arithmetic operations perform multiplications by zero and additions of zero. While practical deep learning frameworks bypass this via integer indexing ($\texttt{nn.Embedding}(V, d)$), the theoretical representation itself remains mathematically degenerate.
-\end{itemize}
-
-\subsubsection{5. The software engineering dimension: code identifier polymorphism and syntactic equidistance}
-In Software Engineering (LLM4SE), the equidistance pathology becomes even more catastrophic due to the nature of source code:
-\begin{itemize}
-    \item \textbf{Identifier naming polymorphism}: In real-world software systems, developers express identical conceptual entities through varying naming conventions across libraries and languages:
-    \begin{align*}
-    &\texttt{"user\_id"} \quad (\text{snake\_case}), \qquad &&\texttt{"userId"} \quad (\text{camelCase}), \\
-    &\texttt{"UserID"} \quad (\text{PascalCase}), \qquad &&\texttt{"getUserId()"} \quad (\text{getter method}).
-    \end{align*}
-    Under one-hot encoding, each variation is an orthogonal unit vector:
-    \begin{equation}
-    \label{eq:code_identifier_orthogonality}
-    d_E(\ve_{\texttt{user\_id}}, \ve_{\texttt{userId}}) = \sqrt{2}, \qquad \cos(\ve_{\texttt{user\_id}}, \ve_{\texttt{userId}}) = 0.
-    \end{equation}
-    A code completion or vulnerability detection model trained on a repository utilizing camelCase will exhibit total zero-shot failure when evaluated on a repository utilizing snake\_case, because the representation treats the identifiers as completely unrelated dimensions with zero parameter transfer.
-    \item \textbf{Type hierarchies and syntactic equidistance}: In object-oriented programming, classes like \texttt{ArrayList} and \texttt{LinkedList} share a common ancestor interface (\texttt{List}) and provide identical method contracts (\texttt{.add()}, \texttt{.get()}, \texttt{.size()}). Yet, under one-hot representations:
-    \begin{equation}
-    \label{eq:code_syntax_equidistance}
-    d_E(\ve_{\texttt{ArrayList}}, \ve_{\texttt{LinkedList}}) = d_E(\ve_{\texttt{ArrayList}}, \ve_{\texttt{while}}) = d_E(\ve_{\texttt{ArrayList}}, \ve_{\texttt{;}}) = \sqrt{2}.
-    \end{equation}
-    The geometry asserts that \texttt{ArrayList} is as semantically distant from \texttt{LinkedList} as it is from a control-flow keyword (\texttt{while}) or a punctuation delimiter (\texttt{;}). The representation cannot preserve subtype polymorphism, functional equivalence, or grammatical roles.
-\end{itemize}
-These five failure modes demonstrate why language and code processing had to abandon discrete one-hot coordinates in favor of dense, continuous distributed representations.
-
-\subsection{From discrete symbols to tokens: the mechanics and trade-offs of tokenization}
-\label{sec:tokenization_mechanisms}
-
-
-Before any mathematical model can map language into continuous vectors, raw textual strings must be segmented into atomic symbolic units known as \emph{tokens}. As emphasized by AI educator Enkk \cite{enkk2023embeddings}, the choice of tokenization scheme defines the foundational alphabet of the model and fundamentally dictates vocabulary size, sequence length, and generalization capability.
-
-Language processing historically operates across three tokenization granularities:
-\begin{enumerate}
-    \item \textbf{Word-level tokenization}: Text is segmented along whitespace and punctuation boundaries into full words.
-    \begin{itemize}
-        \item \emph{The Out-of-Vocabulary (OOV) disaster}: In open-domain text, natural vocabularies follow Zipf's law with an infinite tail of rare words, technical identifiers, misspellings, and neologisms. Any unseen token at test time must be mapped to a generic $\langle\text{UNK}\rangle$ symbol, discarding all specific semantic information.
-        \item \emph{Morphological blindness}: In highly inflected languages (e.g., Italian, Turkish, German), verbal conjugations and compound nouns explode the vocabulary. Under word-level tokenization, the forms \textit{``scrivere''}, \textit{``scrivo''}, \textit{``scriveva''}, and \textit{``scritto''} receive completely independent one-hot IDs, preventing statistical parameter sharing across shared grammatical stems.
-    \end{itemize}
-
-    \item \textbf{Character-level tokenization}: Text is decomposed into raw individual characters (e.g., ASCII or UTF-8 code points).
-    \begin{itemize}
-        \item \emph{Advantages}: The base vocabulary is tiny ($V \approx 256$ for bytes, or a few hundred for Unicode), rendering OOV completely impossible.
-        \item \emph{The sequence explosion bottleneck}: The input sequence length $T$ inflates by a factor of $4\times$ to $8\times$ relative to word-level text. Because recurrent state updates and attention mechanisms scale computationally with sequence length ($\mathcal{O}(T)$ for recurrence, $\mathcal{O}(T^2)$ for standard self-attention), character-level models dilute semantic information over dozens of steps, making long-range reasoning computationally intractable.
-    \end{itemize}
-
-    \item \textbf{Subword tokenization (Byte Pair Encoding, WordPiece, SentencePiece)}:
-    To strike an optimal balance between vocabulary size $V$ and sequence length $T$, modern language models adopt \emph{subword tokenization} algorithms, notably Byte Pair Encoding (BPE) \cite{sennrich2016} and SentencePiece \cite{kudo2018}.
-    \begin{itemize}
-        \item \emph{Algorithm}: BPE begins by treating all individual characters (or raw bytes) as the base vocabulary. It iteratively computes the frequency of all adjacent token pairs in a training corpus and merges the most frequent pair $(t_a, t_b) \to t_{\text{new}}$ into a single compound token. This merge process is repeated for a predefined number of iterations (e.g., $32{,}000$ to $100{,}000$ merges).
-        \item \emph{Byte-Level BPE}: In GPT-2 and modern foundation models \cite{radford2019}, BPE operates directly on the 256 possible values of raw UTF-8 bytes. Because any string---including emojis, non-Latin scripts, code syntax, and arbitrary binary data---can be represented as a sequence of bytes, Byte-Level BPE achieves a strictly finite, compact vocabulary with \textbf{zero out-of-vocabulary tokens}.
-    \end{itemize}
-\end{enumerate}
-
-\begin{examinsight}[Exam warning: the hidden costs and failure modes of subword tokenization]
-While subword tokenization powers modern LLMs, it introduces three significant architectural bottlenecks:
-\begin{enumerate}
-    \item \textbf{Tokenization fragmentation and arithmetic blindness}: Tokenizers segment numbers unpredictably based on corpus frequencies. For instance, \texttt{12345} might be tokenized as \texttt{["12", "345"]}, while \texttt{54321} might become \texttt{["543", "21"]}. This irregular chunking deprives neural models of consistent positional digit alignment, heavily impairing numerical computation and algorithmic reasoning.
-    \item \textbf{Cross-lingual token fertility disparity}: Because BPE merge tables are heavily skewed toward English-dominated web scrapes, English text requires approximately 1 token per word, whereas low-resource languages or non-Latin alphabets (e.g., Greek, Cyrillic, Arabic, Hindi) require $3\times$ to $8\times$ more tokens to express identical semantic content. This disparity induces disproportionate inference latency and computational cost for non-English users.
-    \item \textbf{Reversibility and tokenizer boundary bias}: Subwords cannot model subtle character-level typos or string manipulation without exploding inference steps, motivating recent research into tokenizer-free byte models (e.g., ByT5, MegaByte).
-\end{enumerate}
-\end{examinsight}
+Because local one-hot encodings confine words to isolated, orthogonal coordinate axes where semantic similarity is geometrically undefinable, we require a fundamentally different representational paradigm. This paradigm shift rests on distributing linguistic meaning across continuous latent dimensions---guided by the foundational Distributional Hypothesis.
 
 \section{Distributed representations and the distributional hypothesis}
 \label{sec:distributed_representations}
 
-\subsection{Local vs.~distributed representations}
-One-hot encoding is a classic \textbf{local representation}: each discrete concept is assigned an isolated, single-coordinate identifier. If coordinate $i$ fails, all information about word $i$ vanishes.
+To overcome the orthogonality and isolation of local representations, modern deep learning adopts \textbf{distributed representations}, a concept first formalized in cognitive science and connectionist neural networks by Geoffrey Hinton and colleagues in 1986 \cite{rumelhart1986}.
 
-By contrast, \textbf{distributed representations} (pioneered by Geoffrey Hinton \cite{rumelhart1986}) distribute semantic concepts across $d$ continuous latent dimensions (where $d \ll V$, typically $d \in [100, 300]$ for Word2Vec, and $d \in [768, 4096]$ for modern LLMs). Each dimension represents an abstract, distributed feature, and each concept is defined by a dense vector of continuous values:
-\begin{equation}
-\vv_w = [v_1, v_2, \dots, v_d]^\top \in \R^d.
-\end{equation}
+\begin{definition}{Local vs.~distributed representations}{local_vs_distributed}
+\begin{itemize}
+    \item \textbf{Local Representation}: Each concept or symbol is represented by a single dedicated computational unit (e.g., one coordinate axis in $\R^V$). If that unit is inactive, the concept is entirely absent. There is zero overlap between distinct symbols.
+    \item \textbf{Distributed Representation}: Each concept is represented by a continuous pattern of activation across all $d$ dimensions of a shared vector space $\R^d$ ($d \ll V$). Conversely, each individual dimension participates in representing many distinct concepts.
+\end{itemize}
+\end{definition}
 
-\subsection{The distributional hypothesis}
-How can a machine learn meaningful continuous coordinates for words without human annotations? Modern NLP relies on the \emph{Distributional Hypothesis}, formulated by linguists Zellig Harris (1954) and John Rupert Firth (1957):
+In a distributed representation, meaning is not stored in an isolated slot; rather, it emerges from the continuous coordinates along latent dimensions. For example, latent dimensions might implicitly reflect attributes such as animacy, size, sentiment, syntactic part of speech, or software typing constructs.
+
+\subsection{The distributional hypothesis: context as meaning}
+\label{subsec:distributional_hypothesis}
+
+How can an optimization algorithm discover meaningful continuous coordinates $\vv_w \in \R^d$ for every word purely from raw text, without human supervision? The answer lies in the \textbf{Distributional Hypothesis}, formulated in structural linguistics by Zellig Harris (1954) \cite{harris1954} and popularized by John Rupert Firth (1957) \cite{firth1957}:
 \begin{quote}
 \centering
-\textit{``You shall know a word by the company it keeps.''} (J.R.~Firth, 1957)
+\itshape
+``You shall know a word by the company it keeps.''\\
+\upshape\hfill--- John Rupert Firth (1957) \cite{firth1957}
 \end{quote}
-Words that appear in similar textual contexts tend to possess similar semantic and pragmatic meanings. If \textit{``pen''} and \textit{``pencil''} regularly co-occur with verbs like \textit{``write''}, \textit{``draw''}, and nouns like \textit{``essay''}, \textit{``paper''}, their learned continuous coordinates should be placed close together in vector space.
 
-\subsection{Framing the self-supervised prediction task}
-To learn distributed representations automatically from unannotated text corpora, we formulate an auxiliary prediction task: \emph{the cloze test} (fill-in-the-blank). Given an observed context window of surrounding tokens, the model estimates the conditional probability that a candidate word $w$ fills the missing position:
+The distributional hypothesis posits that words that appear in similar linguistic contexts tend to share similar semantic and pragmatic meanings. Consider two sentences:
+\begin{align*}
+\text{Sentence 1:} \quad &\text{``I used a \textbf{pencil} to write the essay.''} \\
+\text{Sentence 2:} \quad &\text{``You used my \textbf{pen} to write a letter.''}
+\end{align*}
+Even if a machine has never encountered a dictionary definition of \texttt{"pencil"} or \texttt{"pen"}, it observes that both tokens co-occur with identical context words: \texttt{"used"}, \texttt{"write"}, \texttt{"essay"}, \texttt{"letter"}. Conversely, an unrelated word such as \texttt{"crocodile"} or \texttt{"refrigerator"} almost never occurs in the context of \texttt{"used a [\dots] to write"}.
+
+Therefore, statistical co-occurrence within local contextual windows serves as an empirical, computable proxy for semantic similarity. If a learning algorithm is tasked with predicting surrounding context words from a target word (or vice versa), the learned vector coordinates must position words with similar co-occurrence profiles close together in vector space.
+
+While the Distributional Hypothesis asserts that context defines meaning, it does not specify an optimization algorithm. To translate linguistic co-occurrence into optimized vector coordinates, we must frame a self-supervised prediction task and establish an end-to-end differentiable training loop.
+
+\section{The embedding training loop and semantic geometry evolution}
+\label{sec:embedding_training_loop}
+
+To convert the distributional hypothesis into concrete numerical representations, we formulate a \textbf{self-supervised prediction cloze task} from unannotated text corpora.
+
+\subsection{The 7-step self-supervised optimization cycle}
+\label{subsec:seven_step_loop}
+
+Given a raw, unannotated corpus of $T$ running words $\mathcal{C} = (w_1, w_2, \dots, w_T)$, we slide a context window of half-width $C$ across the text. At each step $t$, the model solves a fill-in-the-blank prediction task: estimating the probability distribution over the vocabulary for a missing token given its surrounding context:
 \begin{equation}
 \label{eq:cloze_task}
-\Prob(x_t = w \mid \text{context}) = \Prob(x_t = w \mid x_{t-c}, \dots, x_{t-1}, x_{t+1}, \dots, x_{t+c}).
+\Prob(w_t = w \mid w_{t-C}, \dots, w_{t-1}, w_{t+1}, \dots, w_{t+C}).
 \end{equation}
-For example, given the sentence:
-\begin{center}
-\textit{``I used a \textbf{[PENCIL]} to write the essay''}
-\end{center}
-the model is tasked with assigning high probability mass to plausible instruments (\textit{``pencil''}, \textit{``pen''}) while assigning low probability to incongruous entities (\textit{``cat''}, \textit{``fish''}).
+As presented in Prof.~Flavio Giobergia's lecture slides, this prediction task is executed through an iterative \textbf{7-step optimization cycle}:
 
-\subsection{The 7-step embedding training loop}
-Slides 7 and 8 detail the iterative mechanics used to solve this self-supervised task:
 \begin{enumerate}
-    \item \textbf{Step 1 (Input Initialization)}: Assign each context word to a continuous vector $\vv \in \R^d$ (initialized randomly from a small Gaussian distribution).
-    \item \textbf{Step 2 (Context Aggregation)}: Aggregate all active context word vectors into a single summary vector $\vh \in \R^d$ (typically via element-wise summation or averaging).
-    \item \textbf{Step 3 (Output Initialization)}: Assign each candidate target word in vocabulary $\mathcal{W}$ to an output vector $\vu \in \R^d$ (also initialized randomly).
-    \item \textbf{Step 4 (Similarity Scoring)}: Measure the alignment between context representation $\vh$ and all candidate output vectors $\vu_w$ via the inner product (dot product):
-    \[
-    \hat{p}_w = \vh^\top \vu_w.
-    \]
-    \item \textbf{Step 5 (Probability Normalization)}: Apply the $\softmax$ function over all $V$ candidate scores to obtain a valid categorical distribution $\mathbf{p} \in \R^V$.
-    \item \textbf{Step 6 (Loss Evaluation)}: Evaluate the prediction against the ground-truth target word using Categorical Cross-Entropy loss: $\Loss = -\log p_{\text{target}}$.
-    \item \textbf{Step 7 (Gradient Backpropagation)}: Compute analytical gradients with respect to both input and output word vectors, adjusting their coordinates via Gradient Descent.
-\end{enumerate}
-
-\paragraph{Rinse and repeat across millions of sentences.}
-This exact optimization cycle is repeated across billions of sentences in large text corpora:
-\begin{center}
-\textit{``I used a \textbf{pencil} to write the essay''} \\
-\textit{``You used my \textbf{pen} to write a letter''}
-\end{center}
-Because \textit{``pen''} and \textit{``pencil''} share virtually identical surrounding context tokens (\textit{``used''}, \textit{``to write''}), the gradient updates nudge their respective vectors $\vv_{\text{pen}}$ and $\vv_{\text{pencil}}$ toward the exact same geometric neighborhood in $\R^d$.
-
-\subsection{The embedding lookup table as a linear layer and tensor dimensional plumbing}
-\label{sec:embedding_lookup_karpathy}
-
-In modern deep learning implementations (e.g., PyTorch), practitioners frequently interact with word embeddings through the \texttt{nn.Embedding(num\_embeddings=V, embedding\_dim=d)} module or direct multi-index slicing \texttt{C[X]}. As highlighted by Andrej Karpathy in his pedagogical walkthroughs \cite{karpathy2022makemore}, it is vital to recognize the exact mathematical equivalence between integer indexing and linear matrix operations:
-
-\begin{theorem}{Equivalence of embedding lookup and linear projection}{embedding_linear_equiv}
-Let $\mW \in \R^{d \times V}$ denote an input embedding matrix whose $j$-th column is $\vv_j \in \R^d$, and let $\ve_j \in \{0, 1\}^V$ denote the standard basis (one-hot) vector corresponding to vocabulary token $w_j$. The vector lookup is identically equal to a matrix-vector product without bias:
-\begin{equation}
-\label{eq:lookup_linear_identity}
-\vv_j = \mW[:, j] \equiv \mW \ve_j \equiv \operatorname{Linear}(\ve_j; \mW, \vb=\mathbf{0}).
-\end{equation}
-\end{theorem}
-
-In high-performance hardware execution, computing the full sparse matrix-vector product $\mW \ve_j$ would be computationally wasteful because $V-1$ multiplications involve zeros. Frameworks therefore implement \texttt{nn.Embedding} as an $\mathcal{O}(1)$ direct memory offset lookup into continuous memory. However, during the backward pass of automatic differentiation, reverse-mode autodiff routes the incoming gradient $\frac{\partial \Loss}{\partial \vv_j}$ directly into the $j$-th column of $\mW$, exactly as predicted by the linear layer Jacobian:
-\begin{equation}
-\label{eq:embedding_grad_routing}
-\frac{\partial \Loss}{\partial \mW} = \sum_{i=1}^N \frac{\partial \Loss}{\partial \vv_{w_i}} \ve_{w_i}^\top.
-\end{equation}
-
-\paragraph{Tensor dimensional plumbing across mini-batches.}
-Tracing explicit tensor ranks and dimensional transitions is essential for understanding deep learning codebases:
-\begin{enumerate}
-    \item \textbf{Input Token Batch}: A mini-batch of text sequences containing $B$ independent contexts of length $T = 2c$ is represented as a 2D integer tensor:
+    \item \textbf{Initialize Parameter Matrices}: Allocate two weight matrices with small random values: the input embedding matrix $\mW_{\text{in}} \in \R^{d \times V}$ and the output embedding matrix $\mW_{\text{out}} \in \R^{d \times V}$.
+    \item \textbf{Context Lookup and Aggregation}: For the active context window, retrieve the input embedding vectors $\vv_c = (\mW_{\text{in}})_{:, c}$ and aggregate them into a single hidden context vector $\vh \in \R^d$ (e.g., via vector summation or averaging).
+    \item \textbf{Output Candidate Projection}: Compute the dot product between the hidden context state $\vh$ and every candidate output word vector $\vu_w = (\mW_{\text{out}})_{:, w}$ in the vocabulary:
     \begin{equation}
-    \mathbf{X} \in \mathbb{N}^{B \times T}, \quad \text{where } X_{b, t} \in \{1, 2, \dots, V\}.
+    \label{eq:logit_scoring}
+    z_w = \vu_w^\top \vh, \quad \text{yielding logit vector } \vz = \mW_{\text{out}}^\top \vh \in \R^V.
     \end{equation}
-    \item \textbf{Continuous Embedding Lookup}: Indexing table $\mW_{\text{in}} \in \R^{V \times d}$ expands the integer indices into a continuous 3D activation tensor without adding learnable operations:
+    \item \textbf{Probability Normalization}: Pass the similarity logits through the softmax activation function to produce a valid probability distribution $\hat{\vy} \in \Delta^{V-1}$:
     \begin{equation}
-    \mathbf{E} = \mW_{\text{in}}[\mathbf{X}] \in \R^{B \times T \times d}.
+    \label{eq:softmax_pred}
+    \hat{y}_w = \Prob(w \mid \text{context}) = \frac{\exp(z_w)}{\sum_{k=1}^V \exp(z_k)} = \frac{\exp(\vu_w^\top \vh)}{\sum_{k=1}^V \exp(\vu_k^\top \vh)}.
     \end{equation}
-    \item \textbf{Bag-of-Words Context Pooling}: Aggregating surrounding words across the context dimension $T$ collapses the 3D tensor into a 2D batch representation:
+    \item \textbf{Loss Evaluation}: Evaluate the prediction error against the true ground-truth target token $w^* = w_t$ using Categorical Cross-Entropy:
     \begin{equation}
-    \mathbf{H} = \sum_{t=1}^T \mathbf{E}_{:, t, :} \in \R^{B \times d} \quad \text{or} \quad \mathbf{H} = \frac{1}{T} \sum_{t=1}^T \mathbf{E}_{:, t, :} \in \R^{B \times d}.
+    \label{eq:ce_loss}
+    \Loss_{\text{CE}} = -\log \hat{y}_{w^*} = -\log \left( \frac{\exp(\vu_{w^*}^\top \vh)}{\sum_{k=1}^V \exp(\vu_k^\top \vh)} \right).
     \end{equation}
-    \item \textbf{Output Matrix Projection}: Multiplying by the transposed output matrix $\mW_{\text{out}} \in \R^{d \times V}$ expands the hidden vectors into unnormalized vocabulary logits:
+    \item \textbf{Backpropagation Error Adjoints}: Apply reverse-mode automatic differentiation to compute error adjoints. The gradient with respect to logit vector $\vz$ is the prediction residual $\boldsymbol{\delta} = \hat{\vy} - \vy \in \R^V$, where $\vy = \ve_{w^*}$. Propagating this residual backward yields parameter gradients:
     \begin{equation}
-    \hat{\mathbf{P}} = \mathbf{H} \mW_{\text{out}} \in \R^{B \times V}.
+    \label{eq:param_gradients}
+    \nabla_{\mW_{\text{out}}} \Loss = \vh \, \boldsymbol{\delta}^\top \in \R^{d \times V}, \quad \nabla_\vh \Loss = \mW_{\text{out}} \boldsymbol{\delta} \in \R^d, \quad \nabla_{\mW_{\text{in}}} \Loss = (\nabla_\vh \Loss) \, \ve_{\text{context}}^\top \in \R^{d \times V}.
+    \end{equation}
+    \item \textbf{Stochastic Gradient Descent Parameter Update}: Adjust the coordinates in both embedding matrices by stepping along the negative gradient direction:
+    \begin{equation}
+    \label{eq:sgd_updates}
+    \mW_{\text{out}} \leftarrow \mW_{\text{out}} - \eta \, \nabla_{\mW_{\text{out}}} \Loss, \qquad \mW_{\text{in}} \leftarrow \mW_{\text{in}} - \eta \, \nabla_{\mW_{\text{in}}} \Loss.
     \end{equation}
 \end{enumerate}
 
-\paragraph{Loss landscape and initialization dynamics.}
-As analyzed by Karpathy \cite{karpathy2022makemore}, improper initialization of embedding matrices creates severe optimization pathology:
+Figure~\ref{fig:embedding_training_loop} illustrates this complete learning mechanism, juxtaposing the forward/backward computational dataflow in Panel (a) with the resulting geometric evolution of the embedding space across training epochs in Panel (b).
+
+\begin{figure}[htbp]
+\centering
+\resizebox{0.98\textwidth}{!}{%
+\begin{tikzpicture}[>=Stealth, font=\small]
+
+% ==============================================================================
+% PANEL (a): THE ALGORITHMIC TRAINING CYCLE
+% ==============================================================================
+\begin{scope}[shift={(0, 8.8)}]
+    \draw[fill=gray!3, draw=politoNavy!30, rounded corners=6pt] (-0.8, -3.2) rectangle (16.2, 2.2);
+    \node[anchor=west, font=\bfseries\color{politoNavy}] at (-0.5, 1.8) {(a) Algorithmic Training Cycle \& Backpropagation Flow};
+
+    % Forward nodes
+    \node[draw=politoNavy, fill=skyBlue!40, thick, rounded corners=3pt, minimum width=2.2cm, minimum height=0.9cm, align=center] (tok) at (0.8, 0.4) {Input Token\\$w_t \in \mathcal{V}$ ($\mathbf{e}_{w_t}$)};
+    
+    \node[draw=deepdiveTeal, fill=deepdiveTealBg, thick, minimum width=2.4cm, minimum height=1.1cm, align=center] (win) at (3.8, 0.4) {$\mathbf{W}_{\text{in}} \in \mathbb{R}^{d \times V}$\\(Lookup $\mathbf{v}_{w_t}$)};
+    
+    \node[draw=intuitionPurple, fill=intuitionPurpleBg, very thick, circle, minimum size=1.1cm, align=center] (h) at (6.6, 0.4) {$\mathbf{h} \in \mathbb{R}^d$};
+    
+    \node[draw=deepdiveTeal, fill=deepdiveTealBg, thick, minimum width=2.4cm, minimum height=1.1cm, align=center] (wout) at (9.4, 0.4) {$\mathbf{W}_{\text{out}} \in \mathbb{R}^{d \times V}$\\(Projection $\mathbf{u}_w^\top \mathbf{h}$)};
+    
+    \node[draw=steelBlue, fill=skyBlue!20, thick, rounded corners=3pt, minimum width=1.8cm, minimum height=0.9cm, align=center] (logits) at (12.2, 0.4) {Logits $\mathbf{z}$\\$\mathbf{z} \in \mathbb{R}^V$};
+    
+    \node[draw=examAmberLine, fill=examAmberBg, thick, rounded corners=3pt, minimum width=2.2cm, minimum height=1.1cm, align=center] (loss) at (15.0, 0.4) {Softmax \& $\mathcal{L}$\\$-\log \hat{y}_{\text{target}}$};
+
+    % Forward arrows
+    \draw[->, very thick, color=politoNavy] (tok) -- (win);
+    \draw[->, very thick, color=politoNavy] (win) -- node[above, font=\footnotesize] {$\mathbf{W}_{\text{in}}\mathbf{e}_{w_t}$} (h);
+    \draw[->, very thick, color=politoNavy] (h) -- node[above, font=\footnotesize] {$\mathbf{h}^\top \mathbf{W}_{\text{out}}$} (wout);
+    \draw[->, very thick, color=politoNavy] (wout) -- (logits);
+    \draw[->, very thick, color=politoNavy] (logits) -- node[above, font=\footnotesize] {$\operatorname{softmax}$} (loss);
+
+    % Backward nodes and arrows
+    \coordinate (b_loss) at (15.0, -1.6);
+    \coordinate (b_wout) at (9.4, -1.6);
+    \coordinate (b_h) at (6.6, -1.6);
+    \coordinate (b_win) at (3.8, -1.6);
+
+    \draw[->, thick, dashed, color=examAmberLine] (loss.south) -- (b_loss) node[midway, right, font=\scriptsize] {$\boldsymbol{\delta} = \hat{\mathbf{y}} - \mathbf{y}$};
+    \draw[->, thick, dashed, color=examAmberLine] (b_loss) -- (b_wout) node[midway, below, font=\scriptsize] {$\nabla_{\mathbf{W}_{\text{out}}} \mathcal{L} = \mathbf{h} \boldsymbol{\delta}^\top$};
+    \draw[->, thick, dashed, color=examAmberLine] (b_wout) -- (wout.south);
+
+    \draw[->, thick, dashed, color=crimsonRed] (b_wout) -- (b_h) node[midway, below, font=\scriptsize] {$\nabla_{\mathbf{h}} \mathcal{L} = \mathbf{W}_{\text{out}} \boldsymbol{\delta}$};
+    \draw[->, thick, dashed, color=crimsonRed] (b_h) -- (h.south);
+
+    \draw[->, thick, dashed, color=crimsonRed] (b_h) -- (b_win) node[midway, below, font=\scriptsize] {$\nabla_{\mathbf{W}_{\text{in}}} \mathcal{L} = (\nabla_{\mathbf{h}} \mathcal{L}) \mathbf{e}_{w_t}^\top$};
+    \draw[->, thick, dashed, color=crimsonRed] (b_win) -- (win.south);
+
+    % Update box
+    \node[draw=thmGreenLine, fill=thmGreenBg, thick, rounded corners=3pt, font=\scriptsize, align=center] at (1.0, -2.2) {
+        \textbf{SGD Parameter Updates:}\\
+        $\mathbf{W}_{\text{in}} \leftarrow \mathbf{W}_{\text{in}} - \eta \nabla_{\mathbf{W}_{\text{in}}} \mathcal{L}$\\
+        $\mathbf{W}_{\text{out}} \leftarrow \mathbf{W}_{\text{out}} - \eta \nabla_{\mathbf{W}_{\text{out}}} \mathcal{L}$
+    };
+\end{scope}
+
+% ==============================================================================
+% PANEL (b): GEOMETRIC EVOLUTION OF EMBEDDING SPACE
+% ==============================================================================
+\begin{scope}[shift={(0, 0)}]
+    \draw[fill=gray!3, draw=politoNavy!30, rounded corners=6pt] (-0.8, -3.4) rectangle (16.2, 4.4);
+    \node[anchor=west, font=\bfseries\color{politoNavy}] at (-0.5, 4.0) {(b) Geometric Evolution of Embedding Space Over Optimization Steps};
+
+    % --------------------------------------------------------------------------
+    % Stage 1: Random Initialization (t = 0)
+    % --------------------------------------------------------------------------
+    \begin{scope}[shift={(1.8, 0.4)}]
+        \draw[thick, draw=bodyGray!40, dashed] (0, 0) circle (2.2cm);
+        \node[font=\footnotesize\bfseries\color{politoNavy}] at (0, 2.6) {Phase 1: Initial State ($t=0$)};
+        \node[font=\scriptsize\itshape\color{bodyGray}, align=center] at (0, -2.6) {Isotropic random scattering\\($\cos \approx 0$, no semantic order)};
+
+        \coordinate (p1_dog) at (-0.8, 1.2);
+        \coordinate (p1_cat) at (1.4, -0.6);
+        \coordinate (p1_comp) at (-1.3, -1.0);
+        \coordinate (p1_pars) at (0.9, 1.3);
+        \coordinate (p1_app) at (0.2, -1.5);
+        \coordinate (p1_ban) at (-1.4, 0.4);
+
+        \fill[politoNavy] (p1_dog) circle (2.2pt) node[above left, font=\scriptsize] {\texttt{dog}};
+        \fill[politoNavy] (p1_cat) circle (2.2pt) node[right, font=\scriptsize] {\texttt{cat}};
+        \fill[steelBlue] (p1_comp) circle (2.2pt) node[below left, font=\scriptsize] {\texttt{compiler}};
+        \fill[steelBlue] (p1_pars) circle (2.2pt) node[above right, font=\scriptsize] {\texttt{parser}};
+        \fill[thmGreen] (p1_app) circle (2.2pt) node[below, font=\scriptsize] {\texttt{apple}};
+        \fill[thmGreen] (p1_ban) circle (2.2pt) node[left, font=\scriptsize] {\texttt{banana}};
+    \end{scope}
+
+    % Transition Arrow 1 -> 2
+    \draw[->, line width=1.5pt, color=bodyGray!60] (4.4, 0.4) -- (5.0, 0.4);
+
+    % --------------------------------------------------------------------------
+    % Stage 2: Gradient Optimization (t = k)
+    % --------------------------------------------------------------------------
+    \begin{scope}[shift={(7.4, 0.4)}]
+        \draw[thick, draw=bodyGray!40, dashed] (0, 0) circle (2.2cm);
+        \node[font=\footnotesize\bfseries\color{politoNavy}] at (0, 2.6) {Phase 2: Training ($t=k$)};
+        \node[font=\scriptsize\itshape\color{bodyGray}, align=center] at (0, -2.6) {Gradient push-pull dynamics\\(\textcolor{thmGreen}{pull co-occurring}, \textcolor{crimsonRed}{push noise})};
+
+        \coordinate (p2_dog) at (-0.5, 1.1);
+        \coordinate (p2_cat) at (0.3, 0.9);
+        \coordinate (p2_comp) at (-1.2, -0.7);
+        \coordinate (p2_pars) at (-0.5, -1.3);
+        \coordinate (p2_app) at (1.1, -0.6);
+        \coordinate (p2_ban) at (1.3, -1.3);
+
+        \fill[politoNavy] (p2_dog) circle (2.2pt) node[above left, font=\scriptsize] {\texttt{dog}};
+        \fill[politoNavy] (p2_cat) circle (2.2pt) node[above right, font=\scriptsize] {\texttt{cat}};
+        \fill[steelBlue] (p2_comp) circle (2.2pt) node[left, font=\scriptsize] {\texttt{compiler}};
+        \fill[steelBlue] (p2_pars) circle (2.2pt) node[below left, font=\scriptsize] {\texttt{parser}};
+        \fill[thmGreen] (p2_app) circle (2.2pt) node[above right, font=\scriptsize] {\texttt{apple}};
+        \fill[thmGreen] (p2_ban) circle (2.2pt) node[below right, font=\scriptsize] {\texttt{banana}};
+
+        % Attractive forces (pull)
+        \draw[<->, line width=1.2pt, color=thmGreen] ($(p2_dog)+(0.2,-0.05)$) -- ($(p2_cat)+(-0.2,0.05)$);
+        \draw[<->, line width=1.2pt, color=thmGreen] ($(p2_comp)+(0.2,-0.15)$) -- ($(p2_pars)+(-0.2,0.15)$);
+        \draw[<->, line width=1.2pt, color=thmGreen] ($(p2_app)+(0.05,-0.2)$) -- ($(p2_ban)+(-0.05,0.2)$);
+
+        % Repulsive forces (push)
+        \draw[<->, line width=1.0pt, dashed, color=crimsonRed] ($(p2_cat)+(0.1,-0.2)$) -- ($(p2_app)+(0.0,0.2)$) node[midway, right, font=\tiny] {repel};
+        \draw[<->, line width=1.0pt, dashed, color=crimsonRed] ($(p2_dog)+(-0.2,-0.2)$) -- ($(p2_comp)+(0.2,0.2)$);
+    \end{scope}
+
+    % Transition Arrow 2 -> 3
+    \draw[->, line width=1.5pt, color=bodyGray!60] (10.0, 0.4) -- (10.6, 0.4);
+
+    % --------------------------------------------------------------------------
+    % Stage 3: Converged Semantic Topology (t = infinity)
+    % --------------------------------------------------------------------------
+    \begin{scope}[shift={(13.2, 0.4)}]
+        \draw[thick, draw=bodyGray!40, dashed] (0, 0) circle (2.2cm);
+        \node[font=\footnotesize\bfseries\color{politoNavy}] at (0, 2.6) {Phase 3: Converged ($t=\infty$)};
+        \node[font=\scriptsize\itshape\color{bodyGray}, align=center] at (0, -2.6) {Semantic clustering \&\\relational translation offsets};
+
+        % Cluster 1: Animals
+        \draw[fill=politoNavy!12, draw=politoNavy!50, rounded corners=8pt] (-1.8, 0.6) rectangle (-0.2, 1.9);
+        \node[font=\tiny\bfseries\color{politoNavy}] at (-1.0, 1.7) {Animals};
+        \coordinate (p3_dog) at (-1.5, 0.9);
+        \coordinate (p3_cat) at (-0.5, 0.9);
+        \coordinate (p3_pup) at (-1.5, 1.35);
+        \coordinate (p3_kit) at (-0.5, 1.35);
+        \fill[politoNavy] (p3_dog) circle (2pt) node[below=1pt, font=\tiny] {\texttt{dog}};
+        \fill[politoNavy] (p3_cat) circle (2pt) node[below=1pt, font=\tiny] {\texttt{cat}};
+        \fill[politoNavy] (p3_pup) circle (2pt) node[left=1pt, font=\tiny] {\texttt{puppy}};
+        \fill[politoNavy] (p3_kit) circle (2pt) node[right=1pt, font=\tiny] {\texttt{kitten}};
+        \draw[->, thick, color=examAmberLine] (p3_dog) -- (p3_pup);
+        \draw[->, thick, color=examAmberLine] (p3_cat) -- (p3_kit);
+
+        % Cluster 2: Software Engineering
+        \draw[fill=steelBlue!12, draw=steelBlue!50, rounded corners=8pt] (-1.9, -1.8) rectangle (-0.3, -0.4);
+        \node[font=\tiny\bfseries\color{steelBlue}] at (-1.1, -0.6) {Software Eng.};
+        \coordinate (p3_comp) at (-1.5, -1.0);
+        \coordinate (p3_pars) at (-0.6, -1.0);
+        \coordinate (p3_ast) at (-0.6, -1.5);
+        \fill[steelBlue] (p3_comp) circle (2pt) node[left=1pt, font=\tiny] {\texttt{compiler}};
+        \fill[steelBlue] (p3_pars) circle (2pt) node[right=1pt, font=\tiny] {\texttt{parser}};
+        \fill[steelBlue] (p3_ast) circle (2pt) node[below=1pt, font=\tiny] {\texttt{AST}};
+
+        % Cluster 3: Fruits
+        \draw[fill=thmGreen!12, draw=thmGreen!50, rounded corners=8pt] (0.4, -1.6) rectangle (1.9, -0.2);
+        \node[font=\tiny\bfseries\color{thmGreen}] at (1.15, -0.4) {Food / Fruit};
+        \coordinate (p3_app) at (0.8, -0.8);
+        \coordinate (p3_ban) at (1.5, -0.8);
+        \coordinate (p3_ora) at (1.15, -1.3);
+        \fill[thmGreen] (p3_app) circle (2pt) node[left=1pt, font=\tiny] {\texttt{apple}};
+        \fill[thmGreen] (p3_ban) circle (2pt) node[right=1pt, font=\tiny] {\texttt{banana}};
+        \fill[thmGreen] (p3_ora) circle (2pt) node[below=1pt, font=\tiny] {\texttt{orange}};
+    \end{scope}
+
+\end{scope}
+
+\end{tikzpicture}%
+}
+\caption{The embedding training loop and semantic space evolution. (a) Computational dataflow of the forward prediction pass and backward adjoint parameter updates. (b) Three-phase geometric evolution of embedding space from isotropic random scattering to clustered semantic topology with parallel relational offsets.}
+\label{fig:embedding_training_loop}
+\end{figure}
+
+\subsection{Geometric phase transition of the embedding space}
+\label{subsec:geometric_phase_transition}
+
+As shown in Panel (b) of Figure~\ref{fig:embedding_training_loop}, the continuous embedding space undergoes a profound topological self-organization over the course of training:
+
 \begin{itemize}
-    \item If weights in $\mW_{\text{in}}$ and $\mW_{\text{out}}$ are initialized from a standard normal distribution $\mathcal{N}(0, 1)$, the inner products $\vh^\top \vu_w$ have variance scaling linearly with dimension $d$ ($\Var \approx d$). For $d = 300$, logit differences can reach tens of units.
-    \item Squashing extreme logits through $\softmax$ yields an overconfident, peaky probability distribution that places virtually all probability mass on a single arbitrary word.
-    \item On early training batches, the true word is almost certainly not the arbitrarily peaked word, causing the initial Cross-Entropy loss $\Loss = -\log p_{\text{target}}$ to spike to enormous values ($\Loss \gg 25$).
-    \item This induces the classic \emph{``hockey stick'' loss curve}: the model wastes hundreds of optimization iterations merely flattening the initial extreme weights before genuine semantic learning can begin.
-    \item \emph{Correct Initialization}: Scaling weights by $1/\sqrt{d}$ or initializing from $\mathcal{N}(0, 0.01^2)$ ensures initial logits remain near zero. The model starts with a uniform distribution over vocabulary tokens ($p_w \approx 1/V$), yielding an expected initial loss of $\Loss_{\text{init}} = -\log(1/V) = \log V$. For $V = 50{,}000$, $\Loss_{\text{init}} = \log(50{,}000) \approx 10.82$, ensuring stable, smooth convergence.
+    \item \textbf{Phase 1: Initial State ($t = 0$)}. Vectors are initialized using small Gaussian noise, $\vw \sim \mathcal{N}(\mathbf{0}, \sigma^2 \mI_d)$ with $\sigma \approx 0.01$ or $\sigma \approx 1/\sqrt{d}$. In high dimensions ($d \ge 100$), randomly sampled vectors are almost exactly orthogonal ($\cos \approx 0$). Tokens from disparate semantic domains---\texttt{"dog"}, \texttt{"compiler"}, \texttt{"apple"}---are scattered isotropically across the unit sphere with zero structural order.
+    
+    \item \textbf{Phase 2: Training Dynamics ($t = k$)}. Whenever the model processes an observed sentence (e.g., \emph{``The compiler parsed the syntax tree''}), backpropagation produces an attractive gradient force pulling the vectors of co-occurring words closer together. Concurrently, negative gradients or normalizer updates exert repulsive forces, pushing non-co-occurring words apart.
+    
+    \item \textbf{Phase 3: Converged Semantic Topology ($t = \infty$)}. Upon convergence across millions of sentences, words coalesce into dense semantic neighborhoods (e.g., domestic animals, compiler construction terms, fruits). Remarkably, linear vector differences between related concepts become parallel across distinct pairs, giving rise to relational vector arithmetic (e.g., $\vv_{\text{dog}} - \vv_{\text{puppy}} \approx \vv_{\text{cat}} - \vv_{\text{kitten}}$).
 \end{itemize}
 
-\section{Mathematical matrix formulation of continuous bag-of-words (CBOW)}
-\label{sec:cbow_matrix}
+\subsection{Initialization dynamics and the hockey-stick loss curve}
+\label{subsec:initialization_dynamics}
 
-In Slides 9 and 10, the Continuous Bag of Words (CBOW) architecture is formalized in terms of matrix algebra, laying out the exact tensor dimensions:
-
-\paragraph{1. Input embedding matrix $\mW_{\text{in}} \in \R^{d \times V}$.}
-The input embedding matrix contains the continuous representations of all $V$ vocabulary tokens when they appear in the context. Each column $j \in \{1, \dots, V\}$ corresponds to the $d$-dimensional input vector $\vv_j \in \R^d$ of word $w_j$:
+In his educational analysis of neural language models and lookup tables \cite{karpathy2022makemore}, Andrej Karpathy notes that the scale of initial weights in $\mW_{\text{in}}$ and $\mW_{\text{out}}$ dictates optimization stability. At initialization, before the network has learned any linguistic patterns, the model should assign an approximately uniform probability to every word in the vocabulary:
 \begin{equation}
-\label{eq:win_matrix}
-\mW_{\text{in}} = \begin{bmatrix} \mid & \mid & & \mid \\ \vv_1 & \vv_2 & \dots & \vv_V \\ \mid & \mid & & \mid \end{bmatrix} \in \R^{d \times V}.
+\label{eq:uniform_prior}
+\hat{y}_w \approx \frac{1}{V}, \quad \forall w \in \vocab.
+\end{equation}
+Consequently, the theoretical expected initial cross-entropy loss is strictly:
+\begin{equation}
+\label{eq:expected_initial_loss}
+\Loss_{\text{init}} = -\log \left( \frac{1}{V} \right) = \log V.
+\end{equation}
+For a vocabulary of $V = 50{,}000$, the initial loss must be $\Loss_{\text{init}} = \ln(50{,}000) \approx 10.82$. If $\mW_{\text{in}}$ or $\mW_{\text{out}}$ are initialized with excessively large variance, logits $z_w = \vu_w^\top \vh$ take extreme values; the softmax distribution becomes peaky and confident on arbitrary words, causing the initial loss to spike drastically ($\Loss \gg 20$). The optimizer must then spend thousands of iterations flattening these unearned confidences---producing a pathological ``hockey-stick'' loss curve. Proper variance scaling ($\mathcal{N}(0, 0.01^2)$ or $\mathcal{N}(0, 1/d)$) ensures stable, well-conditioned gradient flow from step zero.
+
+With the general self-supervised training cycle established, we must concretize the network architecture. The first foundational architecture proposed by Mikolov et al.~is the Continuous Bag-of-Words (CBOW) model, which aggregates surrounding context words to predict an omitted target center word.
+
+\section{Word2Vec continuous bag-of-words (CBOW)}
+\label{sec:cbow_architecture}
+
+In 2013, Tomas Mikolov and his research team at Google \cite{mikolov2013efficient,mikolov2013distributed} introduced \textbf{Word2Vec}, a suite of log-linear models designed to scale distributed representation learning to web-scale corpora containing billions of tokens.
+
+The first of these architectures is the \textbf{Continuous Bag-of-Words (CBOW)} model. In CBOW, the objective is to predict the omitted center target token $w_t$ given the symmetric surrounding context window:
+\begin{equation}
+\label{eq:cbow_context_def}
+\mathcal{C}_t = \{w_{t-C}, \dots, w_{t-1}, w_{t+1}, \dots, w_{t+C}\} \setminus \{w_t\}.
 \end{equation}
 
-\paragraph{2. Output embedding matrix $\mW_{\text{out}} \in \R^{d \times V}$.}
-The output embedding matrix contains the continuous representations of all $V$ vocabulary tokens when they appear as prediction targets. Each column $k \in \{1, \dots, V\}$ corresponds to the $d$-dimensional target vector $\vu_k \in \R^d$ of word $w_k$:
+\subsection{Matrix formulation and tensor plumbing}
+\label{subsec:cbow_math_formulation}
+
+The network consists of two weight matrices:
+\begin{itemize}
+    \item $\mW_{\text{in}} \in \R^{d \times V}$: The input embedding matrix, where each column $(\mW_{\text{in}})_{:, k} = \vv_k \in \R^d$ represents the vector of token $k$ when acting as context.
+    \item $\mW_{\text{out}} \in \R^{d \times V}$: The output embedding matrix, where each column $(\mW_{\text{out}})_{:, k} = \vu_k \in \R^d$ represents the vector of token $k$ when acting as the target.
+\end{itemize}
+
+Let $\ve \in \{0, 1\}^V$ denote the multi-hot context vector indicating the presence of words in $\mathcal{C}_t$:
 \begin{equation}
-\label{eq:wout_matrix}
-\mW_{\text{out}} = \begin{bmatrix} \mid & \mid & & \mid \\ \vu_1 & \vu_2 & \dots & \vu_V \\ \mid & \mid & & \mid \end{bmatrix} \in \R^{d \times V}.
+\label{eq:context_indicator}
+e_k = \sum_{j \in \{-C, \dots, C\} \setminus \{0\}} \mathbf{1}_{\{w_{t+j} = w_k\}}.
+\end{equation}
+The hidden state $\vh \in \R^d$ is obtained by projecting the context vector through $\mW_{\text{in}}$ and averaging over the $2C$ context positions:
+\begin{equation}
+\label{eq:cbow_hidden_avg}
+\vh = \frac{1}{2C} \mW_{\text{in}} \ve = \frac{1}{2C} \sum_{\substack{-C \le j \le C \\ j \neq 0}} \vv_{w_{t+j}} \in \R^d.
 \end{equation}
 
-\paragraph{3. Context binary presence vector $\ve \in \{0, 1\}^{V \times 1}$.}
-The surrounding context is encoded as a multi-hot binary indicator vector $\ve \in \{0, 1\}^V$, where entry $e_j = 1$ if word $w_j$ is present in the context window, and $e_j = 0$ otherwise:
-\begin{equation}
-\label{eq:context_e}
-\ve = [1, 0, 0, 1, \dots, 0, 1]^\top \in \{0, 1\}^V.
-\end{equation}
-\emph{Note on Bag-of-Words}: Storing context as a binary presence vector sums word vectors indiscriminately, discarding the relative sequential ordering of words.
-
-\paragraph{4. Hidden representation $\vh \in \R^{d \times 1}$.}
-Multiplying $\mW_{\text{in}}$ by context vector $\ve$ accumulates the input vectors of all active context tokens:
-\begin{equation}
-\label{eq:cbow_h}
-\underbrace{\vh}_{[d \times 1]} = \underbrace{\mW_{\text{in}}}_{[d \times V]} \underbrace{\ve}_{[V \times 1]} = \sum_{j \in \text{context}} \vv_j.
-\end{equation}
-Here, the binary vector $\ve$ acts as an efficient multi-column selector across $\mW_{\text{in}}$.
-
-\paragraph{5. Unnormalized similarity score logits $\hat{\mathbf{p}} \in \R^{1 \times V}$.}
-To determine which vocabulary word is most compatible with context $\vh$, the model computes inner products between $\vh$ and all columns of $\mW_{\text{out}}$:
+Next, the model scores candidate target words by projecting $\vh$ against the columns of $\mW_{\text{out}}$:
 \begin{equation}
 \label{eq:cbow_logits}
-\underbrace{\hat{\mathbf{p}}}_{[1 \times V]} = \underbrace{\vh^\top}_{[1 \times d]} \underbrace{\mW_{\text{out}}}_{[d \times V]} = \left[ \vh^\top \vu_1, \; \vh^\top \vu_2, \; \dots, \; \vh^\top \vu_V \right].
+\hat{\mathbf{p}} = \vh^\top \mW_{\text{out}} \in \R^{1 \times V}, \quad \text{where } \hat{p}_k = \vu_k^\top \vh.
 \end{equation}
-Each scalar logit $\hat{p}_k = \vh^\top \vu_k$ measures the angular alignment and magnitude compatibility between the context state $\vh$ and output word $w_k$.
+As Grant Sanderson (3Blue1Brown) emphasizes in his geometric intuitions of neural representations \cite{sanderson2024embeddings}, the inner product $\vu_k^\top \vh = \|\vu_k\|_2 \|\vh\|_2 \cos \theta$ acts as a directional alignment sensor: it evaluates how closely the target word's representation points in the same direction as the accumulated context vector.
 
-\begin{intuition}[Dot product as geometric projection and semantic agreement]
-As beautifully elucidated by Grant Sanderson in 3Blue1Brown \cite{sanderson2024embeddings}, the inner product $\vh^\top \vu_k$ is fundamentally a projection operator:
-\begin{equation}
-\label{eq:dot_product_projection}
-\vh^\top \vu_k = \|\vh\|_2 \|\vu_k\|_2 \cos \theta_k.
-\end{equation}
-Geometrically, it measures the length of the projection of context vector $\vh$ onto the candidate vector $\vu_k$, scaled by the candidate's magnitude:
-\begin{itemize}
-    \item When the candidate vector $\vu_k$ points in the exact same direction as context $\vh$ ($\theta_k \to 0^\circ, \cos \theta_k \to 1$), the scalar score $\hat{p}_k$ achieves its maximal positive value.
-    \item When $\vu_k$ is orthogonal to $\vh$ ($\theta_k = 90^\circ, \cos \theta_k = 0$), the score is zero, indicating total semantic irrelevance.
-    \item When $\vu_k$ points in the opposite direction ($\theta_k = 180^\circ, \cos \theta_k = -1$), the score is large and negative.
-\end{itemize}
-Because the subsequent $\softmax$ transformation exponentiates these logits ($e^{\hat{p}_k}$), even small angular alignments produce huge relative probability advantages over orthogonal distractors.
-\end{intuition}
-
-\paragraph{6. Normalized categorical probability distribution $\mathbf{p} \in \R^{1 \times V}$.}
-Applying the $\softmax$ transformation exponentiates the logits and normalizes them to sum to unity:
+The raw similarity logits $\hat{\mathbf{p}}$ are normalized via the softmax function to form the conditional probability distribution:
 \begin{equation}
 \label{eq:cbow_softmax}
-\mathbf{p} = \softmax(\hat{\mathbf{p}}) \in \R^{1 \times V}, \quad \text{where } p_i = \frac{\exp(\hat{p}_i)}{\sum_{j=1}^V \exp(\hat{p}_j)} = \frac{\exp(\vh^\top \vu_i)}{\sum_{j=1}^V \exp(\vh^\top \vu_j)}.
+\Prob(w_t = w \mid \mathcal{C}_t) = \frac{\exp(\vu_w^\top \vh)}{\sum_{k=1}^V \exp(\vu_k^\top \vh)}.
 \end{equation}
-
-\paragraph{7. Loss backpropagation.}
-Given one-hot ground-truth target vector $\vy \in \{0, 1\}^V$ corresponding to true word $w_c$, Categorical Cross-Entropy evaluates to:
+The model is trained by minimizing the negative log-likelihood of the ground-truth target word $w^* = w_t$:
 \begin{equation}
 \label{eq:cbow_loss}
-\Loss_{\text{CE}} = - \sum_{k=1}^V y_k \log p_k = - \log p_c = - \vh^\top \vu_c + \log \left( \sum_{j=1}^V \exp(\vh^\top \vu_j) \right).
+\Loss_{\text{CBOW}} = -\log \Prob(w_t = w^* \mid \mathcal{C}_t) = -\vu_{w^*}^\top \vh + \log \sum_{k=1}^V \exp(\vu_k^\top \vh).
 \end{equation}
-Reverse-mode automatic differentiation propagates gradients from $\Loss_{\text{CE}}$ through $\hat{\mathbf{p}}$ and $\vh$ into both embedding matrices $\mW_{\text{in}}$ and $\mW_{\text{out}}$, adjusting coordinates via SGD.
 
-Figure~\ref{fig:cbow_architecture} illustrates this end-to-end matrix computation.
+Figure~\ref{fig:cbow_architecture} illustrates this computational flow.
 
 \begin{figure}[htbp]
 \centering
@@ -547,17 +665,36 @@ Figure~\ref{fig:cbow_architecture} illustrates this end-to-end matrix computatio
 \label{fig:cbow_architecture}
 \end{figure}
 
+\subsection{Bengio (2003) vs.~Mikolov (2013): the log-linear breakthrough}
+\label{subsec:bengio_vs_mikolov}
 
-\section{The Word2Vec architectures: CBOW vs.~skip-gram}
-\label{sec:word2vec_architectures}
-
-In 2013, Tomas Mikolov and colleagues at Google \cite{mikolov2013efficient,mikolov2013distributed} introduced \textbf{Word2Vec}, demonstrating that distributed word embeddings could be trained efficiently on billions of tokens in hours using log-linear models.
-
-Word2Vec comprises two complementary architectural formulations:
+A neural language model learning distributed embeddings had been introduced a decade prior by Yoshua Bengio and colleagues in 2003 \cite{bengio2003}. However, Bengio's architecture had two major differences:
 \begin{enumerate}
-    \item \textbf{Continuous Bag-of-Words (CBOW)}: Uses the surrounding context words $\{w_{t-c}, \dots, w_{t+c}\} \setminus \{w_t\}$ to predict the center target word $w_t$.
-    \item \textbf{Continuous Skip-Gram}: Inverts the CBOW objective: uses the single center target word $w_t$ to predict each of the surrounding context words within radius $c$.
+    \item \textbf{Strict Causal Prediction}: Bengio modeled language autoregressively, predicting $w_t$ strictly from past tokens $w_{t-n+1}, \dots, w_{t-1}$. Mikolov opened the window symmetrically to both left and right context tokens ($w_{t-C}, \dots, w_{t+C}$), doubling the statistical signal.
+    \item \textbf{Elimination of the Non-Linear Hidden Layer}: Bengio passed concatenated context embeddings through a non-linear dense hidden layer $\tanh(\mW_h \vx + \vb)$. The matrix multiplication with $\mW_h$ dominated computation time ($\mathcal{O}(C \cdot d \cdot d_h)$). Mikolov stripped away the non-linear activation entirely, using a direct linear projection (vector averaging). This made Word2Vec a log-linear model, reducing compute costs by orders of magnitude and enabling training on billions of words in a few hours.
 \end{enumerate}
+
+\subsection{Strengths and representational bottlenecks of CBOW}
+\label{subsec:cbow_bottlenecks}
+
+\noindent\textbf{Strengths}:
+\begin{itemize}
+    \item \textbf{Rapid Training Convergence}: Context averaging smooths the gradient signal, allowing CBOW to converge in fewer epochs over large corpora.
+    \item \textbf{Robust Representations for Frequent Words}: For high-frequency tokens with abundant contextual observations, the smoothed averaging stabilizes coordinate estimates against noisy outliers.
+\end{itemize}
+
+\noindent\textbf{Representational Bottlenecks}:
+\begin{itemize}
+    \item \textbf{Loss of Sequential Word Order (Syntactic Blindness)}: Vector summation in Equation~\eqref{eq:cbow_hidden_avg} is strictly commutative: $\vv_a + \vv_b = \vv_b + \vv_a$. The model is incapable of distinguishing \emph{``the dog bit the man''} from \emph{``the man bit the dog''}.
+    \item \textbf{Rare Word Dilution}: Because context words are averaged into a single vector $\vh$, if a rare technical token appears alongside multiple high-frequency stopwords (e.g., \emph{``the \textbf{polymorphism} in the''}), the rare token's embedding is diluted by the dominant stopwords: $\frac{1}{2C} \vv_{\text{rare}} \approx \mathbf{0}$. The gradient update to the rare word is severely attenuated.
+\end{itemize}
+
+Although CBOW trains rapidly by averaging context representations, this very averaging creates a representational bottleneck: it washes out rare vocabulary tokens and discards syntactic word order. To learn high-fidelity representations for infrequent words, Mikolov et al.~inverted the formulation, yielding the Continuous Skip-Gram architecture.
+
+\section{Word2Vec continuous skip-gram and the softmax bottleneck}
+\label{sec:skipgram_architecture}
+
+To preserve the distinct gradient signal of rare words, Mikolov et al.~\cite{mikolov2013efficient} introduced the \textbf{Continuous Skip-Gram} architecture. Instead of aggregating context words to predict a single center token, Skip-Gram \textbf{inverts the predictive direction}: given a single center target word $w_t$, the model independently predicts each surrounding context word within window radius $C$.
 
 \begin{figure}[htbp]
 \centering
@@ -567,7 +704,7 @@ Word2Vec comprises two complementary architectural formulations:
     wordnode/.style={rectangle, rounded corners=3pt, draw=politoNavy, fill=skyBlue!30, thick, minimum width=22mm, minimum height=8mm, font=\small},
     matnode/.style={rectangle, draw=deepdiveTeal, fill=deepdiveTealBg, thick, minimum width=24mm, minimum height=14mm, align=center, font=\small},
     vecnode/.style={circle, draw=intuitionPurple, fill=intuitionPurpleBg, very thick, minimum size=12mm, font=\small\bfseries},
-    outnode/.style={rectangle, rounded corners=3pt, draw=examAmberLine, fill=examAmberBg, thick, minimum width=22mm, minimum height=8mm, align=center, font=\small},
+    outnode/.style={rectangle, rounded corners=3pt, draw=examAmberLine, fill=examAmberBg, thick, minimum width=26mm, minimum height=8mm, align=center, font=\small},
     arr/.style={-{Stealth[scale=1.1]}, thick, draw=bodyDark}
 ]
 
@@ -605,10 +742,10 @@ Word2Vec comprises two complementary architectural formulations:
 \end{figure}
 
 \begin{definition}{Skip-gram objective function}{skipgram_objective}
-Given a training sequence of $T$ words $w_1, w_2, \dots, w_T$ and a context window of half-width $c$, the Skip-gram model maximizes the average log-likelihood:
+Given a training sequence of $T$ words $w_1, w_2, \dots, w_T$ and a context window of half-width $C$, the Skip-gram model maximizes the average log-likelihood:
 \begin{equation}
 \label{eq:skipgram_loglik}
-\mathcal{L}_{\text{SG}} = \frac{1}{T} \sum_{t=1}^T \sum_{-c \le j \le c, j \ne 0} \log \Prob(w_{t+j} \mid w_t).
+\Loss_{\text{SG}} = \frac{1}{T} \sum_{t=1}^T \sum_{\substack{-C \le j \le C \\ j \neq 0}} \log \Prob(w_{t+j} \mid w_t).
 \end{equation}
 Under standard multinomial softmax, the conditional probability of context word $w_O$ given center word $w_I$ is:
 \begin{equation}
@@ -618,308 +755,452 @@ Under standard multinomial softmax, the conditional probability of context word 
 where $\vv_w \in \R^d$ denotes the column of $\mW_{\text{in}}$ (input embedding) and $\vu_w \in \R^d$ denotes the column of $\mW_{\text{out}}$ (output context embedding).
 \end{definition}
 
-\paragraph{Bengio (2000/2003) vs.~Mikolov (2013).}
-Slide 11 notes that Yoshua Bengio et al.~\cite{bengio2003} had previously presented a similar continuous distributed approach in 2000. However, Bengio's model enforced strict \emph{causality} (predicting token $w_t$ exclusively from past tokens $w_{t-1}, w_{t-2}$) and included a computationally heavy non-linear hidden layer in the MLP. Mikolov eliminated the non-linear hidden layer entirely, resulting in log-linear architectures that could be trained on orders of magnitude more data.
+\subsection{Why Skip-gram captures rare words}
+\label{subsec:skipgram_rare_words}
+
+In Skip-Gram, context words are never averaged together. Instead, every context-target co-occurrence $(w_I, w_O)$ generates an independent, dedicated pairwise training instance. When an infrequent, domain-specific term (such as \texttt{"refactoring"} or \texttt{"polymorphism"}) appears in text, its vector $\vv_{w_I}$ directly predicts each context word:
+\begin{equation}
+\label{eq:skipgram_pair_grad}
+\nabla_{\vv_{w_I}} \Loss = \sum_{w_O \in \mathcal{C}} \left( \vu_{w_O} - \sum_{k=1}^V \Prob(w_k \mid w_I) \vu_k \right).
+\end{equation}
+The gradient is never diluted by surrounding words. Consequently, Skip-Gram produces significantly higher-quality embeddings for rare words, specialized technical jargon, and nuanced semantic distinctions than CBOW.
+
+\subsection{The shared computational wall: the full softmax bottleneck}
+\label{subsec:softmax_bottleneck}
+
+Despite its empirical superiority, the standard formulation of Skip-Gram crashes into an insurmountable computational wall: \textbf{the full Softmax partition function bottleneck}.
+
+Examining the denominator of Equation~\eqref{eq:skipgram_softmax}:
+\begin{equation}
+\label{eq:partition_function}
+Z(w_I) = \sum_{w=1}^V \exp\left( \vu_w^\top \vv_{w_I} \right).
+\end{equation}
+Computing this normalizing denominator requires evaluating an inner product $\vu_w^\top \vv_{w_I}$ and an exponential $\exp(\cdot)$ for \textbf{every single token $w$ in the entire vocabulary $\vocab$}.
+\begin{itemize}
+    \item \textbf{Computational Complexity per Token}: Computing $Z(w_I)$ takes $\mathcal{O}(V \cdot d)$ floating-point operations.
+    \item \textbf{Total Corpus Cost}: For a window of radius $C = 5$, predicting $2C = 10$ context words per token over a corpus of $T = 10^9$ words with vocabulary $V = 10^5$ and dimension $d = 300$ requires:
+    \begin{equation}
+    \label{eq:flops_wall}
+    10^9 \text{ tokens} \times 10 \text{ predictions} \times 10^5 \text{ words} \times 300 \text{ dims} = 3 \times 10^{17} \text{ FLOPs}.
+    \end{equation}
+    \item \textbf{Gradient Synchronization Bottleneck}: In backpropagation, the derivative $\frac{\partial \Loss}{\partial \vu_w}$ touches every column $w \in \{1, \dots, V\}$ of $\mW_{\text{out}}$ on every single training step, forcing full-matrix memory writes.
+\end{itemize}
+This $\mathcal{O}(V \cdot d)$ complexity renders standard multinomial softmax completely intractable for web-scale corpora.
+
+While Continuous Skip-Gram excels at capturing nuanced semantic relationships and rare tokens, its standard formulation crashes into a severe computational barrier: normalizing over the full vocabulary requires an $\mathcal{O}(V \cdot d)$ denominator calculation for every single token prediction. To scale to realistic vocabularies, we must circumvent this partition function bottleneck.
 
 \section{Scaling softmax: hierarchical softmax and negative sampling}
 \label{sec:scaling_softmax}
 
-\subsection{The softmax computational bottleneck}
-Evaluating Equation~\eqref{eq:skipgram_softmax} requires summing $\exp(\vu_w^\top \vv_{w_I})$ across every word $w \in \{1, \dots, V\}$ in the denominator. For realistic vocabularies ($V = 10^5$ to $10^6$) and embedding dimensions $d = 300$:
+To bypass the $\mathcal{O}(V \cdot d)$ partition function barrier, Mikolov et al.~\cite{mikolov2013distributed} introduced two distinct scaling methods: \textbf{Hierarchical Softmax} (a structured tree-based approximation) and \textbf{Skip-Gram with Negative Sampling (SGNS)} (a sample-based binary discrimination formulation).
+
+\subsection{Hierarchical softmax (\texorpdfstring{$\mathcal{O}(\log_2 V)$}{O(log2 V)})}
+\label{subsec:hierarchical_softmax}
+
+First developed by Frederic Morin and Yoshua Bengio in 2005 \cite{morin2005hierarchical} and adapted by Mikolov et al.~\cite{mikolov2013distributed}, \textbf{Hierarchical Softmax} decomposes the flat multiclass probability distribution into a hierarchical sequence of binary routing decisions over a binary tree.
+
 \begin{itemize}
-    \item Computing the denominator requires $\mathcal{O}(V \cdot d)$ operations per token step.
-    \item Across a corpus of $10^9$ tokens, computing the normalizer requires $10^9 \times 10^5 \times 300 = 3 \times 10^{16}$ floating-point operations.
+    \item \textbf{Binary Tree Topology}: The $V$ vocabulary words form the leaves of a binary tree (constructed as a binary Huffman tree where frequent words have shorter code lengths).
+    \item \textbf{Path Specification}: For any word $w \in \vocab$, let $L(w)$ denote the depth of the leaf from the root. There exists a unique path of nodes from the root node $n(w, 1) = \text{root}$ to the leaf node $n(w, L(w)) = w$.
+    \item \textbf{Internal Node Parameters}: Each internal node $j \in \{1, \dots, L(w)-1\}$ is assigned a continuous parameter vector $\vv'_{n(w, j)} \in \R^d$.
+    \item \textbf{Binary Branching Probability}: At each internal node, the probability of branching to the left child is parameterized by the logistic sigmoid function:
+    \begin{equation}
+    \label{eq:hierarchical_branch}
+    \Prob(\text{branch left} \mid \vv_{w_I}) = \sigma\left( \vv'_{n(w, j)}{}^\top \vv_{w_I} \right) = \frac{1}{1 + \exp\left( -\vv'_{n(w, j)}{}^\top \vv_{w_I} \right)}.
+    \end{equation}
+    The probability of branching to the right child is:
+    \begin{equation}
+    \label{eq:hierarchical_right}
+    \Prob(\text{branch right} \mid \vv_{w_I}) = 1 - \sigma\left( \vv'_{n(w, j)}{}^\top \vv_{w_I} \right) = \sigma\left( -\vv'_{n(w, j)}{}^\top \vv_{w_I} \right).
+    \end{equation}
+    \item \textbf{Path Probability Product}: The conditional probability of reaching leaf word $w$ is the product of binary decision probabilities along its unique path:
+    \begin{equation}
+    \label{eq:hierarchical_softmax}
+    \Prob(w \mid w_I) = \prod_{j=1}^{L(w)-1} \sigma\left( \text{sign}(w, j) \cdot \vv'_{n(w, j)}{}^\top \vv_{w_I} \right),
+    \end{equation}
+    where $\text{sign}(w, j) = +1$ if the path branches left at node $j$, and $-1$ if it branches right.
 \end{itemize}
-This $O(V)$ scaling renders naive softmax training completely intractable. Mikolov et al.~\cite{mikolov2013distributed} introduced two mathematical workarounds: \emph{Hierarchical Softmax} and \emph{Negative Sampling}.
 
-\subsection{Workaround 1: hierarchical softmax (\texorpdfstring{$\mathcal{O}(\log_2 V)$}{O(log2 V)})}
-Hierarchical Softmax evaluates the probability distribution using a binary tree structure (typically a Huffman tree, where frequent words are placed near the root). The $V$ vocabulary words form the leaf nodes of the tree.
-
-For each leaf word $w$, there exists a unique path from the root node to $w$ of length $L(w)$. At each internal node $j$ along the path, the model computes the probability of taking the left versus right branch using a sigmoid classifier:
+\paragraph{Proof of Exact Normalization.}
+Because probabilities sum to $1$ at each binary branching step ($\sigma(z) + \sigma(-z) = 1$), telescoping products guarantee that the sum of probabilities over all leaves equals $1$ identically:
 \begin{equation}
-\label{eq:hierarchical_softmax}
-\Prob(w \mid w_I) = \prod_{j=1}^{L(w)-1} \sigma\left( \pm \, \mathbf{n}(w, j)^\top \vv_{w_I} \right),
+\label{eq:hierarchical_norm_proof}
+\sum_{w \in \vocab} \Prob(w \mid w_I) \equiv 1.
 \end{equation}
-where $\mathbf{n}(w, j)$ is the parameter vector associated with internal node $j$. Because the expected depth of a balanced Huffman tree is $\mathcal{O}(\log_2 V)$, evaluating $\Prob(w \mid w_I)$ drops from $\mathcal{O}(V)$ to $\mathcal{O}(\log_2 V)$. For $V = 100{,}000$, $\log_2(100{,}000) \approx 17$ operations, achieving a $5{,}800\times$ speedup.
+No global partition function $Z(w_I)$ ever needs to be computed!
 
-\subsection{Workaround 2: skip-gram with negative sampling (SGNS)}
-Rather than evaluating a normalized probability distribution over all $V$ words, \textbf{Negative Sampling} reformulates the multiclass prediction task as a collection of independent binary logistic classification problems:
-\begin{center}
-\textit{Given a word pair $(w_I, w)$, classify whether $w$ is a genuine context word ($y=1$) or drawn from random noise ($y=0$).}
-\end{center}
+\paragraph{Complexity Reduction.}
+Evaluating $\Prob(w \mid w_I)$ and its gradients requires traversing only the $L(w) - 1$ nodes along the path. In a balanced or Huffman binary tree, the average path length is $\mathcal{O}(\log_2 V)$. For a vocabulary of $V = 100{,}000$:
+\begin{equation}
+\label{eq:hierarchical_speedup}
+\log_2(100{,}000) \approx 16.6 \implies \frac{100{,}000}{17} \approx \mathbf{5{,}880\times \text{ acceleration}}.
+\end{equation}
 
-\begin{definition}{Skip-gram with negative sampling (SGNS) objective}{sgns_obj}
-For each true center-context pair $(w_I, w_O)$, the model generates $K$ fictitious ``negative'' noise words $w_{N_1}, \dots, w_{N_K}$ sampled from a noise unigram distribution $P_n(w)$. The objective maximizes:
+\subsection{Skip-gram negative sampling (SGNS)}
+\label{subsec:sgns_formulation}
+
+While Hierarchical Softmax scales to $\mathcal{O}(\log_2 V)$, Mikolov et al.~\cite{mikolov2013distributed} introduced an even more efficient and empirically superior alternative: \textbf{Negative Sampling (SGNS)}, derived as a simplified approximation to Noise Contrastive Estimation (NCE).
+
+Instead of treating context prediction as a massive multinomial classification task over $V$ mutually exclusive categories, SGNS reformulates the problem as \textbf{$1 + K$ independent binary logistic classifications}:
+\begin{enumerate}
+    \item \textbf{Positive Sample ($y = 1$)}: The true center-context pair $(w_c, w_o)$ observed in the text corpus. The model maximizes the probability that this pair is a true co-occurrence.
+    \item \textbf{Negative Samples ($y = 0$)}: $K$ noise words $\{w_{n_1}, w_{n_2}, \dots, w_{n_K}\}$ drawn at random from a noise distribution $P_n(w)$. The model maximizes the probability that these randomly sampled pairs are synthetic noise.
+\end{enumerate}
+
+\begin{definition}{Skip-gram negative sampling objective}{sgns_obj}
+For an observed center-context token pair $(w_c, w_o)$ and $K$ negative samples $\{w_{n_1}, \dots, w_{n_K}\} \sim P_n(w)$, the SGNS loss is:
 \begin{equation}
 \label{eq:sgns_loss_display}
-\mathcal{L}_{\text{NEG}} = \log \sigma\left( \vu_{w_O}^\top \vv_{w_I} \right) + \sum_{k=1}^K \E_{w_{N_k} \sim P_n(w)} \left[ \log \sigma\left( - \vu_{w_{N_k}}^\top \vv_{w_I} \right) \right],
+\Loss_{\text{SGNS}} = -\log \sigma\left( \vu_{w_o}^\top \vv_{w_c} \right) - \sum_{k=1}^K \log \sigma\left( -\vu_{w_{n_k}}^\top \vv_{w_c} \right),
 \end{equation}
-where $\sigma(z) = \frac{1}{1 + e^{-z}}$ is the logistic sigmoid function, $\vu_{w_O}$ is the target output vector, and $\vu_{w_{N_k}}$ is the output vector of the $k$-th noise word.
+where $\sigma(z) = \frac{1}{1 + e^{-z}}$ denotes the standard logistic sigmoid function.
 \end{definition}
 
-\subsection{Full step-by-step mathematical derivation of SGNS gradients}
-To demonstrate compliance with the \emph{Mathematical Expansion Guidelines} (Section~\ref{sec:scaling_softmax}), we derive the exact analytical gradients of $\mathcal{L}_{\text{NEG}}$ with respect to all parameter vectors.
+\subsection{Step-by-step display math analytical gradient derivations}
+\label{subsec:sgns_gradients}
 
-Recall the fundamental identity for the derivative of the log-sigmoid function:
-\begin{align}
-\frac{d}{dz} \log \sigma(z) &= \frac{1}{\sigma(z)} \sigma'(z) = \frac{1}{\sigma(z)} \sigma(z)(1 - \sigma(z)) = 1 - \sigma(z). \label{eq:log_sigmoid_pos} \\
-\frac{d}{dz} \log \sigma(-z) &= \frac{1}{\sigma(-z)} \left( -\sigma'(-z) \right) = \frac{1}{\sigma(-z)} \left( -\sigma(-z)(1 - \sigma(-z)) \right) \notag \\
-&= -(1 - \sigma(-z)) = - \sigma(z), \label{eq:log_sigmoid_neg}
-\end{align}
-utilizing the symmetric identity $1 - \sigma(-z) = \sigma(z)$.
+To understand how SGNS shapes the geometry of the embedding space, we derive the exact analytical gradients of $\Loss_{\text{SGNS}}$ with respect to all parameter vectors.
 
-\paragraph{Gradient with respect to target output vector $\vu_{w_O}$.}
-The positive context vector $\vu_{w_O}$ appears exclusively in the first term of Equation~\eqref{eq:sgns_loss_display}:
+Recall the fundamental identities for the logistic sigmoid derivative:
 \begin{align}
-\frac{\partial \mathcal{L}_{\text{NEG}}}{\partial \vu_{w_O}} &= \frac{\partial}{\partial \vu_{w_O}} \left[ \log \sigma\left( \vu_{w_O}^\top \vv_{w_I} \right) \right] \notag \\
-&= \left[ 1 - \sigma\left( \vu_{w_O}^\top \vv_{w_I} \right) \right] \frac{\partial (\vu_{w_O}^\top \vv_{w_I})}{\partial \vu_{w_O}} \notag \\
-&= \left[ 1 - \sigma\left( \vu_{w_O}^\top \vv_{w_I} \right) \right] \vv_{w_I}. \label{eq:grad_u_pos}
+\label{eq:sigmoid_deriv_identity}
+\sigma'(z) &= \sigma(z)(1 - \sigma(z)), \\
+\label{eq:log_sigmoid_pos}
+\frac{d}{dz} \log \sigma(z) &= \frac{\sigma'(z)}{\sigma(z)} = 1 - \sigma(z), \\
+\label{eq:log_sigmoid_neg}
+\frac{d}{dz} \log \sigma(-z) &= \frac{-\sigma'(-z)}{\sigma(-z)} = \frac{-\sigma(-z)(1 - \sigma(-z))}{\sigma(-z)} = -(1 - \sigma(-z)) = -\sigma(z).
 \end{align}
 
-\paragraph{Gradient with respect to noise vector $\vu_{w_{N_k}}$.}
-For any specific sampled negative token $w_{N_k}$, its vector appears only in its corresponding term in the summation:
+\paragraph{1. Gradient with respect to Positive Target Vector $\vu_{w_o}$.}
+The positive target vector $\vu_{w_o}$ appears exclusively in the first term of Equation~\eqref{eq:sgns_loss_display}:
 \begin{align}
-\frac{\partial \mathcal{L}_{\text{NEG}}}{\partial \vu_{w_{N_k}}} &= \frac{\partial}{\partial \vu_{w_{N_k}}} \left[ \log \sigma\left( - \vu_{w_{N_k}}^\top \vv_{w_I} \right) \right] \notag \\
-&= - \sigma\left( \vu_{w_{N_k}}^\top \vv_{w_I} \right) \frac{\partial (\vu_{w_{N_k}}^\top \vv_{w_I})}{\partial \vu_{w_{N_k}}} \notag \\
-&= - \sigma\left( \vu_{w_{N_k}}^\top \vv_{w_I} \right) \vv_{w_I}. \label{eq:grad_u_neg}
+\frac{\partial \Loss_{\text{SGNS}}}{\partial \vu_{w_o}} &= -\frac{\partial}{\partial \vu_{w_o}} \log \sigma(\vu_{w_o}^\top \vv_{w_c}) \notag \\
+&= -\left[ 1 - \sigma(\vu_{w_o}^\top \vv_{w_c}) \right] \frac{\partial (\vu_{w_o}^\top \vv_{w_c})}{\partial \vu_{w_o}} \notag \\
+\label{eq:grad_u_pos}
+&= \left[ \sigma(\vu_{w_o}^\top \vv_{w_c}) - 1 \right] \vv_{w_c}.
+\end{align}
+Defining the positive prediction error as $e_{\text{pos}} = \sigma(\vu_{w_o}^\top \vv_{w_c}) - 1 = \hat{y}_{\text{pos}} - 1$, this simplifies to:
+\begin{equation}
+\label{eq:grad_u_pos_clean}
+\frac{\partial \Loss_{\text{SGNS}}}{\partial \vu_{w_o}} = (\hat{y}_{\text{pos}} - 1) \vv_{w_c}.
+\end{equation}
+
+\paragraph{2. Gradient with respect to Negative Noise Vector $\vu_{w_{n_k}}$.}
+Each negative sample vector $\vu_{w_{n_k}}$ appears in exactly one term of the summation in Equation~\eqref{eq:sgns_loss_display}:
+\begin{align}
+\frac{\partial \Loss_{\text{SGNS}}}{\partial \vu_{w_{n_k}}} &= -\frac{\partial}{\partial \vu_{w_{n_k}}} \log \sigma(-\vu_{w_{n_k}}^\top \vv_{w_c}) \notag \\
+&= -\left[ -\sigma(\vu_{w_{n_k}}^\top \vv_{w_c}) \right] \frac{\partial (\vu_{w_{n_k}}^\top \vv_{w_c})}{\partial \vu_{w_{n_k}}} \notag \\
+\label{eq:grad_u_neg}
+&= \sigma(\vu_{w_{n_k}}^\top \vv_{w_c}) \, \vv_{w_c}.
+\end{align}
+Defining the negative prediction error as $e_{\text{neg}, k} = \sigma(\vu_{w_{n_k}}^\top \vv_{w_c}) - 0 = \hat{y}_{\text{neg}, k}$, this simplifies to:
+\begin{equation}
+\label{eq:grad_u_neg_clean}
+\frac{\partial \Loss_{\text{SGNS}}}{\partial \vu_{w_{n_k}}} = \hat{y}_{\text{neg}, k} \, \vv_{w_c}.
+\end{equation}
+
+\paragraph{3. Gradient with respect to Center Word Vector $\vv_{w_c}$.}
+The center word vector $\vv_{w_c}$ appears in both the positive term and all $K$ negative terms. Applying the chain rule to the complete loss:
+\begin{align}
+\frac{\partial \Loss_{\text{SGNS}}}{\partial \vv_{w_c}} &= -\frac{\partial}{\partial \vv_{w_c}} \log \sigma(\vu_{w_o}^\top \vv_{w_c}) - \sum_{k=1}^K \frac{\partial}{\partial \vv_{w_c}} \log \sigma(-\vu_{w_{n_k}}^\top \vv_{w_c}) \notag \\
+\label{eq:grad_v_center}
+&= \underbrace{\left[ \sigma(\vu_{w_o}^\top \vv_{w_c}) - 1 \right] \vu_{w_o}}_{\text{Attractive Component (Pull Context)}} + \underbrace{\sum_{k=1}^K \sigma(\vu_{w_{n_k}}^\top \vv_{w_c}) \, \vu_{w_{n_k}}}_{\text{Repulsive Component (Push Noise)}}.
 \end{align}
 
-\paragraph{Gradient with respect to center input vector $\vv_{w_I}$.}
-The center word vector $\vv_{w_I}$ influences both the positive target term and all $K$ negative noise terms simultaneously. Applying the linearity of differentiation:
-\begin{align}
-\frac{\partial \mathcal{L}_{\text{NEG}}}{\partial \vv_{w_I}} &= \frac{\partial}{\partial \vv_{w_I}} \left[ \log \sigma\left( \vu_{w_O}^\top \vv_{w_I} \right) \right] + \sum_{k=1}^K \frac{\partial}{\partial \vv_{w_I}} \left[ \log \sigma\left( - \vu_{w_{N_k}}^\top \vv_{w_I} \right) \right] \notag \\
-&= \left[ 1 - \sigma\left( \vu_{w_O}^\top \vv_{w_I} \right) \right] \vu_{w_O} - \sum_{k=1}^K \sigma\left( \vu_{w_{N_k}}^\top \vv_{w_I} \right) \vu_{w_{N_k}}. \label{eq:grad_v_center}
-\end{align}
+\subsection{Physical vector mechanics interpretation}
+\label{subsec:vector_mechanics}
 
-\paragraph{Intuitive interpretation of the gradients.}
-Equations~\eqref{eq:grad_u_pos}, \eqref{eq:grad_u_neg}, and \eqref{eq:grad_v_center} reveal the underlying mechanics of Negative Sampling:
+Under gradient descent, parameter updates subtract the gradient: $\vv_{w_c} \leftarrow \vv_{w_c} - \eta \nabla_{\vv_{w_c}} \Loss$:
+\begin{equation}
+\label{eq:v_update_expanded}
+\vv_{w_c} \leftarrow \vv_{w_c} + \eta \left( 1 - \hat{y}_{\text{pos}} \right) \vu_{w_o} - \eta \sum_{k=1}^K \hat{y}_{\text{neg}, k} \, \vu_{w_{n_k}}.
+\end{equation}
+This update formula admits a clean, intuitive \textbf{physical vector mechanics} interpretation:
 \begin{itemize}
-    \item The term $[1 - \sigma(\vu_{w_O}^\top \vv_{w_I})]$ represents the \emph{residual error} on the true word. If the model already predicts alignment $\sigma \approx 1$, the gradient vanishes. If alignment is low ($\sigma \approx 0$), the center vector $\vv_{w_I}$ is pulled strongly in the direction of context vector $\vu_{w_O}$.
-    \item The term $-\sigma(\vu_{w_{N_k}}^\top \vv_{w_I})$ represents the penalty for falsely predicting noise words. If the model assigns high probability to a noise word ($\sigma \approx 1$), it receives a large negative gradient that aggressively repels $\vv_{w_I}$ away from noise vector $\vu_{w_{N_k}}$.
-    \item Overall computational complexity drops to $\mathcal{O}(K \cdot d)$ operations per word pair, completely independent of vocabulary size $V$. Setting $K \in [5, 20]$ for small corpora and $K \in [2, 5]$ for massive corpora accelerates training by orders of magnitude.
+    \item \textbf{The Attractive Pull Force}: Since $\hat{y}_{\text{pos}} = \sigma(\vu_{w_o}^\top \vv_{w_c}) \in (0, 1)$, the coefficient $(1 - \hat{y}_{\text{pos}})$ is strictly positive. The update adds a vector component in the direction $+\vu_{w_o}$, \textbf{pulling the center word vector toward the true context vector}. If the model is already confident ($\hat{y}_{\text{pos}} \approx 1$), the force vanishes; if the model is surprised ($\hat{y}_{\text{pos}} \approx 0$), the force reaches maximum strength $+1 \cdot \vu_{w_o}$.
+    \item \textbf{The Repulsive Push Force}: For every negative sample $k$, $\hat{y}_{\text{neg}, k} = \sigma(\vu_{w_{n_k}}^\top \vv_{w_c}) \in (0, 1)$ is strictly positive. The update subtracts a vector component along each noise vector $-\vu_{w_{n_k}}$, \textbf{pushing the center word vector away from noise words}. If the noise word is far away ($\hat{y}_{\text{neg}, k} \approx 0$), no force is exerted; if the noise word is erroneously close ($\hat{y}_{\text{neg}, k} \approx 1$), a strong repulsive kick $-\vu_{w_{n_k}}$ repels the points.
 \end{itemize}
 
-\begin{examinsight}[The 3/4 exponent of the noise distribution]
-A staple exam question tests student knowledge of the noise distribution $P_n(w)$:
+Crucially, the computational complexity of evaluating Equation~\eqref{eq:v_update_expanded} is $\mathcal{O}(K \cdot d)$, which is \textbf{entirely independent of vocabulary size $V$}. In practice, choosing $K \in [5, 20]$ for small corpora and $K \in [2, 5]$ for web-scale corpora provides sufficient negative contrast, reducing training time from days to hours.
+
+\subsection{Theoretical justification of the \texorpdfstring{$3/4$}{3/4} unigram noise exponent}
+\label{subsec:unigram_three_quarters}
+
+How should negative samples be drawn? Mikolov et al.~\cite{mikolov2013distributed} define the noise distribution $P_n(w)$ as a smoothed unigram distribution raised to the power of $\alpha = 3/4 = 0.75$:
 \begin{equation}
 \label{eq:unigram_three_quarters}
-P_n(w) = \frac{U(w)^{3/4}}{\sum_{w'} U(w')^{3/4}},
+P_n(w) = \frac{f(w)^{3/4}}{\sum_{w' \in \vocab} f(w')^{3/4}},
 \end{equation}
-where $U(w)$ is the raw unigram empirical frequency in the corpus.
+where $f(w)$ denotes the raw unigram occurrence frequency of token $w$ in the corpus.
+
+\paragraph{Why $\alpha = 0.75$ instead of $\alpha = 1.0$ (Raw Frequency) or $\alpha = 0.0$ (Uniform)?}
+\begin{enumerate}
+    \item \textbf{Failure of Raw Frequency ($\alpha = 1.0$)}: Natural language word frequencies follow Zipf's law ($f(r) \propto 1/r$). A tiny fraction of stopwords (\texttt{"the"}, \texttt{"of"}, \texttt{"and"}, \texttt{"to"}) account for over $50\%$ of all token occurrences in a typical corpus. If $\alpha = 1.0$, more than half of all negative samples drawn are uninformative stopwords. The model wastes its entire discriminative budget separating words from \texttt{"the"}, while rare content words (\texttt{"polymorphism"}, \texttt{"compiler"}) have near-zero probability of ever being selected as negative samples, receiving virtually zero negative gradient updates.
+    
+    \item \textbf{Failure of Uniform Sampling ($\alpha = 0.0$)}: Under a uniform distribution $P_n(w) = 1/V$, every vocabulary word has equal probability. Because the vast majority of words in any natural vocabulary reside in the long tail of rare words, sampling uniformly selects almost exclusively rare words as negatives. The network rarely practices distinguishing moderately frequent content words from one another.
+    
+    \item \textbf{The Sub-linear Compromise ($\alpha = 0.75$)}: The exponent $3/4$ acts as a concave, sub-linear dampener. It compresses the gap between ultra-frequent stopwords and rare content words.
+\end{enumerate}
+
+\paragraph{Numerical Demonstration of the Rare-Word Boost.}
+Consider a frequent stopword $w_{\text{freq}}$ with corpus frequency $f(w_{\text{freq}}) = 0.01$ (e.g., $10^6$ occurrences in $10^8$ words) and a rare technical term $w_{\text{rare}}$ with corpus frequency $f(w_{\text{rare}}) = 10^{-6}$ (e.g., $100$ occurrences in $10^8$ words):
 \begin{itemize}
-    \item \emph{Why not use raw unigram frequency ($U(w)$)?} If we sample strictly proportional to raw counts, ultra-frequent stopwords (``the'', ``is'', ``of'') dominate the negative samples, while rare words are almost never sampled as negative distractors.
-    \item \emph{Why not use uniform distribution ($1/V$)?} Uniform sampling would select rare domain-specific words overwhelmingly often, ignoring linguistic frequency realities.
-    \item \emph{Why exponent $3/4 = 0.75$?} Raising frequencies to $0.75$ serves as a non-linear regularizer: it compresses the probability gap between frequent and rare tokens. For example, if word $A$ occurs $1{,}000{,}000$ times and word $B$ occurs $1{,}000$ times:
-    \[
-    \frac{U(A)}{U(B)} = 1{,}000 \implies \frac{U(A)^{0.75}}{U(B)^{0.75}} = \frac{31{,}622}{177.8} \approx 177.8.
-    \]
-    The probability ratio drops from $1{,}000$ to $178$, amplifying the probability that rare words appear as negative samples by over $5\times$.
+    \item Under raw unigram frequency ($\alpha = 1.0$), the sampling ratio is:
+    \begin{equation}
+    \label{eq:ratio_raw}
+    \frac{f(w_{\text{freq}})}{f(w_{\text{rare}})} = \frac{10^{-2}}{10^{-6}} = 10{,}000.
+    \end{equation}
+    The stopword is sampled $10{,}000$ times more frequently than the rare word.
+    
+    \item Under the smoothed distribution ($\alpha = 0.75$), the ratio becomes:
+    \begin{equation}
+    \label{eq:ratio_smoothed}
+    \frac{f(w_{\text{freq}})^{0.75}}{f(w_{\text{rare}})^{0.75}} = \left( \frac{10^{-2}}{10^{-6}} \right)^{0.75} = (10{,}000)^{0.75} = (10^4)^{3/4} = 10^3 = 1{,}000.
+    \end{equation}
 \end{itemize}
-\end{examinsight}
+By applying the $3/4$ power, the relative probability of sampling the rare word is amplified by a factor of:
+\begin{equation}
+\label{eq:boost_factor}
+\frac{10{,}000}{1{,}000} = \mathbf{10\times}.
+\end{equation}
+This $10\times$ boost provides rare words with sufficient negative gradient pushes to carve out accurate decision boundaries, while still reflecting broad corpus statistics.
 
 \subsection{Global count matrix factorization: GloVe (Pennington et al., 2014)}
-\label{sec:glove_derivation}
+\label{subsec:glove_comparison}
 
-While Mikolov's Word2Vec revolutionized the field, it operates via continuous local window scanning, implicitly sampling local co-occurrences. Conversely, classical methods like Latent Semantic Analysis (LSA) factorize the global term-document or term-term co-occurrence matrix via Singular Value Decomposition (SVD), capturing global statistical counts but performing poorly on local linear analogies.
+Around the same time, Jeffrey Pennington, Richard Socher, and Christopher Manning (2014) introduced \textbf{GloVe (Global Vectors for Word Representation)} \cite{pennington2014glove}. Whereas Word2Vec is a local window-based predictive model that processes streaming word pairs, GloVe demonstrated that distributed embeddings could be trained by directly factorizing a \textbf{global co-occurrence matrix} $\mX \in \R^{V \times V}$, where $X_{ij}$ counts the number of times word $j$ appears in the context window of word $i$.
 
-To unify these paradigms, Jeffrey Pennington, Richard Socher, and Christopher Manning \cite{pennington2014glove} introduced \textbf{GloVe} (Global Vectors for Word Representation).
-
-\paragraph{1. The ratio of co-occurrence probabilities.}
-GloVe begins with the insight that the raw co-occurrence counts alone do not directly encode meaning; rather, the \emph{ratio of conditional co-occurrence probabilities} isolates semantic differences between two words.
-
-Let $\mathbf{X} \in \R^{V \times V}$ denote the global word-word co-occurrence matrix, where $X_{ij}$ counts the number of times word $j$ appears in the context of word $i$. Let $X_i = \sum_k X_{ik}$ be the total occurrences of word $i$, and define the conditional probability:
+GloVe's core insight is that the semantic distinction between two words $i$ and $j$ relative to a probe word $k$ is encoded not by raw probabilities $P_{ik} = X_{ik}/X_i$, but by the \textbf{ratio of co-occurrence probabilities}:
 \begin{equation}
-\label{eq:glove_cond_prob}
-P_{ij} = \Prob(w_j \mid w_i) = \frac{X_{ij}}{X_i}.
+\label{eq:glove_ratio}
+\frac{P_{ik}}{P_{jk}} = \frac{P(k \mid i)}{P(k \mid j)}.
 \end{equation}
-Consider two probe target words $i = \text{ice}$ and $j = \text{steam}$, and observe their co-occurrence with various context words $k$:
+
+Table~\ref{tab:glove_ratio} reproduces the seminal example from Pennington et al.~\cite{pennington2014glove} comparing $i = \text{\texttt{"ice"}}$ and $j = \text{\texttt{"steam"}}$ across probe words $k$.
+
 \begin{table}[htbp]
 \centering
 \small
-\caption{Co-occurrence probabilities and ratios demonstrating semantic discrimination in GloVe \cite{pennington2014glove}.}
+\caption{Co-occurrence probability ratios illustrating semantic discrimination in GloVe \cite{pennington2014glove}.}
 \label{tab:glove_ratio}
-\begin{tabularx}{\textwidth}{l X X X X}
+\begin{tabular}{lcccc}
 \toprule
-\textbf{Probability \& Ratio} & $k = \text{solid}$ & $k = \text{gas}$ & $k = \text{water}$ & $k = \text{fashion}$ \\
+\textbf{Probability \& Ratio} & $k = \text{\texttt{"solid"}}$ & $k = \text{\texttt{"gas"}}$ & $k = \text{\texttt{"water"}}$ & $k = \text{\texttt{"fashion"}}$ \\
 \midrule
-$P(k \mid \text{ice})$ & $1.9 \times 10^{-4}$ & $1.0 \times 10^{-5}$ & $3.0 \times 10^{-3}$ & $1.7 \times 10^{-5}$ \\
-$P(k \mid \text{steam})$ & $2.2 \times 10^{-5}$ & $7.8 \times 10^{-4}$ & $2.2 \times 10^{-3}$ & $1.8 \times 10^{-5}$ \\
+$P(k \mid \text{\texttt{"ice"\/}})$ & $1.9 \times 10^{-4}$ & $6.6 \times 10^{-5}$ & $3.0 \times 10^{-3}$ & $1.7 \times 10^{-5}$ \\
+$P(k \mid \text{\texttt{"steam"\/}})$ & $2.2 \times 10^{-5}$ & $7.8 \times 10^{-4}$ & $2.2 \times 10^{-3}$ & $1.8 \times 10^{-5}$ \\
 \midrule
-\textbf{Ratio}: $\frac{P(k \mid \text{ice})}{P(k \mid \text{steam})}$ & \textbf{8.9} (Large: ice-specific) & \textbf{0.013} (Small: steam-specific) & \textbf{1.36} (Near 1: both water) & \textbf{0.96} (Near 1: irrelevant) \\
+$P(k \mid \text{\texttt{"ice"\/}}) / P(k \mid \text{\texttt{"steam"\/}})$ & $\mathbf{8.9}$ & $\mathbf{0.085}$ & $1.36$ & $0.96$ \\
 \bottomrule
-\end{tabularx}
+\end{tabular}
 \end{table}
 
-As shown in Table~\ref{tab:glove_ratio}:
-\begin{itemize}
-    \item When $k$ is selectively related to \textit{ice} ($k = \text{solid}$), $\frac{P(k \mid \text{ice})}{P(k \mid \text{steam})} \gg 1$.
-    \item When $k$ is selectively related to \textit{steam} ($k = \text{gas}$), $\frac{P(k \mid \text{ice})}{P(k \mid \text{steam})} \ll 1$.
-    \item When $k$ is shared by both ($k = \text{water}$) or completely irrelevant to both ($k = \text{fashion}$), the ratio hovers close to $1$.
-\end{itemize}
-The ratio cleanly extracts the discriminatory semantic properties while canceling out non-discriminatory background noise.
+When $k = \text{\texttt{"solid"}}$ is strongly related to \texttt{"ice"} but not \texttt{"steam"}, the ratio is large ($8.9 \gg 1$). When $k = \text{\texttt{"gas"}}$ is related to \texttt{"steam"} but not \texttt{"ice"}, the ratio is tiny ($0.085 \ll 1$). When $k = \text{\texttt{"water"}}$ is equally related to both (or $k = \text{\texttt{"fashion"}}$ is related to neither), the ratio hovers near $1.0$.
 
-\paragraph{2. Deriving the log-bilinear objective.}
-We seek a mapping $F$ that relates the word vectors $\vw_i, \vw_j \in \R^d$ and a separate context vector $\tilde{\vw}_k \in \R^d$ to this probability ratio:
-\begin{equation}
-F(\vw_i, \vw_j, \tilde{\vw}_k) = \frac{P_{ik}}{P_{jk}}.
-\end{equation}
-To enforce vector space linearity, $F$ should depend only on the vector difference $\vw_i - \vw_j$:
-\begin{equation}
-F(\vw_i - \vw_j, \tilde{\vw}_k) = \frac{P_{ik}}{P_{jk}}.
-\end{equation}
-Since the argument on the left is a vector and the right-hand side is a scalar, we constrain $F$ to operate on their dot product:
-\begin{equation}
-F\left( (\vw_i - \vw_j)^\top \tilde{\vw}_k \right) = \frac{P_{ik}}{P_{jk}}.
-\end{equation}
-We now require that $F$ be a homomorphism between the additive group $(\R, +)$ and the multiplicative group $(\R^+, \times)$, satisfying $F(A - B) = \frac{F(A)}{F(B)}$. This uniquely identifies $F$ as the exponential function $F = \exp$:
-\begin{equation}
-\exp\left( (\vw_i - \vw_j)^\top \tilde{\vw}_k \right) = \frac{\exp(\vw_i^\top \tilde{\vw}_k)}{\exp(\vw_j^\top \tilde{\vw}_k)} = \frac{P_{ik}}{P_{jk}}.
-\end{equation}
-Equating the numerators directly yields:
-\begin{equation}
-\vw_i^\top \tilde{\vw}_k = \log P_{ik} = \log X_{ik} - \log X_i.
-\end{equation}
-Notice that the term $\log X_i$ is independent of context word $k$. To preserve symmetry between word and context under transposition ($X_{ij} = X_{ji}$), Pennington et al.~absorb $\log X_i$ into a target word bias $b_i$ and introduce an independent context bias $\tilde{b}_k$:
-\begin{equation}
-\label{eq:glove_core_relation}
-\vw_i^\top \tilde{\vw}_k + b_i + \tilde{b}_k = \log X_{ik}.
-\end{equation}
-
-\paragraph{3. The weighted least-squares loss function.}
-Because Equation~\eqref{eq:glove_core_relation} represents an overdetermined linear system across all pairs $(i, j)$ in vocabulary $\mathcal{W}$, GloVe casts optimization as a \textbf{weighted least-squares regression problem}:
+GloVe enforces this relationship by fitting a log-bilinear model where dot products approximate log co-occurrence counts, minimized via weighted least squares:
 \begin{equation}
 \label{eq:glove_loss}
-J = \sum_{i=1}^V \sum_{j=1}^V f(X_{ij}) \left( \vw_i^\top \tilde{\vw}_j + b_i + \tilde{b}_j - \log X_{ij} \right)^2.
+J = \sum_{i=1}^V \sum_{j=1}^V f(X_{ij}) \left( \vw_i^\top \tilde{\vw}_j + b_i + \tilde{b}_j - \log X_{ij} \right)^2,
 \end{equation}
-The weighting function $f(X_{ij})$ is designed to satisfy three essential mathematical properties:
-\begin{enumerate}
-    \item $f(0) = 0$: If two words never co-occur ($X_{ij} = 0$), $f(0) \log^2(0) = 0$ by continuous limit, eliminating the $\log(0)$ singularity and keeping the loss well-defined.
-    \item $f(x)$ is continuous and non-decreasing, ensuring rare co-occurrences are not overweighted.
-    \item $f(x)$ is capped for large values of $x$, preventing frequent stopwords (``the'', ``of'') from dominating the gradient updates.
-\end{enumerate}
-Pennington et al.~proposed the truncated power function:
-\begin{equation}
-\label{eq:glove_weighting_fn}
-f(x) = \begin{cases} \left( \frac{x}{x_{\max}} \right)^\alpha & \text{if } x < x_{\max} \\ 1 & \text{otherwise} \end{cases}
-\end{equation}
-where extensive empirical evaluation identified $x_{\max} = 100$ and $\alpha = 0.75$ as optimal across word analogy benchmarks. Once trained, the final word representation is taken as the sum of input and context vectors: $\vv_i = \vw_i + \tilde{\vw}_i$.
+where $f(X_{ij}) = \min(1, (X_{ij}/x_{\max})^\alpha)$ is a sub-linear weighting function preventing frequent stopwords from dominating the loss. Both Word2Vec and GloVe construct semantically structured vector spaces, with SGNS operating on streaming text and GloVe operating on aggregated count statistics.
 
-\section{Limitations of Word2Vec}
+Skip-Gram Negative Sampling and GloVe resolve the computational bottleneck, making large-scale distributed representation learning feasible. However, Word2Vec operates under an implicit architectural assumption: that the word is the minimal, indivisible atomic unit of language. In real-world deployment, this assumption creates severe structural vulnerabilities.
+
+\section{Limitations of Word2Vec and the out-of-vocabulary (OOV) barrier}
 \label{sec:word2vec_limitations}
 
-Despite transforming natural language processing, classical Word2Vec architectures hit fundamental theoretical and computational walls (Slide 12):
+Despite their revolutionary impact, classical Word2Vec and GloVe architectures suffer from fundamental linguistic and software engineering limitations.
 
-\paragraph{1. Inability to handle out-of-vocabulary (OOV) tokens.}
-Word2Vec assigns a fixed lookup row/column to each word observed during training. If a test document contains a word not present in the training vocabulary (e.g., technical jargon, a neologism like \textit{``microservices''}, a typo like \textit{``artifical''}, or an inflected morphological variant like \textit{``unconstitutional''}), the model has no corresponding vector in $\mW_{\text{in}}$. Standard workarounds (such as mapping all unknown words to a generic $\langle\text{UNK}\rangle$ vector) discard all semantic specificity.
+\subsection{The atomic word token assumption and out-of-vocabulary (OOV) failure}
+\label{subsec:oov_barrier}
 
-\paragraph{2. Lack of contextualization and polysemy collapse.}
-Once training concludes, Word2Vec assigns exactly \emph{one static vector} to each unique token string, completely regardless of downstream syntactic or semantic context:
-\begin{center}
-Sentence A: \textit{``A \textbf{bat} is a nocturnal mammal that flies.''} \\
-Sentence B: \textit{``The player swung the baseball \textbf{bat} and hit a home run.''}
-\end{center}
+Word2Vec models assume a closed, fixed vocabulary $\vocab = \{w_1, \dots, w_V\}$ established during training. Each word is treated as an indivisible, atomic entity: its character composition is completely ignored. This creates the \textbf{Out-of-Vocabulary (OOV) catastrophe}:
+\begin{itemize}
+    \item \textbf{Unseen Words at Test Time}: In open-domain text and evolving codebases, users constantly produce novel tokens: technical neologisms, composite identifiers (e.g., \texttt{AsyncHttpClientFactory}), misspelled words (e.g., \texttt{"recusive"}), and inflected stems.
+    \item \textbf{Mapping to \texttt{<UNK>}}: When a trained Word2Vec model encounters an OOV word at inference, it has no entry in $\mW_{\text{in}}$ or $\mW_{\text{out}}$. Deep learning pipelines are forced to map all OOV tokens to a generic unknown token placeholder:
+    \begin{equation}
+    \label{eq:unk_collapse}
+    w_{\text{oov}} \longmapsto \text{\texttt{<UNK>}} \implies \vv_{w_{\text{oov}}} = \vv_{\text{\texttt{<UNK>}}}.
+    \end{equation}
+    This discards all semantic identity. To Word2Vec, a typo like \texttt{"algorithmm"} is as completely devoid of meaning as an alien string.
+\end{itemize}
 
-\begin{definition}{The polysemy collapse theorem}{polysemy_collapse}
-Suppose a word $w$ possesses $M$ distinct semantic senses $\mathcal{S}_1, \dots, \mathcal{S}_M$, each appearing in corpus contexts $\mathcal{C}_1, \dots, \mathcal{C}_M$ with empirical frequencies $N_1, \dots, N_M$. Because Word2Vec allocates only a single static parameter vector $\vv_w \in \R^d$, stochastic gradient descent optimizes the joint objective across all senses:
-\begin{equation}
-\label{eq:polysemy_objective}
-\vv_w^* = \arg\min_{\vv} \sum_{m=1}^M \sum_{c \in \mathcal{C}_m} \Loss(\vv, \vu_c).
-\end{equation}
-Under first-order linear approximation, the converged parameter vector collapses to the convex combination of the ideal sense centroids:
+\subsection{Morphological blindness}
+\label{subsec:morphological_blindness}
+
+Word2Vec is entirely blind to internal word morphology. In natural languages with rich inflectional systems (e.g., Italian, German, Turkish) as well as programming languages, words share sub-morphemic stems, prefixes, and suffixes:
+\begin{align*}
+\text{Natural language:} \quad &\text{\texttt{"develop"}}, \; \text{\texttt{"developer"}}, \; \text{\texttt{"developing"}}, \; \text{\texttt{"undeveloped"}}, \\
+\text{Software identifiers:} \quad &\text{\texttt{"parseFile"}}, \; \text{\texttt{"parseTokens"}}, \; \text{\texttt{"parseTree"}}.
+\end{align*}
+Under Word2Vec, each of these variants is assigned a totally disjoint, independent column in $\mW_{\text{in}}$. The model possesses zero architectural mechanism to share parameters across words containing the common root \texttt{"develop"} or \texttt{"parse"}. If \texttt{"undeveloped"} occurs only twice in the corpus, its vector remains poorly trained, unable to inherit semantic properties from the frequent token \texttt{"develop"}.
+
+\subsection{Polysemy collapse: static context invariance}
+\label{subsec:polysemy_collapse}
+
+Word2Vec assigns exactly \textbf{one static vector $\vv_w \in \R^d$ to each word string $w$}, regardless of the surrounding runtime context in which it appears. This results in \textbf{polysemy collapse}.
+
+\begin{definition}{Polysemy collapse}{polysemy_collapse}
+Let word $w$ possess $M$ distinct semantic senses $\mathcal{S}_1, \dots, \mathcal{S}_M$ with respective corpus mixture proportions $\pi_1, \dots, \pi_M$ ($\sum \pi_m = 1$). Because Word2Vec minimizes prediction error across all occurrences using a single vector $\vv_w$, the optimal vector converges to the convex combination of distinct sense centroids:
 \begin{equation}
 \label{eq:polysemy_convex_combination}
-\vv_w^* \approx \sum_{m=1}^M \pi_m \vv_{\mathcal{S}_m}, \quad \text{where } \pi_m = \frac{N_m}{\sum_{k=1}^M N_k}.
+\vv_w^* \approx \sum_{m=1}^M \pi_m \vv_{\mathcal{S}_m}.
 \end{equation}
 \end{definition}
 
-As a consequence of Equation~\eqref{eq:polysemy_convex_combination}, the single vector $\vv_{\text{bat}}^*$ is dragged toward an uninformative midpoint situated halfway between zoology and athletics. In nearest-neighbor queries, its cosine similarity to both \textit{``mammal''} and \textit{``baseball''} is systematically degraded.
+For example, consider the polysemous word \texttt{"bat"}:
+\begin{align*}
+\text{Sense 1 (Zoological):} \quad &\text{``A \textbf{bat} is a nocturnal flying mammal.''} \\
+\text{Sense 2 (Sports Equipment):} \quad &\text{``The baseball player swung the wooden \textbf{bat}.''}
+\end{align*}
+In Word2Vec, $\vv_{\text{bat}}$ is pulled toward biological animals on some iterations, and toward sports equipment on others. The resulting point converges to an intermediate centroid in $\R^d$ that represents neither animal nor sports gear accurately, degrading cosine similarity to both senses.
 
-\paragraph{3. Syntactic and order destruction in bag-of-words contexts.}
-As highlighted during classroom discussions, the Continuous Bag-of-Words projection averages context vectors:
-\begin{equation}
-\vh = \frac{1}{2c} \sum_{j \in \{-c, \dots, c\} \setminus \{0\}} \vv_{w_{t+j}}.
-\end{equation}
-Because vector addition is commutative, the context representation $\vh$ is strictly permutation-invariant:
-\begin{equation}
-\vh(\text{``the dog bit the man''}) \equiv \vh(\text{``the man bit the dog''}).
-\end{equation}
-While averaging captures topical gist over narrow windows ($c \le 2$), it completely obliterates grammatical roles, agency, and causal flow.
-
-\paragraph{4. The frozen parameter bottleneck vs.~dynamic contextualization.}
-In static embedding models, the lookup matrix $\mW_{\text{in}}$ is completely frozen after training. During downstream inference on new documents, the word representations cannot adapt to the subtle nuances of surrounding text.
-
-This fundamental limitation marked the historical ceiling of static word representations, prompting the paradigm shift toward \textbf{contextualized representations}:
+In software engineering, polysemy is ubiquitous:
 \begin{itemize}
-    \item \textbf{ELMo (Peters et al., 2018)} \cite{peters2018}: Employs deep bidirectional LSTMs to compute word vectors as a function of the entire sentence context: $\vh_i = f(w_i \mid w_1, \dots, w_T)$.
-    \item \textbf{Transformers and Self-Attention (Vaswani et al., 2017)} \cite{vaswani2017}: Replaces recurrence with dynamic pairwise attention routing, where every token's representation is synthesized by querying all surrounding tokens, dynamically projecting polysemous words into their context-appropriate semantic subspaces.
+    \item \texttt{"Python"}: A biological serpent vs.~a high-level dynamic programming language.
+    \item \texttt{"Spring"}: A season of the year vs.~a popular Java enterprise application framework.
+    \item \texttt{"rust"}: Iron oxide corrosion vs.~a memory-safe systems programming language.
 \end{itemize}
+A static Word2Vec model maps \texttt{"Rust"} to a compromise vector that conflates oxidation chemistry with memory safety guarantees.
+
+While contextual ambiguity requires sequence models that dynamically modulate representations based on full sentence context, the Out-of-Vocabulary barrier and morphological blindness can be solved at the token representation level. By abandoning the word as an atomic unit and descending into subword character $n$-grams, FastText establishes a morphologically aware embedding paradigm.
 
 \section{FastText: subword character \texorpdfstring{$n$}{n}-gram embeddings}
-\label{sec:fasttext}
+\label{sec:fasttext_subwords}
 
-To resolve the Out-of-Vocabulary pathology, Piotr Bojanowski, Edouard Grave, Armand Joulin, and Tomas Mikolov at Facebook AI Research developed \textbf{FastText} \cite{bojanowski2017}.
+To conquer the OOV barrier and enable morphological parameter sharing, Piotr Bojanowski, Edouard Grave, Armand Joulin, and Tomas Mikolov (2017) at Facebook AI Research introduced \textbf{FastText} \cite{bojanowski2017}.
 
-Rather than treating words as atomic indivisible symbols, FastText represents each word as a collection of character $n$-grams augmented with special boundary characters $\langle$ and $\rangle$:
-\begin{itemize}
-    \item Boundary symbols $\langle$ and $\rangle$ demarcate prefixes and suffixes, distinguishing subwords like $\langle\text{her}$ (prefix) from $\text{her}\rangle$ (suffix) and $\text{her}$ (internal stem).
-    \item The full word itself is included within boundary tags $\langle w \rangle$ to retain whole-word semantics.
-\end{itemize}
+\subsection{Character \texorpdfstring{$n$}{n}-gram decomposition and boundary markers}
+\label{subsec:character_ngrams}
 
-\paragraph{Exact worked example from slide 13: the word $\langle\text{where}\rangle$.}
-For character trigrams ($n=3$), the word \textit{``where''} is segmented into:
+Rather than treating a word as an atomic token, FastText represents each word as a \textbf{bag of character $n$-grams}.
+
+\begin{enumerate}
+    \item \textbf{Boundary Enclosure}: To distinguish prefixes and suffixes from character sequences occurring in the interior of a word, each word $w$ is bracketed by special boundary symbols \texttt{"<"} and \texttt{">"}:
+    \begin{equation}
+    \label{eq:boundary_enclosure}
+    \tilde{w} = \text{\texttt{"<"}} \circ w \circ \text{\texttt{">"}}.
+    \end{equation}
+    This ensures that the prefix sequence \texttt{"<re"} (as in \texttt{"<refactor>"}) is mathematically distinct from the internal substring \texttt{"re"} (as in \texttt{"<where>"}).
+    
+    \item \textbf{Subword Extraction}: All character $n$-grams of length $n \in [n_{\min}, n_{\max}]$ (typically $n \in [3, 6]$) are extracted, along with the special sequence containing the entire word itself $\tilde{w}$.
+\end{enumerate}
+
+\paragraph{Course Slide Example: $\langle\text{\texttt{where}}\rangle$.}
+Following Slide 13 of Prof.~Flavio Giobergia's lecture deck, consider the word \texttt{"where"} with character trigrams ($n = 3$):
 \begin{equation}
 \label{eq:fasttext_subwords}
-\mathcal{G}_{\text{where}} = \{\langle\text{wh}, \; \text{whe}, \; \text{her}, \; \text{ere}, \; \text{re}\rangle\} \cup \{\langle\text{where}\rangle\}.
+\text{\texttt{"<where>"}} \implies \mathcal{G}_{\text{\texttt{where}}} = \Big\{ \text{\texttt{"<wh"}}, \; \text{\texttt{"whe"}}, \; \text{\texttt{"her"}}, \; \text{\texttt{"ere"}}, \; \text{\texttt{"re>"}}, \; \text{\texttt{"<where>"}} \Big\}.
 \end{equation}
-Each subword character $n$-gram $g \in \mathcal{G}_w$ is assigned its own learned embedding vector $\vz_g \in \R^d$. The final vector representation of the word is computed as the sum of its constituent subword vectors:
+
+\subsection{Vector sum composition}
+\label{subsec:fasttext_composition}
+
+Each subword $n$-gram $g$ is assigned a latent continuous embedding vector $\vz_g \in \R^d$. The final representation of word $w$ is defined as the \textbf{sum of its constituent subword vectors}:
 \begin{equation}
 \label{eq:fasttext_sum}
-\vv_{\text{where}} = \sum_{g \in \mathcal{G}_{\text{where}}} \vz_g = \vz_{\langle\text{wh}} + \vz_{\text{whe}} + \vz_{\text{her}} + \vz_{\text{ere}} + \vz_{\text{re}\rangle} + \vz_{\langle\text{where}\rangle}.
+\vv_w = \sum_{g \in \mathcal{G}_w} \vz_g \in \R^d.
 \end{equation}
 
-\paragraph{How FastText solves OOV and morphological richness.}
-If a completely novel word appears at test time (e.g., \textit{``precomputation''}), FastText decomposes it into known character subwords ($\langle\text{pre}, \text{com}, \text{put}, \text{ati}, \text{ion}\rangle$). Summing the existing subword vectors synthesizes an accurate semantic representation for the unseen word without retraining. Furthermore, shared grammatical affixes (e.g., \textit{-ation}, \textit{-able}, \textit{un-}) naturally share statistical strength across vocabulary entries.
-
-\section{Vector geometry, semantic clustering, and relational offsets}
-\label{sec:vector_geometry}
-
-When distributed representations are optimized over massive corpora, the resulting continuous vector space exhibits clean geometric structure (Slides 14 and 15):
-
-\subsection{Semantic clustering via principal component analysis (PCA)}
-FastText vectors are trained in high-dimensional Euclidean space ($d = 300$). Because visualizing 300 dimensions directly is impossible, we project the vectors onto a 2-dimensional plane using \emph{Principal Component Analysis (PCA)}, which computes the orthogonal axes of maximal variance.
-
-As demonstrated on Slide 14, when 300-dimensional FastText vectors for words belonging to three separate semantic categories are projected to 2D:
-\begin{enumerate}
-    \item \textbf{Household Items}: \textit{pen}, \textit{pencil}, \textit{table}, \textit{chair}, \textit{lamp}.
-    \item \textbf{Mammals}: \textit{dog}, \textit{cat}, \textit{elephant}, \textit{bat}, \textit{lion}.
-    \item \textbf{Birds}: \textit{eagle}, \textit{sparrow}, \textit{pigeon}, \textit{hawk}, \textit{owl}.
-\end{enumerate}
-The words belonging to each category form tightly bound, mutually separated clusters in embedding space. Semantic relatedness maps directly to geometric proximity:
+Under the Skip-Gram Negative Sampling objective, the similarity score between center word $w$ and context word $c$ becomes:
 \begin{equation}
-\label{eq:cosine_proximity}
-\cos(\vv_{\text{dog}}, \vv_{\text{cat}}) \gg \cos(\vv_{\text{dog}}, \vv_{\text{pencil}}).
+\label{eq:fasttext_scoring}
+s(w, c) = \vv_w^\top \vu_c = \sum_{g \in \mathcal{G}_w} \vz_g^\top \vu_c.
+\end{equation}
+During backpropagation, the prediction error with respect to $\vv_w$ distributes gradients to every constituent subword vector $\vz_g$.
+
+\subsection{Resolving OOV tokens dynamically and morphological sharing in code}
+\label{subsec:fasttext_oov_resolution}
+
+This simple compositional formulation yields two decisive capabilities:
+
+\begin{enumerate}
+    \item \textbf{Zero-Shot Synthesis of Out-of-Vocabulary Tokens}:
+    When an unseen word $w_{\text{oov}}$ appears at test time (e.g., a compound identifier like \texttt{"refactorable"} or a code typo like \texttt{"recusive"}), even if the full token was never seen during training, its constituent character $n$-grams (\texttt{"<re"}, \texttt{"ref"}, \texttt{"fact"}, \texttt{"able>"}) were updated across other vocabulary words.
+    FastText synthesizes an accurate embedding vector on the fly by summing the vectors of its known subwords:
+    \begin{equation}
+    \label{eq:fasttext_oov_synth}
+    \vv_{w_{\text{oov}}} = \sum_{g \in \mathcal{G}_{w_{\text{oov}}}} \vz_g.
+    \end{equation}
+    The OOV barrier is completely eliminated!
+    
+    \item \textbf{Morphological Parameter Sharing}:
+    In natural language, prefixes like \texttt{"un-"}, suffixes like \texttt{"-tion"}, and inflections like \texttt{"-ing"} accumulate shared vector representations across hundreds of distinct words.
+    In software engineering, identifier substrings automatically share semantics:
+    \begin{equation}
+    \label{eq:code_subword_sharing}
+    \text{\texttt{"parseXmlDocument"}} \quad \text{and} \quad \text{\texttt{"parseJsonDocument"}}
+    \end{equation}
+    share the character subwords for \texttt{"parse"} and \texttt{"Document"}. The model immediately recognizes that both identifiers describe parsing operations on structured documents.
+\end{enumerate}
+
+\paragraph{Memory Bounding via the Fowler-Noll-Vo (FNV-1a) Hash Trick.}
+Because the universe of all character $n$-grams ($n \in [3, 6]$) across large vocabularies exceeds tens of millions of unique strings, allocating an unbounded matrix would cause memory blowout. FastText bounds the embedding table to $K = 2 \times 10^6$ rows using the Fowler-Noll-Vo (FNV-1a) hashing function:
+\begin{equation}
+\label{eq:fnv_hash}
+\text{index}(g) = \text{FNV-1a}(g) \pmod K.
+\end{equation}
+Colliding $n$-grams share bucket rows; due to the high dimensionality ($d = 300$) and independent sum aggregation, hash collisions act as benign regularizing noise that does not disrupt semantic retrieval.
+
+\subsection{Connection to modern subword tokenizers: BPE and WordPiece}
+\label{subsec:subword_tokenizers_link}
+
+As AI educator Enkk highlights in his review of language models \cite{enkk2023embeddings}, the subword philosophy pioneered by FastText directly inspired the tokenization mechanisms powering modern Large Language Models:
+\begin{itemize}
+    \item \textbf{Byte Pair Encoding (BPE)} (Sennrich et al., 2016 \cite{sennrich2016}; Radford et al., 2019 \cite{radford2019}): Iteratively merges the most frequent pairs of adjacent characters or bytes to form a deterministic subword vocabulary (used in GPT-2, GPT-4, and LLaMA).
+    \item \textbf{SentencePiece} (Kudo and Richardson, 2018 \cite{kudo2018}): Treats input text as a raw byte stream without whitespace pre-segmentation, training unigram language model segmentations.
+\end{itemize}
+FastText operates continuous character $n$-gram summations at the embedding layer, whereas BPE operates discrete token mergers during preprocessing. Both architectures fundamentally exist to dismantle the brittle, isolated word-level assumption and establish robust subword parameter sharing.
+
+By decomposing words into character $n$-grams, FastText conquers the Out-of-Vocabulary barrier and enables morphological parameter sharing. With our embedding models fully trained, we can now step back and examine the remarkable mathematical geometry that spontaneously emerges within these dense vector spaces.
+
+\section{Emergent vector space geometry: clustering, metrics and relational analogies}
+\label{sec:vector_geometry_metrics}
+
+When Word2Vec and FastText models are trained over large text corpora, the resulting continuous vector spaces exhibit profound emergent mathematical properties: high-dimensional semantic clustering, metric equivalence, and linear relational translations.
+
+\subsection{Semantic clustering and dimensionality reduction}
+\label{subsec:semantic_clustering_pca}
+
+In high-dimensional embedding space ($d = 300$), words with similar functional roles organize into distinct, tightly bound clusters.
+
+Following Slide 14 of Prof.~Flavio Giobergia's lecture deck, projecting 300-dimensional FastText vectors into two dimensions via Principal Component Analysis (PCA) reveals distinct semantic clusters:
+\begin{itemize}
+    \item \textbf{Household Items}: \texttt{"table"}, \texttt{"chair"}, \texttt{"desk"}, \texttt{"sofa"}.
+    \item \textbf{Mammals}: \texttt{"dog"}, \texttt{"cat"}, \texttt{"tiger"}, \texttt{"elephant"}.
+    \item \textbf{Birds}: \texttt{"eagle"}, \texttt{"sparrow"}, \texttt{"parrot"}, \texttt{"pigeon"}.
+\end{itemize}
+The leading principal components preserve categorical variance: domestic entities, animal taxonomy, and biological sub-branches form linearly separable clusters in the compressed 2D projection as well as in the original 300-dimensional manifold.
+
+\subsection{Linear relational translations (vector analogy arithmetic)}
+\label{subsec:relational_analogies}
+
+The most celebrated emergent property of continuous word embeddings is that semantic and syntactic relationships manifest as \textbf{linear vector translation offsets}:
+\begin{equation}
+\label{eq:relational_offset_concept}
+\vv_{w_2} - \vv_{w_1} \approx \vec{d}_{\text{relation}}.
 \end{equation}
 
-\subsection{Relational linear translations (vector analogies)}
-Remarkably, distributed vector spaces do not merely cluster synonyms; they capture linear semantic relationships. Semantic relations correspond to nearly constant displacement vectors (translations) across the vector space.
-
-As shown on Slide 15:
+\paragraph{Country-to-Capital Analogy (Course Slides 15).}
+In Prof.~Giobergia's lecture deck, subtracting the vector for \texttt{"Berlin"} from \texttt{"Germany"} produces a directional displacement vector $\vec{d}_{\text{capital\_of}}$:
 \begin{equation}
 \label{eq:rel_germany_berlin}
 \vv_{\text{Germany}} - \vv_{\text{Berlin}} \approx \vec{d}_{\text{capital\_of}}.
 \end{equation}
-The difference vector $\vec{d}_{\text{capital\_of}}$ isolates the abstract semantic concept of ``capital city of a country''. Applying this learned translation vector to a different country predicts its capital city with high geometric precision:
+Applying this learned offset vector to another country predicts its capital city via simple vector addition:
 \begin{equation}
 \label{eq:rel_spain_madrid}
-\vv_{\text{Spain}} + \vec{d}_{\text{capital\_of}} = \vv_{\text{Spain}} + (\vv_{\text{Germany}} - \vv_{\text{Berlin}}) \approx \vv_{\text{Madrid}}.
+\vv_{\text{Spain}} + (\vv_{\text{Germany}} - \vv_{\text{Berlin}}) \approx \vv_{\text{Madrid}}.
 \end{equation}
 
-The most famous canonical instance of relational vector arithmetic is the gender-royalty parallelogram \cite{mikolov2013distributed}:
+\paragraph{The Gender-Royalty Parallelogram.}
+The canonical demonstration discovered by Mikolov et al.~\cite{mikolov2013distributed} is the gender-royalty parallelogram:
 \begin{equation}
 \label{eq:king_queen_arithmetic}
-\vv_{\text{King}} - \vv_{\text{Man}} + \vv_{\text{Woman}} \approx \vv_{\text{Queen}}.
+\vv_{\text{king}} - \vv_{\text{man}} + \vv_{\text{woman}} \approx \vv_{\text{queen}}.
 \end{equation}
-Figure~\ref{fig:vector_parallelogram} illustrates this geometric parallelogram in two dimensions.
+
+Figure~\ref{fig:vector_parallelogram} illustrates this parallelogram in two dimensions.
 
 \begin{figure}[htbp]
 \centering
@@ -953,23 +1234,19 @@ Figure~\ref{fig:vector_parallelogram} illustrates this geometric parallelogram i
 \label{fig:vector_parallelogram}
 \end{figure}
 
-\begin{deepdive}[Mikolov's 2013 breakthrough and word analogy benchmarks]
-Prior to Mikolov et al.~\cite{mikolov2013efficient,mikolov2013distributed}, word embeddings were viewed as expensive auxiliary features for specialized neural taggers. Mikolov released pre-trained vectors trained on the Google News dataset (100 billion words, vocabulary size $V = 3 \times 10^6$, $d = 300$) alongside a formal \textbf{Word Analogy Benchmark} comprising 19,544 linguistic questions partitioned into syntactic analogies (e.g., \textit{quick : quickly :: slow : slowly}) and semantic analogies (e.g., \textit{Athens : Greece :: Rome : Italy}).
+\paragraph{Software Engineering Analogy Equivalents.}
+In code representation learning (e.g., CodeBERT \cite{feng2020codebert}, OpenAI Codex embeddings \cite{chen2021codex}), relational vector arithmetic reflects runtime architectures and language toolchains:
+\begin{align}
+\label{eq:se_analogy_runtime}
+\vv_{\text{Java}} - \vv_{\text{JVM}} + \vv_{\text{Python}} &\approx \vv_{\text{CPython}}, \\
+\label{eq:se_analogy_compiler}
+\vv_{\text{C++}} - \vv_{\text{g++}} + \vv_{\text{Rust}} &\approx \vv_{\text{rustc}}.
+\end{align}
 
-To answer the analogy query \textit{``A is to B as C is to ?''}, the model searches for the vocabulary word $w^*$ maximizing cosine similarity:
-\begin{equation}
-w^* = \argmax_{w \in \mathcal{W} \setminus \{A, B, C\}} \cos\left( \vv_w, \; \vv_B - \vv_A + \vv_C \right).
-\end{equation}
-SGNS achieved over $70\%$ accuracy across the entire benchmark, establishing that simple log-linear architectures trained over massive corpora naturally discover linear manifold representations of human language.
-\end{deepdive}
+\subsection{Metric geometry of embedding spaces: cosine vs.~Euclidean distance}
+\label{subsec:metric_geometry}
 
-\subsection{Semantic geometry, distance metrics, and vector databases in modern LLM pipelines}
-\label{sec:semantic_geometry_enkk}
-
-The geometric properties discovered by Word2Vec form the foundational bedrock for modern representation learning and information retrieval. In his educational breakdown on word embeddings \cite{enkk2023embeddings}, Italian computer scientist and AI educator Enkk highlights how the geometric intuition of continuous vector spaces governs retrieval-augmented generation (RAG) and semantic search in contemporary software engineering systems.
-
-\paragraph{1. The metric geometry of embedding space: cosine vs.~Euclidean distance.}
-When measuring semantic similarity between two continuous vectors $\vu, \vv \in \R^d$, three distinct distance functions are available:
+When querying nearest neighbors or evaluating semantic similarity between two continuous vectors $\vu, \vv \in \R^d$, three metrics are commonly considered:
 \begin{enumerate}
     \item \textbf{Euclidean ($L_2$) Distance}:
     \begin{equation}
@@ -981,10 +1258,10 @@ When measuring semantic similarity between two continuous vectors $\vu, \vv \in 
     \label{eq:dot_prod_metric}
     \inner{\vu, \vv} = \vu^\top \vv = \sum_{i=1}^d u_i v_i = \|\vu\|_2 \|\vv\|_2 \cos \theta.
     \end{equation}
-    \item \textbf{Cosine Similarity and Cosine Distance}:
+    \item \textbf{Cosine Distance}:
     \begin{equation}
     \label{eq:cosine_dist_def}
-    \cos(\vu, \vv) = \frac{\vu^\top \vv}{\|\vu\|_2 \|\vv\|_2}, \qquad D_{\cos}(\vu, \vv) = 1 - \cos(\vu, \vv) \in [0, 2].
+    D_{\cos}(\vu, \vv) = 1 - \cos(\vu, \vv) = 1 - \frac{\vu^\top \vv}{\|\vu\|_2 \|\vv\|_2} \in [0, 2].
     \end{equation}
 \end{enumerate}
 
@@ -997,40 +1274,49 @@ Let $\vu, \vv \in \R^d$ be normalized to unit Euclidean length ($\|\vu\|_2 = \|\
 Consequently, nearest neighbor rankings under Euclidean distance, Cosine distance, and Dot Product are mathematically identical on the unit hypersphere $\mathbb{S}^{d-1}$.
 \end{theorem}
 
-\paragraph{Why cosine distance dominates natural language processing.}
-As emphasized by Enkk \cite{enkk2023embeddings}, when word embeddings are trained without explicit length constraints, the Euclidean norm $\|\vv_w\|_2$ strongly correlates with the word's unigram frequency in the training corpus. Ultra-frequent terms receive frequent gradient pushes that systematically stretch their vector lengths, whereas rare, domain-specific technical terms remain close to the origin.
+\paragraph{Why Cosine Distance Dominates Natural Language Processing.}
+As explained by Enkk \cite{enkk2023embeddings}, when word embeddings are trained without explicit length regularization, the Euclidean norm $\|\vv_w\|_2$ strongly correlates with unigram token frequency. Highly frequent words undergo millions of gradient pushes, systematically expanding their vector magnitude, whereas rare terms remain close to the origin.
+Cosine distance normalizes out vector magnitude, projecting all embeddings onto $\mathbb{S}^{d-1}$. It evaluates \textbf{pure angular orientation} (conceptual topic) rather than \textbf{vector length} (frequency artifact).
+
+\subsection{Dimensionality trade-offs and the Johnson-Lindenstrauss lemma}
+\label{subsec:johnson_lindenstrauss}
+
+Why do word embeddings operate effectively in dimensions $d \in [100, 300]$, and modern LLMs in $d \in [768, 4096]$?
 \begin{itemize}
-    \item If we measure similarity via raw Euclidean distance $D_{L_2}$, two rare synonymous words (e.g., \textit{``polymorphism''} and \textit{``subtyping''}) will have small vector norms and might be declared closer to a random low-frequency token near the origin than to a high-frequency related token (\textit{``inheritance''}).
-    \item By contrast, \textbf{Cosine Distance} normalizes out the vector length, projecting every word onto the unit hypersphere $\mathbb{S}^{d-1}$. It isolates the \emph{pure angular orientation} (the conceptual topic) from the \emph{vector magnitude} (the frequency artifact).
+    \item \textbf{Under-parameterization ($d < 50$)}: Severe geometric crowding occurs. The space lacks enough orthogonal degrees of freedom to separate independent semantic concepts, forcing unrelated topics into spurious proximity.
+    \item \textbf{Over-parameterization ($d \gg 10{,}000$)}: The space suffers from the curse of dimensionality. The volume of the unit ball concentrates entirely in a thin outer shell, distance distributions become uniform, and memory bandwidth demands explode.
 \end{itemize}
 
-\paragraph{2. The dimensionality trade-off and the Johnson-Lindenstrauss lemma.}
-A central design decision in vector space construction is the choice of embedding dimension $d$:
-\begin{itemize}
-    \item \textbf{Under-parameterization ($d < 50$)}: Severe geometric crowding occurs. As the vocabulary grows, the space lacks enough orthogonal degrees of freedom to separate distinct semantic facets, forcing disparate concepts into spurious proximity.
-    \item \textbf{Over-parameterization ($d \gg 10{,}000$)}: The space suffers from the curse of dimensionality. The volume of the unit hypersphere concentrates entirely in an infinitesimally thin spherical shell, distance distributions become nearly uniform (destroying discriminative contrast), and storage/compute costs explode.
-    \item \textbf{The sweet spot}: Mikolov and Pennington found $d \in [100, 300]$ optimal for static word vectors, whereas modern LLM representations use $d \in [768, 4096]$ to encode rich contextual sequences.
-\end{itemize}
-The theoretical foundation of this stability is the \textbf{Johnson-Lindenstrauss Lemma}:
+The mathematical guarantee underwriting this stability is the \textbf{Johnson-Lindenstrauss Lemma}:
 \begin{theorem}{Johnson-Lindenstrauss Lemma}{jl_lemma}
-Given $0 < \epsilon < 1$, a set of $N$ points in arbitrary Euclidean space can be embedded into a Euclidean space of dimension $d = \mathcal{O}\left( \frac{\log N}{\epsilon^2} \right)$ such that all pairwise distances are preserved within a factor of $1 \pm \epsilon$:
+Given $0 < \epsilon < 1$, any set of $N$ points in arbitrary Euclidean space can be embedded into a Euclidean space of dimension:
 \begin{equation}
+\label{eq:jl_dimension}
+d = \mathcal{O}\left( \frac{\log N}{\epsilon^2} \right),
+\end{equation}
+such that all pairwise Euclidean distances are preserved within a distortion factor of $1 \pm \epsilon$:
+\begin{equation}
+\label{eq:jl_bound}
 (1 - \epsilon) \|\vu - \vv\|_2^2 \le \|f(\vu) - f(\vv)\|_2^2 \le (1 + \epsilon) \|\vu - \vv\|_2^2.
 \end{equation}
 \end{theorem}
-In a 300-dimensional space, an exponential number of randomly sampled vectors are almost exactly orthogonal ($\cos \approx 0$). This high-dimensional orthogonality provides massive capacity to pack tens of thousands of concepts without interference.
+For a vocabulary of $N = 100{,}000$ tokens and distortion tolerance $\epsilon = 0.2$, $\log(10^5) / 0.04 \approx 287$, precisely justifying why $d = 300$ serves as the golden standard for dense static word vectors.
 
-\paragraph{3. Vector databases and Approximate Nearest Neighbor (ANN) search in software engineering.}
-In modern software engineering, distributed representations extend from individual words to dense sentence and code embeddings (e.g., CodeBERT \cite{feng2020codebert}, OpenAI embeddings \cite{chen2021codex}). When building Retrieval-Augmented Generation (RAG) tools for large-scale software repositories (indexing $10^6$ source code functions and API documentation files), querying the nearest vector via brute-force cosine comparison requires $\mathcal{O}(N \cdot d)$ operations per user query, incurring unacceptable latency ($> 500\,\text{ms}$).
+\subsection{Vector databases and Approximate Nearest Neighbor (ANN) search}
+\label{subsec:vector_databases}
 
-To achieve sub-millisecond retrieval, modern vector databases (e.g., Chroma, FAISS, Milvus, Pinecone, Qdrant) implement **Approximate Nearest Neighbor (ANN)** indexing algorithms \cite{enkk2023embeddings}:
+In modern software engineering, distributed embeddings power semantic code search and Retrieval-Augmented Generation (RAG) across millions of functions and documentation files. Evaluating brute-force cosine comparisons across $N = 10^7$ stored vectors requires $\mathcal{O}(N \cdot d)$ operations, resulting in unacceptable search latencies ($>500\,\text{ms}$).
+
+To achieve sub-millisecond retrieval, modern vector databases (e.g., Chroma, FAISS, Milvus, Qdrant) implement **Approximate Nearest Neighbor (ANN)** indexing algorithms \cite{enkk2023embeddings}:
 \begin{enumerate}
     \item \textbf{Hierarchical Navigable Small World (HNSW) Graphs}: Constructs a multi-layer graph topology inspired by the ``six degrees of separation'' principle. The top layers contain sparse long-range highway edges that skip across semantic clusters, while the bottom layer contains dense local nearest-neighbor connections. Search begins at the top layer with greedy routing and transitions downward, achieving logarithmic $\mathcal{O}(\log N)$ query complexity with $>98\%$ recall.
     \item \textbf{Inverted File with Product Quantization (IVF-PQ)}: Partitions the vector space into $K$ Voronoi cells using $k$-means clustering, while Product Quantization divides each $d$-dimensional vector into $M$ sub-vectors and quantizes them into compact discrete codebooks. This compresses embeddings by $8\times$ to $32\times$, allowing millions of code embeddings to reside entirely in high-speed RAM with symmetric distance lookup tables.
 \end{enumerate}
 
-\paragraph{4. Practical implementation and the query filtering caveat.}
-In his course demonstration on Word2Vec and FastText semantic arithmetic \cite{giobergia2024gist}, Prof.~Flavio Giobergia presents a minimal implementation of relational queries using pre-trained embeddings:
+\subsection{Python implementation and the query filtering caveat}
+\label{subsec:python_gist}
+
+In his course demonstration on Word2Vec and FastText semantic arithmetic \cite{giobergia2024gist}, Prof.~Flavio Giobergia presents a clean Python implementation for answering relational analogy queries:
 
 \begin{lstlisting}[language=Python, caption={Implementation of relational vector arithmetic and candidate filtering in Python \cite{giobergia2024gist}.}, label={lst:giobergia_gist}]
 import numpy as np
@@ -1067,13 +1353,22 @@ print("Top prediction:", results[0][0])  # Output: 'madrid'
 \begin{examinsight}[The query token exclusion caveat in vector arithmetic]
 A recurrent practical and examination trap involves candidate ranking in vector arithmetic:
 \begin{equation}
+\label{eq:target_vector_exam}
 \vec{v}_{\text{target}} = \vec{v}_{\text{Berlin}} - \vec{v}_{\text{Germany}} + \vec{v}_{\text{Spain}}.
 \end{equation}
 Because words naturally have significant baseline norm and self-correlation, if an unconstrained nearest neighbor search is performed across the entire vocabulary $\mathcal{W}$, the query token $\vec{v}_{\text{Spain}}$ or $\vec{v}_{\text{Berlin}}$ will frequently have the highest dot product with $\vec{v}_{\text{target}}$!
 Practitioners must explicitly filter out the input prompt words ($\mathcal{W} \setminus \{A, B, C\}$), forcing the cosine argmax to search exclusively among genuine unconditioned candidates:
 \begin{equation}
+\label{eq:filtered_argmax}
 w^* = \argmax_{w \in \mathcal{W} \setminus \{A, B, C\}} \cos(\vv_w, \vec{v}_{\text{target}}).
 \end{equation}
 \end{examinsight}
+
+\subsection{Causal bridge to Chapter 4: the necessity of sequential recurrence}
+\label{subsec:bridge_to_chapter_4}
+
+While distributed word vectors successfully map discrete vocabulary symbols into a structured, continuous semantic space, they suffer from a fundamental, insurmountable temporal limitation: \textbf{they treat language as a static collection of isolated tokens}. 
+
+In natural language and software engineering source code, tokens do not exist in isolation. Language is an ordered, variable-length temporal sequence where token order, syntactic hierarchy, and long-range dependencies dictate execution and meaning. A static embedding layer has no memory: it cannot track whether a variable was declared before it was referenced, cannot resolve nested control scopes, and cannot retain state across an extended document. To model variable-length sequential context and compute dynamically stateful representations, we must advance from static spatial embeddings to temporal recurrent architectures: \textbf{Recurrent Neural Networks (RNNs)}, the subject of Chapter~\ref{ch:rnn_sequence_modeling}.
 
 \end{document}
