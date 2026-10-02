@@ -20,7 +20,10 @@ In Section 2.7 (*"Creating token embeddings"*), Raschka highlights the direct ma
 - **Trainable Parameters**: The rows of this matrix are initialized with small random values (`torch.manual_seed(123)`), and are updated during model training via gradient descent and backpropagation.
 
 ### 3. Data Preparation & Tokenization Pipeline
-- **Step 1: Text to Tokens**: Splitting raw string into atomic tokens (word-level vs character-level vs subword BPE).
+- **Step 1: Text to Tokens**: Splitting raw strings into atomic tokens (character-level vs. word-level vs. subword BPE).
 - **Step 2: Tokens to Token IDs**: Assigning unique integer indices $i \in \{0, \dots, V-1\}$ to vocabulary items.
-- **Step 3: Sliding Window Sampling**: Creating input-target training pairs $(x, y)$ by sliding a context window across the tokenized sequence.
-- **Step 4: Token IDs to Embedding Vectors**: Converting integer IDs into dense $d$-dimensional continuous vectors via the embedding layer lookup.
+- **Step 3: Special Context Tokens**: Handling document boundaries (`<|endoftext|>`), unknown tokens (`<|unk|>`), and batch padding (`<|pad|>`).
+- **Step 4: Byte Pair Encoding (BPE)**: Statistical pair merge algorithm; byte-level BPE on 256 UTF-8 bytes completely eliminating `<|unk|>` and preserving whitespace losslessly.
+- **Step 5: Sliding Window Sampling**: Creating autoregressive input-target training pairs $(x, y)$ shifted by 1 token across context window $L$ with stride $s$.
+- **Step 6: Token IDs to Embedding Vectors**: Converting integer IDs into dense $d$-dimensional continuous vectors via `torch.nn.Embedding`.
+- **Step 7: Encoding Word Positions**: Combining token embeddings additively with learned absolute positional embeddings to overcome the permutation invariance of self-attention ($\mathbf{X}_{\text{in}} = \mathbf{E}_{\text{tok}} + \mathbf{E}_{\text{pos}}$).

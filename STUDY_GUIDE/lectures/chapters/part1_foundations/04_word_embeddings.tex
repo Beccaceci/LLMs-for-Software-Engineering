@@ -1364,26 +1364,447 @@ w^* = \argmax_{w \in \mathcal{W} \setminus \{A, B, C\}} \cos(\vv_w, \vec{v}_{\te
 \end{equation}
 \end{examinsight}
 
-\subsection{Causal bridge to Chapter 5: static embeddings, polysemy amnesia, and the attention revolution}
+\section{Modern subword tokenization and input pipelines for foundation models}
+\label{sec:modern_tokenization_pipeline}
+
+In Sections~\ref{sec:representation_problem} through~\ref{sec:vector_geometry_metrics}, we formulated the mathematical foundations of classical distributed word representations (Word2Vec, GloVe, FastText). While continuous embeddings solved the differentiability barrier and geometric similarity, classical architectures operated under a fragmented, static paradigm: input text was naively pre-split on whitespace into word-level units, vocabulary sizes ballooned into hundreds of thousands of entries, rare or misspelled tokens collapsed into the uninformative $\text{\texttt{<UNK>}}$ placeholder, and input sequences were treated as unordered bags or static lookup tables.
+
+Modern Large Language Models (LLMs) such as GPT-2, GPT-3, GPT-4, LLaMA, and Claude discard this isolated design in favor of an integrated, end-to-end \textbf{data preprocessing, tokenization, and input embedding pipeline}. As formalized by Sebastian Raschka in \emph{Build a Large Language Model from Scratch} \cite{raschka2024llm}, preparing raw text for foundation model pretraining requires an indivisible four-stage architectural pipeline:
+\begin{enumerate}
+    \item \textbf{Subword Tokenization}: Segmenting raw text into atomic subword units using Byte Pair Encoding (BPE), resolving punctuation and whitespace losslessly.
+    \item \textbf{Token ID Mapping}: Converting discrete subwords into numerical indices via an invertible vocabulary lookup table, enriched with special operational context markers.
+    \item \textbf{Autoregressive Sliding Window Sampling}: Constructing shifted input-target training pairs $(\mathbf{X}, \mathbf{Y})$ with causal next-token alignment.
+    \item \textbf{Composite Embedding Synthesis}: Injecting order into permutation-invariant neural layers by additively combining continuous token embeddings with position embeddings: $\mathbf{X}_{\text{in}} = \mathbf{E}_{\text{tok}} + \mathbf{E}_{\text{pos}}$.
+\end{enumerate}
+
+Figure~\ref{fig:modern_tokenization_pipeline} illustrates this end-to-end data pipeline from raw textual strings to the final continuous tensor ingested by Transformer architectures.
+
+\begin{figure}[htbp]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[
+    node distance=1.0cm and 1.2cm,
+    block/.style={rectangle, draw=politoNavy, fill=skyBlue!20, thick, rounded corners=3pt, minimum height=11mm, minimum width=26mm, align=center, font=\small\sffamily},
+    tokblock/.style={rectangle, draw=deepdiveTeal, fill=deepdiveTealBg, thick, rounded corners=3pt, minimum height=10mm, minimum width=22mm, align=center, font=\footnotesize\ttfamily},
+    matblock/.style={rectangle, draw=intuitionPurple, fill=intuitionPurpleBg, thick, rounded corners=3pt, minimum height=11mm, minimum width=28mm, align=center, font=\small\sffamily},
+    outblock/.style={rectangle, draw=examAmber, fill=examAmberBg, very thick, rounded corners=4pt, minimum height=12mm, minimum width=34mm, align=center, font=\small\bfseries\sffamily},
+    arr/.style={-{Stealth[scale=1.1]}, thick, draw=bodyDark},
+    dimlabel/.style={font=\tiny\ttfamily, text=bodyGray}
+]
+
+% Top pipeline: Text to Windowed Tokens
+\node[block] (raw) at (0, 0) {\textbf{1. Raw Text Stream}\\[2pt]\footnotesize\ttfamily "Hello, world! <|endoftext|>"};
+\node[tokblock] (bpe) at (4.0, 0) {\textbf{2. Byte-Level BPE}\\[2pt]['Hello', ',', 'Ġworld', '!', '<|endoftext|>']};
+\node[tokblock] (ids) at (8.5, 0) {\textbf{3. Token IDs}\\[2pt]\texttt{[15496, 11, 995, 0, 50256]}};
+\node[block] (window) at (12.8, 0) {\textbf{4. Sliding Window}\\[2pt]Shifted Causal Pairs $(\mathbf{X}, \mathbf{Y})$};
+
+% Bottom embeddings
+\node[matblock] (tok_emb) at (10.0, -2.4) {\textbf{Token Embedding Table}\\[2pt]$\mathbf{W}_{\text{tok}} \in \R^{V \times d} \implies \mathbf{E}_{\text{tok}} \in \R^{B \times L \times d}$};
+\node[matblock] (pos_emb) at (15.5, -2.4) {\textbf{Positional Embedding}\\[2pt]$\mathbf{W}_{\text{pos}} \in \R^{L_{\max} \times d} \implies \mathbf{E}_{\text{pos}} \in \R^{1 \times L \times d}$};
+
+\node[circle, draw=politoNavy, fill=skyBlue!30, thick, inner sep=2pt, font=\large\bfseries] (add) at (12.8, -3.9) {$+$};
+\node[outblock] (final) at (12.8, -5.3) {\textbf{Composite Input Tensor to Transformer}\\[2pt]$\mathbf{X}_{\text{in}} = \mathbf{E}_{\text{tok}} + \mathbf{E}_{\text{pos}} \in \R^{B \times L \times d}$};
+
+% Connections
+\draw[arr] (raw) -- (bpe);
+\draw[arr] (bpe) -- (ids);
+\draw[arr] (ids) -- (window);
+
+\draw[arr] (window.south) -- ++(0, -0.6) -| (tok_emb.north);
+\draw[arr] (window.south) -- ++(0, -0.6) -| (pos_emb.north);
+
+\draw[arr] (tok_emb.south) |- (add.west);
+\draw[arr] (pos_emb.south) |- (add.east);
+\draw[arr] (add) -- (final);
+
+\end{tikzpicture}%
+}
+\caption{The complete modern foundation model tokenization and input preparation pipeline. Raw text is segmented into byte-level BPE subwords, mapped to unique token IDs, sliced into autoregressive input-target pairs via a sliding window, and mapped into continuous latent space where token embeddings and learned positional embeddings combine additively.}
+\label{fig:modern_tokenization_pipeline}
+\end{figure}
+
+\subsection{The tokenization spectrum: character, word, and subword trade-offs}
+\label{subsec:tokenization_spectrum}
+
+Converting raw natural language or software code into discrete units reveals a fundamental trade-off across three representational granularities: character-level, word-level, and subword tokenization.
+
+\begin{table}[htbp]
+\centering
+\footnotesize
+\caption{Comprehensive taxonomy and trade-off analysis of tokenization paradigms in natural language processing and modern foundation models.}
+\label{tab:tokenization_tradeoffs}
+\begin{tabularx}{\textwidth}{l c c c >{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}p{2.6cm}}
+\toprule
+\textbf{Paradigm} & \textbf{Vocab ($V$)} & \textbf{Length ($L$)} & \textbf{OOV} & \textbf{Linguistic \& Systems Limitations} & \textbf{Representative Models} \\
+\midrule
+\textbf{Character-Level} & $100 - 256$ & Massive ($4-6\times$) & Zero & High sequence length explodes computational complexity $\mathcal{O}(L^2)$ in self-attention; lacks word-level semantic priors. & Char-RNN, Canine, ByT5 \\
+\addlinespace[3pt]
+\textbf{Word-Level} & $50\text{k} - 1\text{M}+$ & Minimal ($1\times$) & Severe & Out-of-vocabulary words collapse to $\text{\texttt{<UNK>}}$; morphologically blind; massive embedding matrix $\mW \in \R^{V \times d}$. & Word2Vec, GloVe, N-gram LMs \\
+\addlinespace[3pt]
+\textbf{Subword-Level} & $32\text{k} - 100\text{k}$ & Moderate ($1.2-1.4\times$) & Zero & Requires statistical offline pre-tokenization merge training; optimal Pareto frontier of length and vocabulary. & BPE (GPT-2/3/4, LLaMA), WordPiece (BERT) \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\paragraph{Why whitespace splitting fails.}
+A naive baseline approach to text tokenization splits raw strings on whitespace characters (`\texttt{\textbackslash s}'). However, whitespace splitting fails catastrophically on punctuation:
+\begin{center}
+\texttt{"Hello, world! This is a test."} $\stackrel{\text{whitespace split}}{\Longrightarrow}$ \texttt{['Hello,', 'world!', 'This', 'is', 'a', 'test.']}
+\end{center}
+The comma is fused to \texttt{"Hello"}, and periods are fused to \texttt{"world"} and \texttt{"test"}. Consequently, the model assigns distinct vocabulary indices to \texttt{"world"}, \texttt{"world!"}, \texttt{"world,"}, and \texttt{"world?"}. This fragments training counts, bloats the vocabulary with redundant punctuation variants, and destroys syntactic generalization.
+
+\paragraph{Regex-based tokenization with punctuation isolation.}
+To isolate punctuation while preserving them as distinct semantic tokens, Sebastian Raschka formulates a regular expression splitting rule that captures punctuation symbols, em-dashes, and whitespaces:
+\begin{lstlisting}[language=Python, caption={Basic regular expression text tokenization with punctuation isolation and vocabulary construction \cite{raschka2024llm}.}, label={lst:simple_tokenizer}]
+import re
+
+class SimpleTokenizerV1:
+    def __init__(self, vocab):
+        self.str_to_int = vocab
+        self.int_to_str = {i: s for s, i in vocab.items()}
+    
+    def encode(self, text):
+        # Split on whitespace, punctuation marks, and special dash patterns
+        tokens = re.split(r'([,.:;?_!"()\']|--|\s)', text)
+        tokens = [t.strip() for t in tokens if t.strip()]
+        token_ids = [self.str_to_int[t] for t in tokens]
+        return token_ids
+    
+    def decode(self, token_ids):
+        text = " ".join([self.int_to_str[i] for i in token_ids])
+        # Clean up spaces before punctuation marks
+        text = re.sub(r'\s+([,.?!])', r'\1', text)
+        return text
+
+# Building the vocabulary from unique preprocessed tokens
+text = "Hello, world. Is this-- a test?"
+raw_tokens = re.split(r'([,.:;?_!"()\']|--|\s)', text)
+tokens = [t.strip() for t in raw_tokens if t.strip()]
+vocab = {token: idx for idx, token in enumerate(sorted(set(tokens)))}
+tokenizer = SimpleTokenizerV1(vocab)
+encoded = tokenizer.encode("Hello, world.")
+print("Encoded IDs:", encoded)
+print("Decoded text:", tokenizer.decode(encoded))
+\end{lstlisting}
+
+\subsection{Special context tokens: document boundaries, padding, and masked batching}
+\label{subsec:special_tokens}
+
+In practical machine learning and software engineering workflows, a vocabulary cannot consist solely of natural language words. The model requires \textbf{special context tokens} to encode structural and operational metadata:
+
+\begin{enumerate}
+    \item \textbf{Unknown Word Token} ($\text{\texttt{<|unk|>}}$):
+    In fixed-vocabulary systems, words unseen during training cannot be mapped to an integer index. Such tokens are mapped to $\text{\texttt{<|unk|}>}$. While this prevents code execution errors, it irreversibly destroys semantic information: a technical identifier or typo is flattened into a generic void.
+    
+    \item \textbf{Document Boundary Delimiter} ($\text{\texttt{<|endoftext|>}}$):
+    In large-scale autoregressive pretraining, billions of tokens spanning Wikipedia articles, books, and GitHub repositories are concatenated into continuous sequential streams. Without an explicit separator, the causal attention mechanism would assume that the first sentence of an article is the causal continuation of an unrelated previous document!
+    The token $\text{\texttt{<|endoftext|>}}$ signals that all preceding context is decoupled from subsequent tokens, allowing clean document demarcation.
+    
+    \item \textbf{Padding Token} ($\text{\texttt{<|pad|>}}$):
+    Mini-batch processing on GPU hardware requires rectangular tensors $\mathbf{X} \in \mathbb{Z}^{B \times L}$. When batching sequences of varying lengths ($L_1 \ne L_2$), shorter sequences are padded with $\text{\texttt{<|pad|>}}$ tokens up to maximum length $L$. Crucially, the model's self-attention mechanism is configured with an \textbf{attention mask}:
+    \begin{equation}
+    \label{eq:pad_attention_mask}
+    M_{ij} = \begin{cases} 0 & \text{if token } j \text{ is a genuine text token}, \\ -\infty & \text{if token } j \text{ is a } \text{\texttt{<|pad|>}} \text{ token}. \end{cases}
+    \end{equation}
+    Adding $M_{ij}$ to attention logits before Softmax drives pad attention weights to $\frac{e^{-\infty}}{\sum e^z} = 0$, completely preventing padded positions from corrupting token representations.
+\end{enumerate}
+
+\subsection{Byte Pair Encoding (BPE): algorithmic mechanics and merge trees}
+\label{subsec:bpe_algorithm}
+
+To conquer the Out-of-Vocabulary barrier without blowing up sequence length, modern LLMs deploy \textbf{Byte Pair Encoding (BPE)}. Originally invented by Philip Gage in 1994 for data compression \cite{gage1994}, BPE was adapted to natural language processing by Rico Sennrich et al.~(2016) \cite{sennrich2016}.
+
+\paragraph{Algorithmic formalization.}
+BPE constructs a subword vocabulary through an iterative bottom-up statistical merge procedure:
+\begin{enumerate}
+    \item \textbf{Initialization}: Initialize vocabulary $\mathcal{V}_0$ with all unique characters occurring in the training corpus $\mathcal{C}$. Represent each word in $\mathcal{C}$ as a sequence of individual character symbols followed by an end-of-word boundary marker.
+    \item \textbf{Pair Counting}: At iteration $k$, count the frequency of all adjacent symbol pairs $(p_1, p_2)$ across all words in corpus $\mathcal{C}$:
+    \begin{equation}
+    \label{eq:bpe_pair_freq}
+    (p_1^*, p_2^*) = \argmax_{(p_1, p_2)} \sum_{w \in \mathcal{C}} \text{count}(w) \cdot \mathbb{I}\{(p_1, p_2) \subseteq w\}.
+    \end{equation}
+    \item \textbf{Symbol Merge}: Merge the most frequent pair $(p_1^*, p_2^*)$ into a new atomic symbol $p_{\text{new}} = p_1^* \circ p_2^*$.
+    \item \textbf{Vocabulary Expansion}: Update the vocabulary: $\mathcal{V}_k = \mathcal{V}_{k-1} \cup \{p_{\text{new}}\}$, and replace all occurrences of the contiguous pair $(p_1^*, p_2^*)$ across corpus $\mathcal{C}$ with $p_{\text{new}}$.
+    \item \textbf{Termination}: Repeat Steps 2--4 for $M$ iterations until the target vocabulary size $|\mathcal{V}| = |\mathcal{V}_0| + M$ is reached.
+\end{enumerate}
+
+\begin{table}[htbp]
+\centering
+\small
+\caption{Step-by-step Byte Pair Encoding (BPE) merge walkthrough on a toy corpus: \texttt{\{"low": 5, "lower": 2, "newest": 6, "widest": 3\}}.}
+\label{tab:bpe_toy_walkthrough}
+\begin{tabularx}{\textwidth}{c c c c >{\raggedright\arraybackslash}X}
+\toprule
+\textbf{Iter ($k$)} & \textbf{Top Pair $(p_1^*, p_2^*)$} & \textbf{Freq} & \textbf{New Merged Symbol} & \textbf{Corpus Representation After Merge} \\
+\midrule
+$0$ & --- & --- & Base: \texttt{\{d, e, i, l, n, o, r, s, t, w\}} & \texttt{l o w : 5}, \; \texttt{l o w e r : 2}, \; \texttt{n e w e s t : 6}, \; \texttt{w i d e s t : 3} \\
+$1$ & \texttt{('e', 's')} & 9 & \texttt{'es'} & \texttt{l o w : 5}, \; \texttt{l o w e r : 2}, \; \texttt{n e w es t : 6}, \; \texttt{w i d es t : 3} \\
+$2$ & \texttt{('es', 't')} & 9 & \texttt{'est'} & \texttt{l o w : 5}, \; \texttt{l o w e r : 2}, \; \texttt{n e w est : 6}, \; \texttt{w i d est : 3} \\
+$3$ & \texttt{('l', 'o')} & 7 & \texttt{'lo'} & \texttt{lo w : 5}, \; \texttt{lo w e r : 2}, \; \texttt{n e w est : 6}, \; \texttt{w i d est : 3} \\
+$4$ & \texttt{('lo', 'w')} & 7 & \texttt{'low'} & \texttt{low : 5}, \; \texttt{low e r : 2}, \; \texttt{n e w est : 6}, \; \texttt{w i d est : 3} \\
+$5$ & \texttt{('n', 'e')} & 6 & \texttt{'ne'} & \texttt{low : 5}, \; \texttt{low e r : 2}, \; \texttt{ne w est : 6}, \; \texttt{w i d est : 3} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+As demonstrated in Table~\ref{tab:bpe_toy_walkthrough}, frequent words such as \texttt{"low"} coalesce into atomic single tokens, while rare words like \texttt{"widest"} decompose into common constituent subwords (\texttt{"w"}, \texttt{"i"}, \texttt{"d"}, \texttt{"est"}).
+
+\subsection{Byte-level BPE: the 256 UTF-8 byte foundation and elimination of unknown tokens}
+\label{subsec:byte_level_bpe}
+
+Despite the success of character-level BPE, applying it directly to Unicode strings faces a severe scaling barrier: the Unicode standard contains over $150{,}000$ unique characters spanning hundreds of languages and symbol sets. Initializing $\mathcal{V}_0$ with every conceivable character creates an unmanageably large base alphabet, yet still fails when a user inputs rare historical glyphs or newly released emojis.
+
+\paragraph{The 256 UTF-8 base byte breakthrough.}
+In GPT-2, Alec Radford et al.~\cite{radford2019} solved this dilemma by introducing \textbf{Byte-Level Byte Pair Encoding (BBPE)}. Instead of characters, the base alphabet $\mathcal{V}_0$ is initialized strictly with the \textbf{256 distinct byte values} ($0x00$ through $0xFF$) of the UTF-8 encoding standard:
+\begin{equation}
+\label{eq:byte_alphabet}
+\mathcal{V}_0 = \{0x00, 0x01, \dots, 0xFF\}, \quad |\mathcal{V}_0| = 256.
+\end{equation}
+
+\begin{theorem}{Total elimination of unknown tokens in byte-level BPE}{zero_oov_proof}
+Under Byte-Level BPE with base alphabet $\mathcal{V}_0 = \{0x00, \dots, 0xFF\}$, the probability of an Out-of-Vocabulary (OOV) token is strictly zero:
+\begin{equation}
+\label{eq:zero_oov_guarantee}
+\Prob(w_{\text{oov}}) = 0 \quad \forall S \in \Sigma^*.
+\end{equation}
+\end{theorem}
+
+\paragraph{Proof.}
+By definition of the Unicode transformation format (UTF-8), any arbitrary character or sequence of symbols in the Unicode code space ($U+0000$ to $U+10FFFF$) encodes deterministically into a sequence of between 1 and 4 raw bytes in $\{0x00, \dots, 0xFF\}$.
+Because the base alphabet $\mathcal{V}_0$ contains all 256 possible 8-bit byte values, every byte sequence can be parsed. If an input string contains an unseen compound word, a programming syntax construct, a severe typo, or an unknown emoji, the tokenizer attempts to apply merged subword rules; if no higher-level merge rule applies, the tokenizer simply falls back to emitting individual byte tokens from $\mathcal{V}_0$. Because no input byte can ever fall outside $\{0x00, \dots, 0xFF\}$, no token can ever be unmapped. The token $\text{\texttt{<|unk|>}}$ is completely eliminated. $\blacksquare$
+
+\paragraph{Lossless whitespace preservation.}
+Standard natural language processing pipelines strip whitespace or split on spaces, making exact detokenization ambiguous. In Byte-Level BPE, whitespaces are treated as regular characters/bytes. In GPT-2 and Hugging Face tokenizers, a leading whitespace is mapped to a special character (e.g., `\texttt{Ġ}' or byte $0x20$), binding the space directly to the succeeding word:
+\begin{center}
+\texttt{"Hello world"} $\stackrel{\text{BBPE}}{\Longrightarrow}$ \texttt{['Hello', 'Ġworld']}
+\end{center}
+This guarantees that tokenization is \textbf{strictly lossless and fully invertible}:
+\begin{equation}
+\label{eq:lossless_invertibility}
+\text{\texttt{decode}}(\text{\texttt{encode}}(S)) \equiv S \quad \forall S \in \Sigma^*.
+\end{equation}
+
+\paragraph{Production implementations: OpenAI's \texttt{tiktoken}.}
+In modern production LLM engineering, tokenization must process terabytes of training data without creating CPU bottlenecks. OpenAI's open-source library \texttt{tiktoken} implements byte-level BPE in pure Rust, executing tokenization orders of magnitude faster than Python regular expressions:
+\begin{itemize}
+    \item \textbf{GPT-2 Tokenizer} (\texttt{gpt2}): Vocabulary size $V = 50{,}257$ (composed of 256 base byte tokens $+ 50{,}000$ learned BPE merges $+ 1$ special $\text{\texttt{<|endoftext|>}}$ token).
+    \item \textbf{GPT-4 Tokenizer} (\texttt{cl100k\_base}): Vocabulary size $V = 100{,}277$. Expanding vocabulary from $50\text{k}$ to $100\text{k}$ reduces the total token count of natural language and code by $15-20\%$, directly reducing sequence length $L$, decreasing GPU memory footprint, and slashing API inference costs.
+\end{itemize}
+
+\begin{lstlisting}[language=Python, caption={Byte-level BPE tokenization using OpenAI's \texttt{tiktoken} library \cite{raschka2024llm}.}, label={lst:bpe_tiktoken}]
+import tiktoken
+
+# Instantiate the GPT-2 tokenizer (vocab size 50,257)
+tokenizer = tiktoken.get_encoding("gpt2")
+
+text = "Hello, do you like tea? <|endoftext|> In the sunlit terraces of someunknownPlace."
+# Disallow special tokens check or explicitly allow specific ones
+integers = tokenizer.encode(text, allowed_special={"<|endoftext|>"})
+print("Token IDs:", integers)
+
+# Zero-shot handling of unknown words:
+# 'someunknownPlace' is decomposed into subwords: ['some', 'unknown', 'Place']
+for token_id in integers:
+    print(f"{token_id:>5} -> {tokenizer.decode([token_id])!r}")
+
+# Lossless roundtrip reconstruction
+decoded_text = tokenizer.decode(integers)
+assert decoded_text == text, "Decoded text must match original string identically!"
+print("Lossless decoding confirmed!")
+\end{lstlisting}
+
+\subsection{Autoregressive data preparation: the sliding window input-target formulation}
+\label{subsec:sliding_window_sampling}
+
+After a raw text corpus is converted into a 1D sequence of token IDs $\mathbf{T} = [t_0, t_1, \dots, t_{N-1}] \in \mathbb{Z}^N$, how does an LLM learn to generate language?
+Foundation models are trained on the self-supervised objective of \textbf{next-token prediction} (autoregressive language modeling). Preparing training data requires chunking continuous token streams into input-target pairs $(\mathbf{X}, \mathbf{Y})$ using a \textbf{sliding window}.
+
+\paragraph{The shifted input-target alignment.}
+For a context window length $L$ (often termed `\texttt{max\_length}' or context size, e.g., $L = 1024$ in GPT-2, $L = 8192$ in LLaMA-3) starting at token index $k$:
+\begin{align}
+\text{Input Sequence:} \quad \vx &= [t_k, \; t_{k+1}, \; t_{k+2}, \; \dots, \; t_{k+L-1}] \in \mathbb{Z}^L, \label{eq:sliding_x} \\
+\text{Target Sequence:} \quad \vy &= [t_{k+1}, \; t_{k+2}, \; t_{k+3}, \; \dots, \; t_{k+L}] \in \mathbb{Z}^L. \label{eq:sliding_y}
+\end{align}
+The target sequence $\vy$ is identically the input sequence $\vx$ \textbf{shifted forward by one position}.
+
+\paragraph{Why target shifting maximizes training efficiency.}
+In causal language models, a triangular causal attention mask ensures that when computing the output at position $i$, the model can only attend to tokens $x_0, \dots, x_i$. Consequently, a single input-target tensor pair of length $L$ simultaneously optimizes $L$ distinct autoregressive prediction tasks in parallel during a single forward-backward pass:
+\begin{align*}
+\text{Step 1:} \quad [t_k] &\longrightarrow \text{predicts } t_{k+1}, \\
+\text{Step 2:} \quad [t_k, t_{k+1}] &\longrightarrow \text{predicts } t_{k+2}, \\
+\text{Step 3:} \quad [t_k, t_{k+1}, t_{k+2}] &\longrightarrow \text{predicts } t_{k+3}, \\
+&\;\;\vdots \\
+\text{Step } L\text{:} \quad [t_k, t_{k+1}, \dots, t_{k+L-1}] &\longrightarrow \text{predicts } t_{k+L}.
+\end{align*}
+
+\paragraph{Context size and sliding stride.}
+To extract all available training samples from a corpus of $N$ tokens, the window slides by a configurable \textbf{stride} $s$:
+\begin{equation}
+\label{eq:num_samples_stride}
+N_{\text{samples}} = \left\lfloor \frac{N - L}{s} \right\rfloor + 1.
+\end{equation}
+\begin{itemize}
+    \item \textbf{Non-Overlapping Chunks} ($s = L$): Maximizes computational throughput and avoids duplicate token evaluations.
+    \item \textbf{Overlapping Sliding Window} ($s < L$, e.g., $s = L/2$ or $s = 1$): Maximizes data efficiency on small datasets and prevents contextual boundary blindness (ensuring tokens near window edges are also evaluated with rich preceding context).
+\end{itemize}
+
+\begin{lstlisting}[language=Python, caption={PyTorch custom \texttt{Dataset} and \texttt{DataLoader} implementing sliding window causal data sampling \cite{raschka2024llm}.}, label={lst:sliding_window_dataset}]
+import torch
+from torch.utils.data import Dataset, DataLoader
+
+class GPTDatasetV1(Dataset):
+    def __init__(self, txt, tokenizer, max_length, stride):
+        self.input_ids = []
+        self.target_ids = []
+        
+        # Tokenize entire corpus into a 1D token ID sequence
+        token_ids = tokenizer.encode(txt, allowed_special={"<|endoftext|>"})
+        
+        # Slide window across token_ids with stride s
+        for i in range(0, len(token_ids) - max_length, stride):
+            input_chunk = token_ids[i:i + max_length]
+            target_chunk = token_ids[i + 1:i + max_length + 1]
+            self.input_ids.append(torch.tensor(input_chunk, dtype=torch.long))
+            self.target_ids.append(torch.tensor(target_chunk, dtype=torch.long))
+            
+    def __len__(self):
+        return len(self.input_ids)
+        
+    def __getitem__(self, idx):
+        return self.input_ids[idx], self.target_ids[idx]
+
+def create_dataloader_v1(txt, batch_size=4, max_length=256, stride=128, shuffle=True, drop_last=True):
+    tokenizer = tiktoken.get_encoding("gpt2")
+    dataset = GPTDatasetV1(txt, tokenizer, max_length, stride)
+    dataloader = DataLoader(
+        dataset, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last
+    )
+    return dataloader
+
+# Example batch extraction
+sample_text = ("In software engineering, continuous integration and continuous "
+               "delivery automate the testing and deployment pipeline.") * 20
+dataloader = create_dataloader_v1(sample_text, batch_size=2, max_length=8, stride=4)
+data_iter = iter(dataloader)
+inputs, targets = next(data_iter)
+print("Batch Input Tensor (X)  shape:", inputs.shape)   # [2, 8]
+print("Batch Target Tensor (Y) shape:", targets.shape)  # [2, 8]
+print("Input  row 0:", inputs[0].tolist())
+print("Target row 0:", targets[0].tolist())
+\end{lstlisting}
+
+\subsection{From token IDs to composite inputs: token embeddings and positional encoding synthesis}
+\label{subsec:embedding_positional_synthesis}
+
+Having transformed raw text into mini-batch integer tensors $\mathbf{X} \in \mathbb{Z}^{B \times L}$, we arrive at the final computational phase: mapping discrete integer token IDs into continuous, differentiable vector representations equipped with sequential order.
+
+\paragraph{1. The token embedding layer.}
+In PyTorch, continuous token representations are instantiated via:
+\begin{lstlisting}[language=Python]
+token_embedding_layer = torch.nn.Embedding(num_embeddings=vocab_size, embedding_dim=d)
+\end{lstlisting}
+Passing batch tensor $\mathbf{X} \in \mathbb{Z}^{B \times L}$ retrieves the corresponding continuous embedding vectors:
+\begin{equation}
+\label{eq:token_embedding_lookup_batch}
+\mathbf{E}_{\text{tok}} = \text{\texttt{Embedding}}(\mathbf{X}) \in \R^{B \times L \times d},
+\end{equation}
+where slice $(\mathbf{E}_{\text{tok}})_{b, t, :} = \vw_{X_{b, t}} \in \R^d$ is the $d$-dimensional embedding vector for the token at position $t$ in batch item $b$.
+
+\paragraph{2. The permutation invariance of self-attention.}
+However, feeding $\mathbf{E}_{\text{tok}}$ alone into a Transformer causes a fundamental failure.
+Unlike Recurrent Neural Networks (which process tokens sequentially step-by-step) or Convolutional Neural Networks (which slide localized spatial kernels), the core mathematical operator of Transformers—\textbf{Self-Attention}—is strictly \textbf{permutation-invariant}:
+\begin{theorem}{Permutation invariance of self-attention}{attention_permutation_invariance}
+Let $\mX \in \R^{L \times d}$ be an input sequence of $L$ vectors, and let $\mP \in \{0, 1\}^{L \times L}$ be an arbitrary permutation matrix. Under standard dot-product self-attention $\text{\texttt{Attention}}(\mX) = \softmax\left(\frac{\mX \mW_Q (\mX \mW_K)^\top}{\sqrt{d_k}}\right) \mX \mW_V$, the operator is equivariant to permutation:
+\begin{equation}
+\label{eq:attention_permutation_proof}
+\text{\texttt{Attention}}(\mP \mX) = \mP \, \text{\texttt{Attention}}(\mX).
+\end{equation}
+\end{theorem}
+In the absence of causal masking or positional markers, self-attention treats input tokens as an \emph{unordered set}. To an unaugmented Transformer, the sentences:
+\begin{center}
+\textit{``The compiler parsed the code''} \quad and \quad \textit{``The code parsed the compiler''}
+\end{center}
+would generate identical contextual representations! Positional awareness is mandatory.
+
+\paragraph{3. Absolute learned positional embeddings (GPT-2 convention).}
+To inform the model of sequential order, modern autoregressive models (including GPT-2, GPT-3, and original Transformer variants) allocate a dedicated, trainable \textbf{positional embedding table}:
+\begin{equation}
+\label{eq:pos_embedding_layer}
+\mW_{\text{pos}} \in \R^{L_{\max} \times d}.
+\end{equation}
+Each integer position index $p \in \{0, 1, \dots, L-1\}$ is mapped to a trainable $d$-dimensional vector $\vp_p = (\mW_{\text{pos}})_{p, :} \in \R^d$. A position index tensor $\vp = [0, 1, \dots, L-1]^\top$ is queried:
+\begin{equation}
+\label{eq:pos_lookup}
+\mathbf{E}_{\text{pos}} = \text{\texttt{pos\_embedding\_layer}}(\text{\texttt{torch.arange}}(L)) \in \R^{L \times d}.
+\end{equation}
+
+\paragraph{4. Additive synthesis of the composite Transformer input.}
+The continuous token representations and positional embeddings are combined via \textbf{elementwise addition}:
+\begin{equation}
+\label{eq:composite_input_tensor}
+\mathbf{X}_{\text{in}} = \mathbf{E}_{\text{tok}} + \mathbf{E}_{\text{pos}} \in \R^{B \times L \times d},
+\end{equation}
+where for each batch sample $b$ and temporal position $p$:
+\begin{equation}
+(\mathbf{X}_{\text{in}})_{b, p, :} = \vw_{X_{b, p}} + \vp_p \in \R^d.
+\end{equation}
+Because vector addition in $\R^d$ is elementwise, the resulting vector $(\mathbf{X}_{\text{in}})_{b, p, :}$ encodes both \emph{what} token was observed (semantic identity $\vw_{X_{b, p}}$) and \emph{where} it appeared in the sequence (temporal coordinate $\vp_p$).
+
+\begin{lstlisting}[language=Python, caption={PyTorch synthesis of token embeddings and learned positional embeddings \cite{raschka2024llm}.}, label={lst:token_pos_embeddings}]
+import torch
+
+vocab_size = 50257     # GPT-2 BPE vocabulary size
+output_dim = 256       # Latent embedding dimension d
+context_length = 4     # Sequence length L
+
+# 1. Allocate trainable token embedding layer
+token_embedding_layer = torch.nn.Embedding(vocab_size, output_dim)
+
+# 2. Allocate trainable absolute positional embedding layer
+pos_embedding_layer = torch.nn.Embedding(context_length, output_dim)
+
+# Example batch of token IDs: [batch_size=2, context_length=4]
+inputs = torch.tensor([[40, 367, 2885, 1464],
+                       [1807, 3619, 402, 271]])
+
+# Extract token embeddings: [2, 4, 256]
+token_embeddings = token_embedding_layer(inputs)
+
+# Generate position indices: tensor([0, 1, 2, 3]) -> [4, 256]
+pos_indices = torch.arange(context_length)
+pos_embeddings = pos_embedding_layer(pos_indices)
+
+# 3. Additive composite synthesis with PyTorch tensor broadcasting
+# token_embeddings: [2, 4, 256] + pos_embeddings: [4, 256] -> [2, 4, 256]
+input_embeddings = token_embeddings + pos_embeddings
+
+print("Token Embeddings Shape:", token_embeddings.shape)  # torch.Size([2, 4, 256])
+print("Pos Embeddings Shape:  ", pos_embeddings.shape)    # torch.Size([4, 256])
+print("Final Composite Shape: ", input_embeddings.shape)  # torch.Size([2, 4, 256])
+\end{lstlisting}
+
+\subsection{Causal bridge to Chapter 5: from static token lookups to the Transformer attention revolution}
 \label{subsec:bridge_to_chapter_5}
 
-While distributed word vectors (Word2Vec, FastText) successfully map discrete vocabulary symbols into a structured, continuous semantic metric space:
+Throughout this chapter, we have traced the evolution of vector space representations:
 \begin{enumerate}
-    \item \textbf{Continuous Differentiability}: They provide dense, low-dimensional vectors $\vv_w \in \R^d$ that feed directly into neural network matrix multiplications and gradient backpropagation.
-    \item \textbf{Emergent Geometry}: Vector distances and inner products encode semantic clustering and linear relational analogies ($\vv_{\text{king}} - \vv_{\text{man}} + \vv_{\text{woman}} \approx \vv_{\text{queen}}$).
-    \item \textbf{Subword Robustness}: Character $n$-grams (FastText) solve the out-of-vocabulary (OOV) barrier and compound word decomposition in software engineering identifiers.
+    \item \textbf{Local Encodings Failed}: One-hot vectors $\ve_i \in \{0, 1\}^V$ suffered from orthogonality ($d_E = \sqrt{2}, \cos = 0$), memory explosion, and zero parameter sharing.
+    \item \textbf{Continuous Dense Embeddings}: Word2Vec and FastText learned dense vector manifolds $\R^d$ where geometric proximity encodes semantic clustering and linear relational translations.
+    \item \textbf{Byte-Level BPE}: Solved the Out-of-Vocabulary catastrophe by decomposing arbitrary text into subword units down to 256 UTF-8 base bytes, guaranteeing $\Prob(\text{OOV}) = 0$ with lossless roundtrip detokenization.
+    \item \textbf{Autoregressive Sliding Windows \& Positional Injection}: Formulated causal next-token prediction targets and synthesized composite position-aware input tensors $\mathbf{X}_{\text{in}} \in \R^{B \times L \times d}$.
 \end{enumerate}
 
-\paragraph{The two fatal bottlenecks of static word embeddings.}
-Despite these capabilities, static word embeddings face two insurmountable structural limitations:
-\begin{enumerate}
-    \item \textbf{Polysemy Amnesia (Context-Independent Representation)}: In Word2Vec and FastText, each vocabulary token is assigned exactly \emph{one static vector} in $\R^d$, completely decoupled from its surrounding context. In natural language, the word \textit{"bank"} has entirely distinct meanings in a financial setting (\textit{"the bank approved the mortgage"}) versus a geographical setting (\textit{"he sat by the river bank"}). In software engineering, this pathology is even more severe: an identifier \texttt{"count"} may represent an integer variable, a loop accumulator, or a database query function. A static lookup table forces all these distinct semantic roles into a single, averaged compromise vector $\vv_w$.
-    \item \textbf{The Synthesis of Continuous Embeddings and Attention}: In Chapter~\ref{ch:rnn_sequence_modeling}, we observed that Recurrent Neural Networks attempted to build context sequentially, but were throttled by the $\mathcal{O}(T)$ sequential computation wall that prevents GPU sequence parallelization. Soft attention proved that dynamic, direct pairwise addressing could bypass sequential bottlenecks.
-\end{enumerate}
+\paragraph{The remaining representational impasse: static isolation.}
+Despite these remarkable advances in data preparation, a profound theoretical limitation remains:
+\begin{center}
+\textbf{The input tensor $\mathbf{X}_{\text{in}}$ is still a collection of context-independent static lookups.}
+\end{center}
+In $\mathbf{X}_{\text{in}}$, the vector representation for a word like \texttt{"bank"} or code keyword \texttt{"count"} is identical whether it appears in a financial document, a geography textbook, or an algorithmic loop counter. It contains zero dynamic information about the surrounding tokens in the sentence!
 
-\paragraph{The path forward: dynamic contextualized representations.}
-This motivates the ultimate synthesis of modern natural language processing: \emph{Can we combine continuous token embeddings with dynamic, constant-time $\mathcal{O}(1)$ self-attention to generate contextualized vector representations on the fly, without any recurrent sequential bottlenecks?}
+In Chapter~\ref{ch:rnn_sequence_modeling}, we saw that Recurrent Neural Networks (Elman RNNs, LSTMs, GRUs) attempted to build dynamic context sequentially by recurrently propagating state $\vh_t = f(\vh_{t-1}, \vx_t)$. However, sequential recurrence suffered from an insurmountable physical bottleneck: \textbf{the sequential execution wall}, requiring $\mathcal{O}(L)$ sequential steps that prevented parallel GPU tensor execution during training.
 
-This breakthrough leads directly to Chapter~5: \emph{The Transformer Architecture} \cite{vaswani2017}---the architectural engine underlying all modern foundation models.
+This impasse sets the stage for the single most consequential breakthrough in modern artificial intelligence: \emph{Can we design an architecture that allows every token in $\mathbf{X}_{\text{in}}$ to attend to every other token dynamically across the entire sequence in constant $\mathcal{O}(1)$ time, with full GPU sequence parallelization?}
+
+In Chapter~5 (\emph{The Transformer Architecture}), we answer this question by introducing the architecture that discarded recurrence entirely: the \textbf{Transformer} \cite{vaswani2017}, powered by Multi-Head Self-Attention.
 
 \end{document}
