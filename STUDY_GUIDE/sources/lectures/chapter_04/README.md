@@ -1,84 +1,73 @@
-# Sources Dossier: Chapter 04 (Recurrent Neural Networks and Sequence Modeling)
+# Sources Dossier: Chapter 04 (Distributed Word Representations and Word2Vec)
 
 This directory houses all required primary and external reference materials for Chapter 04, organized prior to chapter authoring to ensure zero omission and rigorous pedagogical grounding.
 
 ## 1. Definitive Graduate Textbooks
-- [Deep Learning](https://www.deeplearningbook.org/) (Ian Goodfellow, Yoshua Bengio, Aaron Courville — MIT Press, 2016)
-  - **Chapter 10**: Sequence Modeling: Recurrent and Recursive Nets
-  - **Why it matters**: Universally considered the most mathematically complete textbook treatment.
-  - **What it covers**: Unfolding computational graphs, Backpropagation Through Time (BPTT), Teacher Forcing, gradient vanishing and exploding proofs, bidirectional RNNs, Encoder-Decoder architectures, and detailed formulations of gated RNNs (LSTMs and GRUs).
+- [Build a Large Language Model (from Scratch)](https://www.manning.com/books/build-a-large-language-model-from-scratch) (Sebastian Raschka — Manning Publications, 2024)
+  - **Chapter 2**: Working with Text Data (Tokenization, Vocabulary Mapping, Embedding Layers)
+  - **Why it matters**: Demonstrates the mathematical and implementation equivalence between one-hot matrix multiplication ($\mathbf{W}^\top \mathbf{e}_i$) and direct embedding lookup tables (`nn.Embedding`).
+  - **What it covers**: BPE tokenizers, special tokens, discrete token-to-ID mapping, weight matrix initialization, embedding layer lookups, and positional embedding injection.
+  - **Local resource**: [`../../shared/books/Build a Large Language Model from scratch (Sebastian Raschka).epub`](../../shared/books/Build a Large Language Model from scratch (Sebastian Raschka).epub), notes in [`books/raschka_chapter_2_notes.md`](books/raschka_chapter_2_notes.md).
 - [Speech and Language Processing](https://web.stanford.edu/~jurafsky/slp3/) (Dan Jurafsky & James H. Martin — 3rd ed. draft)
-  - **Chapter 9**: Deep Learning Architectures for Sequence Processing: RNNs, LSTMs, and GRUs
-  - **Why it matters**: The standard NLP reference. Focuses on sequential language modeling, autoregression, POS-tagging, and classification tasks with clear step-by-step vector walkthroughs.
-- [Dive into Deep Learning (D2L.ai)](https://d2l.ai/) (Aston Zhang, Zachary C. Lipton, Mu Li, Alexander J. Smola)
-  - **Chapter 9** (Recurrent Neural Networks) & **Chapter 10** (Modern Recurrent Neural Networks)
-  - **Why it matters**: Bridges mathematical derivations with complete, working PyTorch/NumPy implementations from scratch (without high-level nn.RNN or nn.LSTM abstractions).
-  - **What it covers**: Manual implementation of recurrent layers from scratch in PyTorch, gradient clipping by global norm, LSTM gated state updates, and GRU candidate hidden states.
+  - **Chapter 6**: Vector Semantics and Embeddings
+  - **Why it matters**: The canonical theoretical text on lexical semantics, distributional hypothesis, and dense vectors.
+  - **What it covers**: Term-document matrices, PPMI, TF-IDF, Word2Vec Skip-Gram with Negative Sampling (SGNS), cosine distance metrics, and semantic analogy evaluations.
+- [Deep Learning](https://www.deeplearningbook.org/) (Ian Goodfellow, Yoshua Bengio, Aaron Courville — MIT Press, 2016)
+  - **Chapter 14**: Autoencoders and Representation Learning
+  - **Why it matters**: Formalizes distributed representations as continuous manifold discovery, contrasting local vs. distributed capacity scaling ($\mathcal{O}(V)$ vs. $\mathcal{O}(2^d)$).
 
 ## 2. Intuitive Masterclasses & Visual Walkthroughs
-- Christopher Olah (colah's blog): ["Understanding LSTM Networks" (2015)](https://colah.github.io/posts/2015-08-Understanding-LSTMs/)
-  - **Why it matters**: The undisputed gold standard visual explanation of recurrent cell mechanics.
-  - **Key insights**: Dissects the LSTM cell state into an intuitive "conveyor belt" (the Constant Error Carousel) modulated by pointwise multiplications via the forget, input, candidate ($\tilde{C}_t$), and output gates. Also illustrates GRUs.
-- Andrej Karpathy: ["The Unreasonable Effectiveness of Recurrent Neural Networks" (2015)](https://karpathy.github.io/2015/05/21/rnn-effectiveness/)
-  - **Why it matters**: Demonstrates character-level RNNs, autoregressive sampling, and temperature scaling.
-  - **Key insights**: Visualizes individual hidden state neurons operating as interpretable linguistic finite-state machines (e.g., cells that activate specifically inside quotation marks, track indentation depth, or monitor URL structures).
-  - **Companion code**: [min-char-rnn.py](https://gist.github.com/karpathy/d4dee566867f8291f086) — A pure 112-line NumPy implementation with explicit manual forward pass and BPTT backpropagation.
-- Denny Britz (WildML): ["Recurrent Neural Networks Tutorial" (Parts 1–4)](http://www.wildml.com/2015/09/recurrent-neural-networks-tutorial-part-1-introduction-to-rnns/)
-  - **Why it matters**: Walks through the exact matrix calculus behind BPTT step-by-step, deriving $\frac{\partial L_t}{\partial W}$ across all time steps and showing why truncation is necessary.
-  - **Key insights**: Derives adjoint backpropagation through time matrices, explains vanishing gradient scaling with sequence length, and shows how to vectorize recurrent batch updates.
-  - **Companion code**: [WildML RNN Tutorial Code](https://github.com/dennybritz/rnn-tutorial-rnnlm) — Pure Python/NumPy implementation of an RNN language model with explicit BPTT (~250 LOC).
+- Enkk (YouTube): ["Embeddings e Tokenization: come i computer capiscono il testo" (2023)](https://www.youtube.com/watch?v=5sYkC8aVv1k)
+  - **Why it matters**: Visual and intuitive walkthrough of how discrete tokens map to continuous semantic vector coordinates.
+  - **Key insights**: Demonstrates how token embeddings create geometric neighborhoods, why cosine similarity measures semantic closeness, and why subword representations solve the out-of-vocabulary barrier.
+  - **Local notes**: [`multimedia/enkk_karpathy_notes.md`](multimedia/enkk_karpathy_notes.md).
+- Andrej Karpathy: ["Neural Networks: Zero to Hero — makemore Part 2: MLP"](https://karpathy.github.io/)
+  - **Why it matters**: Unveils the mechanics of Bengio's 2003 neural language model and embedding lookup tables.
+  - **Key insights**: Explicitly demystifies `C = torch.randn((27, 2))` as a linear layer weight matrix without bias, showing `C[X]` as equivalent to $\mathbf{X} \mathbf{C}$ when $\mathbf{X}$ is one-hot encoded, and traces gradient backpropagation directly into embedding rows.
+  - **Companion code**: [`makemore` repository](https://github.com/karpathy/makemore) (Part 2 MLP script, ~150 LOC in pure PyTorch).
+- 3Blue1Brown (Grant Sanderson): ["Word Embeddings and Vector Arithmetic"](https://www.3blue1brown.com/)
+  - **Why it matters**: Provides visual geometric intuition for high-dimensional hyperspheres, cosine angular separation, and linear relational translation vectors.
+  - **Key insights**: Illustrates high-dimensional vector spaces, why dot products measure alignment on the hypersphere, and how linear offsets represent semantic relations.
 
 ## 3. Landmark Seminal Papers (Primary Ground Truth)
-- **Origins & BPTT Formulation**:
-  - Elman, J. L. (1990): [Finding Structure in Time](https://citeseerx.ist.psu.edu/document?repid=rep1&type=pdf&doi=10.1.1.157.9355) — Formulates the Simple Recurrent Network (SRN / Elman RNN):
-    - Hidden state recurrence: $\mathbf{h}_t = \sigma_h(\mathbf{W}_{hh} \mathbf{h}_{t-1} + \mathbf{W}_{xh} \mathbf{x}_t + \mathbf{b}_h)$
-    - Output projection: $\hat{\mathbf{y}}_t = \text{softmax}(\mathbf{W}_{hy} \mathbf{h}_t + \mathbf{b}_y)$
-  - Werbos, P. J. (1990): [Backpropagation Through Time: What It Does and How to Do It](https://ieeexplore.ieee.org/document/58337) — Formalized gradient computation along the unfolded recurrent graph:
-    - Accumulated gradient: $\frac{\partial \mathcal{L}}{\partial \mathbf{W}_{hh}} = \sum_{t=1}^T \sum_{k=1}^t \frac{\partial \mathcal{L}_t}{\partial \mathbf{h}_t} \frac{\partial \mathbf{h}_t}{\partial \mathbf{h}_k} \frac{\partial^+ \mathbf{h}_k}{\partial \mathbf{W}_{hh}}$
-- **The Vanishing / Exploding Gradient Proofs**:
-  - Bengio, Y., Simard, P., & Frasconi, P. (1994): [Learning Long-Term Dependencies with Gradient Descent is Difficult](https://ieeexplore.ieee.org/document/279181) — The foundational theoretical proof that the spectral radius of the transition matrix causes exponential gradient decay:
-    - Decay condition: $\left\| \frac{\partial \mathbf{h}_t}{\partial \mathbf{h}_{t-\tau}} \right\| \le \|\mathbf{W}_{hh}^\top\|_2^\tau \cdot \prod_{j=0}^{\tau-1} \|\operatorname{diag}(\sigma'(\mathbf{a}_{t-j}))\|_2 \longrightarrow 0 \quad \text{if } \rho(\mathbf{W}_{hh}) < 1/\gamma$
-  - Pascanu, R., Mikolov, T., & Bengio, Y. (2013): [On the Difficulty of Training Recurrent Neural Networks](https://proceedings.mlr.press/v28/pascanu13.html) — Provides the modern Jacobian matrix product proof and introduces gradient clipping by norm:
-    - Temporal Jacobian chain: $\frac{\partial \mathcal{L}_t}{\partial \mathbf{h}_j} = \frac{\partial \mathcal{L}_t}{\partial \mathbf{h}_t} \prod_{k=j+1}^t \frac{\partial \mathbf{h}_k}{\partial \mathbf{h}_{k-1}} = \frac{\partial \mathcal{L}_t}{\partial \mathbf{h}_t} \prod_{k=j+1}^t \operatorname{diag}(1 - \mathbf{h}_k^2) \mathbf{W}_{hh}^\top$
-    - Gradient clipping by global norm: $\mathbf{g} \leftarrow \mathbf{g} \cdot \min\left(1, \frac{v}{\|\mathbf{g}\|_2}\right)$
-- **Gated Architectures & Sequence-to-Sequence**:
-  - Hochreiter, S., & Schmidhuber, J. (1997): [Long Short-Term Memory](https://www.bioinf.jku.at/publications/photocopies/pub-hochreiter-1997.pdf) — Introduces the Constant Error Carousel (CEC), demonstrating how additive memory updates enforce $\frac{\partial \mathbf{C}_t}{\partial \mathbf{C}_{t-1}} = \mathbf{I}$:
-    - Cell state: $\mathbf{c}_t = \mathbf{f}_t \odot \mathbf{c}_{t-1} + \mathbf{i}_t \odot \tilde{\mathbf{c}}_t$
-    - Forget gate: $\mathbf{f}_t = \sigma(\mathbf{W}_f [\mathbf{h}_{t-1}, \mathbf{x}_t] + \mathbf{b}_f)$
-    - Input gate: $\mathbf{i}_t = \sigma(\mathbf{W}_i [\mathbf{h}_{t-1}, \mathbf{x}_t] + \mathbf{b}_i)$
-    - Candidate state: $\tilde{\mathbf{c}}_t = \tanh(\mathbf{W}_c [\mathbf{h}_{t-1}, \mathbf{x}_t] + \mathbf{b}_c)$
-    - Output gate: $\mathbf{o}_t = \sigma(\mathbf{W}_o [\mathbf{h}_{t-1}, \mathbf{x}_t] + \mathbf{b}_o)$
-    - Hidden state: $\mathbf{h}_t = \mathbf{o}_t \odot \tanh(\mathbf{c}_t)$
-  - Cho, K., et al. (2014): [Learning Phrase Representations using RNN Encoder-Decoder for Statistical Machine Translation](https://arxiv.org/abs/1406.1078) — Introduces the Gated Recurrent Unit (GRU) and RNN Encoder-Decoder:
-    - Reset gate: $\mathbf{r}_t = \sigma(\mathbf{W}_r [\mathbf{h}_{t-1}, \mathbf{x}_t] + \mathbf{b}_r)$
-    - Update gate: $\mathbf{z}_t = \sigma(\mathbf{W}_z [\mathbf{h}_{t-1}, \mathbf{x}_t] + \mathbf{b}_z)$
-    - Candidate hidden state: $\tilde{\mathbf{h}}_t = \tanh(\mathbf{W}_h [\mathbf{r}_t \odot \mathbf{h}_{t-1}, \mathbf{x}_t] + \mathbf{b}_h)$
-    - Final hidden state: $\mathbf{h}_t = (1 - \mathbf{z}_t) \odot \mathbf{h}_{t-1} + \mathbf{z}_t \odot \tilde{\mathbf{h}}_t$
-  - Sutskever, I., Vinyals, O., & Le, Q. V. (2014): [Sequence to Sequence Learning with Neural Networks](https://arxiv.org/abs/1409.3215) — Introduces multi-layer LSTM sequence-to-sequence translation:
-    - Sequence objective: $\arg\max_\theta \sum_{(X, Y)} \sum_{t=1}^{T'} \log P(y_t \mid \mathbf{v}, y_1, \dots, y_{t-1})$ where $\mathbf{v} = \mathbf{h}_T^{\text{enc}}$
-  - Bahdanau, D., Cho, K., & Bengio, Y. (2014): [Neural Machine Translation by Jointly Learning to Align and Translate](https://arxiv.org/abs/1409.0473) — Solves the fixed-length vector bottleneck of RNN encoders using Additive Soft Attention:
-    - Context vector: $\mathbf{c}_i = \sum_{j=1}^{T_x} \alpha_{ij} \mathbf{h}_j$
-    - Alignment weights: $\alpha_{ij} = \frac{\exp(e_{ij})}{\sum_{k=1}^{T_x} \exp(e_{ik})}$ where $e_{ij} = \mathbf{v}_a^\top \tanh(\mathbf{W}_a \mathbf{s}_{i-1} + \mathbf{U}_a \mathbf{h}_j)$
+- **Foundations of the Distributional Hypothesis**:
+  - Harris, Z. S. (1954): [Distributional Structure](https://www.tandfonline.com/doi/abs/10.1080/00437956.1954.11659520) — Formulates that words occurring in similar linguistic environments have similar meanings.
+  - Firth, J. R. (1957): [A Synopsis of Linguistic Theory 1930-1955](https://cir.nii.ac.jp/crid/1570572700346337664) — Established the famous aphorism: *"You shall know a word by the company it keeps"*.
+- **The Word2Vec Breakthrough**:
+  - Mikolov, T., et al. (2013a): [Efficient Estimation of Word Representations in Vector Space](https://arxiv.org/abs/1301.3781) — Introduces Continuous Bag-of-Words (CBOW) and Continuous Skip-gram:
+    - CBOW projection: $\mathbf{h} = \frac{1}{2C} \sum_{-C \le j \le C, j \ne 0} \mathbf{v}_{w_{t+j}}$
+    - Skip-Gram log-likelihood objective: $\mathcal{L}_{\text{SG}} = \sum_{t=1}^T \sum_{-C \le j \le C, j \ne 0} \log P(w_{t+j} \mid w_t)$ where $P(w_O \mid w_I) = \frac{\exp(\mathbf{u}_{w_O}^\top \mathbf{v}_{w_I})}{\sum_{w=1}^V \exp(\mathbf{u}_w^\top \mathbf{v}_{w_I})}$
+  - Mikolov, T., et al. (2013b): [Distributed Representations of Words and Phrases and their Compositionality](https://arxiv.org/abs/1310.4546) — Formulates Skip-Gram with Negative Sampling (SGNS), subsampling of frequent words, and demonstrates emergent linear relational analogies ($\mathbf{v}_{\text{king}} - \mathbf{v}_{\text{man}} + \mathbf{v}_{\text{woman}} \approx \mathbf{v}_{\text{queen}}$):
+    - SGNS objective: $\mathcal{L}_{\text{SGNS}}(\mathbf{v}_w, \mathbf{u}_c, \{\mathbf{u}_{n,k}\}_{k=1}^K) = \log \sigma(\mathbf{u}_c^\top \mathbf{v}_w) + \sum_{k=1}^K \log \sigma(-\mathbf{u}_{n,k}^\top \mathbf{v}_w)$
+    - Unigram noise distribution: $P_n(w) \propto U(w)^{3/4}$
+- **Softmax Scaling & Morphology**:
+  - Morin, F., & Bengio, Y. (2005): [Hierarchical Probabilistic Neural Network Language Model](http://proceedings.mlr.press/v5/morin05a/morin05a.pdf) — Replaces full Softmax with a binary Huffman hierarchical tree, reducing cost from $\mathcal{O}(V)$ to $\mathcal{O}(\log_2 V)$:
+    - Path probability: $P(w \mid \mathbf{h}) = \prod_{j=1}^{L(w)-1} \sigma\left([\![ \text{ch}(n(w, j)) = n(w, j+1) ]\!] \cdot \mathbf{v}'^\top_{n(w, j)} \mathbf{h}\right)$
+  - Bojanowski, P., et al. (2017): [Enriching Word Vectors with Subword Information](https://arxiv.org/abs/1607.04606) — Formulates FastText subword character $n$-gram representations:
+    - Subword vector sum: $\mathbf{v}_w = \sum_{g \in \mathcal{G}_w} \mathbf{z}_g$, scoring target token via $s(w, c) = \sum_{g \in \mathcal{G}_w} \mathbf{z}_g^\top \mathbf{u}_c$, solving the Out-Of-Vocabulary (OOV) bottleneck and rare morphological variations.
 
 ## 4. University Video Lectures
 - **Stanford CS224n (Natural Language Processing with Deep Learning)**:
-  - Lecture 6: Language Models and Recurrent Neural Networks (Christopher Manning & Abigail See). Focuses on RNN language models, perplexity, and gradient dynamics.
-- **Stanford CS231n (Deep Learning for Computer Vision)**:
-  - Lecture 10: Recurrent Neural Networks (Justin Johnson / Andrej Karpathy). Visualizes computational graphs, unrolling in time, and image captioning Seq2Seq architectures.
-- **MIT 6.S191 (Introduction to Deep Learning)**:
-  - Lecture 2: Recurrent Neural Networks, Transformers, and Attention (Alexander Amini). Visual animations of information flow, hidden state dynamics, and gate operations.
+  - Lecture 1: Introduction and Word Vectors (Christopher Manning). Focuses on discrete word representations, the one-hot collapse, Word2Vec objective, and analytical gradient derivations ($\frac{\partial J}{\partial \mathbf{v}_c}$).
+  - Lecture 2: Neural Classifiers and Word Vectors (Christopher Manning). Focuses on Negative Sampling optimization, continuous Skip-Gram objective, and intrinsic evaluations.
 
 ## 5. In This Workspace
 You already have detailed materials synthesized in this repository:
-- [`STUDY_GUIDE/lectures/chapters/part1_foundations/04_recurrent_neural_networks.tex`](../../lectures/chapters/part1_foundations/04_recurrent_neural_networks.tex): Chapter 4 of the course study guide, containing:
-  - The transition from FCNNs to Elman RNNs.
-  - The complete BPTT derivation and Jacobian product proof ($\prod_{k=j+1}^t \frac{\partial \mathbf{h}_k}{\partial \mathbf{h}_{k-1}}$).
-  - The Sherlock Holmes character casing training dynamics experiment.
-  - Mathematical equations and TikZ diagrams for LSTM gates (CEC) and GRUs.
-  - The Seq2Seq information bottleneck that motivated Attention.
+- [`STUDY_GUIDE/lectures/chapters/part1_foundations/04_word_embeddings.tex`](../../lectures/chapters/part1_foundations/04_word_embeddings.tex): Chapter 4 of the course study guide, structured in 10 linear causal sections (4.1 to 4.10):
+  - Section 3.1: The Representation Problem: Why Continuous Embeddings are Mandatory.
+  - Section 3.2: The Baseline Approach: Local One-Hot Encodings and Why They Fail (proof of $\mathbf{W}^\top \mathbf{e}_i = \mathbf{w}_i$ and Figure `fig:onehot_orthogonality_geometry`).
+  - Section 3.3: Distributed Representations and the Distributional Hypothesis.
+  - Section 3.4: The Embedding Training Loop & Semantic Geometry Evolution (with Figure `fig:embedding_training_loop`).
+  - Section 3.5: Word2Vec Continuous Bag-of-Words (CBOW) and context dilution.
+  - Section 3.6: Word2Vec Continuous Skip-Gram and the full Softmax $\mathcal{O}(V)$ computational wall.
+  - Section 3.7: Scaling Softmax: Hierarchical Softmax Huffman trees and SGNS binary logistic regressions.
+  - Section 3.8: Limitations of Word2Vec & The Out-Of-Vocabulary (OOV) Barrier.
+  - Section 3.9: FastText: Subword Character $n$-gram Embeddings.
+  - Section 3.10: Emergent Vector Space Geometry: Clustering, Metrics & Relational Analogies.
 - **Empirical Lecture Experiments**:
-  - **Sherlock Holmes Casing & Semantic Tracking Experiment**: Slides 19 & 36: Training character-level RNNs on Sherlock Holmes text to compare one-to-one sequence modeling versus encoder-decoder architectures. Shows how character-level models dynamically learn quotation marks, capitalization rules, and indentation depth across training epochs 1 to 1070.
-  - **Cat & Mouse Long-Term Dependency Failure**: Slide 25 presents the prompt: *"The mouse was getting chased by the cat through the big house. After a long chase, the cat finally managed to catch the [mouse]"*. Demonstrates that standard Elman RNNs fail to predict *"mouse"* due to vanishing gradients across intervening tokens, outputting grammatically plausible but semantically disconnected completions.
-  - **English-to-Italian Translation Length Disparity & Non-Monotonic Alignment**: Slides 31–32 demonstrate why naive recurrent sequence-to-sequence without attention breaks down when target length differs from source length (`[it] [is] [indeed] [sunny] [today]` (5 tokens) $\to$ `[effettivamente] [oggi] [è] [soleggiato]` (4 tokens)), illustrating the fundamental necessity of dynamic encoder-decoder representations.
-- [`slides/04-RNN.pdf`](slides/04-RNN.pdf): Course lecture slides (symlink to `SLIDES/04-RNN.pdf`).
+  - **The 5-Word Toy Vocabulary & Metric Collapse**: Slide 5 introduces vocabulary $W = \{\text{dog}, \text{cat}, \text{fish}, \text{pen}, \text{pencil}\}$. Under standard basis one-hot encoding, every pair $(w_i, w_j)$ has Euclidean distance $d_E(\mathbf{e}_i, \mathbf{e}_j) = \sqrt{2}$ and cosine similarity $\cos(\mathbf{e}_i, \mathbf{e}_j) = 0$, exposing the total metric collapse of discrete orthogonal representations.
+  - **Prof. Flavio Giobergia's Gist Demo**: The live empirical Python walkthrough (`giobergia2024gist`, `https://gist.github.com/fgiobergia/b3a20e097f9b697d0a02fb17685cfd5a`) demonstrating training word embeddings from scratch on real text corpora using Gensim Word2Vec, showing how continuous gradient updates map words to semantic coordinates.
+  - **3-Category FastText PCA Projection**: Slide 14 visualizes a 2D PCA projection of subword embeddings across three distinct semantic domains (Household items, Mammals, Birds), proving that unsupervised training discovers clustered semantic neighborhoods.
+  - **Country-Capital Relational Analogy Vector Arithmetic**: Slide 15 demonstrates emergent linear relational offsets: $\mathbf{v}_{\text{Rome}} - \mathbf{v}_{\text{Italy}} + \mathbf{v}_{\text{France}} \approx \mathbf{v}_{\text{Paris}}$, confirming that vector addition and subtraction operate as meaningful semantic relations.
+- [`slides/03-WordEmbeddings.pdf`](slides/03-WordEmbeddings.pdf): Course lecture slides (symlink to `SLIDES/03-WordEmbeddings.pdf`).
 - [`transcriptions/03-04-Word-Embeddings-And-RNNs.md`](transcriptions/03-04-Word-Embeddings-And-RNNs.md): Full lecture transcription (symlink to `TRANSCRIPTIONS/LECTURES/03-04-Word-Embeddings-And-RNNs.md`).

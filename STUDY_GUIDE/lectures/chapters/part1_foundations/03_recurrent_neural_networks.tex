@@ -7,7 +7,7 @@
 \section{Sequential data and constraints of feed-forward neural networks}
 \label{sec:fcnn_limits}
 
-In Chapters~\ref{ch:deep_learning_foundations} and~\ref{ch:word_embeddings}, we formulated the mathematical foundations of multi-layer feed-forward networks and continuous distributed word embeddings. As formalized at the conclusion of Chapter~\ref{ch:word_embeddings}, however, static embedding lookup matrices and feed-forward architectures treat input tokens as isolated vectors or unordered bags of words. They operate under a rigid, memoryless paradigm: they cannot retain dynamic state across variable-length temporal sequences, cannot enforce grammatical agreement across long horizons, and cannot dynamically adapt to variable-length inputs or outputs.
+In Chapter~\ref{ch:deep_learning_foundations}, we formulated the mathematical and architectural foundations of deep feedforward neural networks (FCNNs) and backpropagation across computational DAGs. As established at the conclusion of that chapter, however, feedforward architectures operate under a rigid, memoryless paradigm: they assume fixed-dimensional Euclidean inputs $\vx \in \R^{d_{\text{in}}}$, possess no internal recurrence or persistent temporal state across sequential time steps, and cannot enforce grammatical agreement across temporal horizons.
 
 In standard deep learning, a Fully-Connected Neural Network (FCNN) or Multi-Layer Perceptron is represented as a cascade of weight matrices interleaved with non-linear activation functions:
 \begin{equation}
@@ -825,21 +825,28 @@ The lineage of sequence modeling represents one of the most intellectually cohes
 \end{itemize}
 \end{deepdive}
 
-\subsection{Causal bridge to Chapter 5: the attention revolution and the elimination of recurrence}
-\label{subsec:bridge_to_chapter_5}
+\subsection{Causal bridge to Chapter 4: the representation problem and continuous word embeddings}
+\label{subsec:bridge_to_chapter_4}
 
 Throughout this chapter, we have traced the linear evolutionary arc of sequential neural architectures:
 \begin{enumerate}
-    \item \textbf{Vanilla RNNs} introduced temporal weight sharing to eliminate the fixed-dimensional constraints of feedforward networks, but suffered from exponential vanishing gradients ($\mathbf{D}_j \mW_{hh}$) and recency amnesia.
-    \item \textbf{LSTMs and GRUs} resolved vanishing gradients along the temporal chain via the Constant Error Carousel ($\frac{\partial \vc_t}{\partial \vc_{t-1}} \approx \mathbf{I}$) and multiplicative gating highways, enabling gradient flow across hundreds of steps.
-    \item \textbf{Seq2Seq Encoder-Decoder Pipelines} overcame the causal lookahead blindness of one-to-one recurrent cells by reading entire input sequences into a context vector $\vh_N$ before generation.
+    \item \textbf{Vanilla RNNs} introduced temporal recurrence and weight sharing to eliminate the fixed-dimensional constraints of feedforward networks, processing elastic sequences via an evolving hidden state $\vh_t \in \R^{d_h}$.
+    \item \textbf{LSTMs and GRUs} resolved exponential vanishing gradients along the temporal chain via the Constant Error Carousel ($\frac{\partial \vc_t}{\partial \vc_{t-1}} \approx \mathbf{I}$) and multiplicative gating highways, enabling gradient propagation across extended sequences.
+    \item \textbf{Seq2Seq Encoder-Decoder Pipelines} overcame the causal lookahead blindness of one-to-one recurrent cells by mapping variable-length input sequences into dynamic variable-length output sequences.
     \item \textbf{Bahdanau Additive Attention} shattered the single-vector bottleneck ($\vh_N \in \R^{d_h}$) by granting the decoder dynamic soft addressing across all encoder annotations ($\vc_i = \sum_j \alpha_{ij} \vh_j$).
 \end{enumerate}
 
-Despite these triumphs, an insurmountable physical and computational bottleneck remains: \textbf{the sequential computation wall}. Because every recurrent transition $\vh_t = f(\vh_{t-1}, \vx_t)$ strictly requires the prior state $\vh_{t-1}$, training an RNN over a sequence of length $T$ demands $\mathcal{O}(T)$ sequential operations. On modern tensor-parallel hardware (GPUs and TPUs), this prevents parallelization across time during training. Furthermore, despite gating and soft attention, information still traverses an unrolled graph of length $\mathcal{O}(T)$.
+\paragraph{The unresolved input bottleneck: what is $\vx_t$?}
+Despite these mathematical triumphs in temporal modeling, every recurrent transition $\vh_t = \tanhact(\mW_{hh} \vh_{t-1} + \mW_{xh} \vx_t + \vb_h)$ rests upon a fundamental, unaddressed prerequisite: \emph{the input $\vx_t$ must be a numeric vector in $\R^{d_{\text{in}}}$}. In our pedagogical character casing example, we used a toy ASCII one-hot vector $\vx_t \in \{0, 1\}^{256}$. However, scaling sequence models to real-world natural language or software engineering source code reveals three catastrophic failure modes of local one-hot representations:
+\begin{enumerate}
+    \item \textbf{Dimensionality Explosion}: Realistic vocabularies contain $V = |\vocab| \ge 50{,}000$ to $1{,}000{,}000$ unique words. Representing tokens as one-hot vectors $\ve_i \in \{0, 1\}^V$ forces the recurrent input projection matrix $\mW_{xh} \in \R^{d_h \times V}$ to balloon into millions of parameters, causing severe memory bloat and extreme sample inefficiency.
+    \item \textbf{Orthogonal Metric Collapse}: Standard basis vectors are strictly mutually orthogonal ($\ve_i^\top \ve_j = 0$ for all $i \ne j$) and uniformly equidistant ($d_E(\ve_i, \ve_j) = \sqrt{2}$). The recurrent cell receives zero geometric signal that \textit{"dog"} and \textit{"puppy"}, or keywords \texttt{"while"} and \texttt{"for"}, share syntactic or semantic roles.
+    \item \textbf{Zero Gradient Parameter Sharing}: During backpropagation through time (BPTT), updating weights for one-hot vector $\ve_i$ provides absolutely zero learning transfer to semantically similar words $\ve_j$, requiring astronomical training data to observe every word in every temporal context.
+\end{enumerate}
 
-This computational barrier prompts the revolutionary question that birthed modern foundation models: \emph{If dynamic attention provides direct, constant-time $\mathcal{O}(1)$ information routing between any two tokens in a sequence, why maintain recurrent connections at all?}
+\paragraph{The path forward.}
+While recurrent networks solved the \emph{temporal dynamics} problem across sequences, they are crippled without a dense, low-dimensional, continuous metric space $\phi: \vocab \to \R^d$ ($d \ll V$) where geometric proximity directly encodes syntactic and semantic similarity.
 
-In Chapter~5 (\emph{The Transformer Architecture}), we answer this question by introducing the architecture that discarded recurrence entirely: the \textbf{Transformer} \cite{vaswani2017}. By replacing sequential recurrence with Multi-Head Self-Attention and positional encodings, Transformers unlocked full GPU sequence parallelization, establishing the foundational architecture for all modern Large Language Models.
+This fundamental representational challenge leads directly to Chapter~\ref{ch:word_embeddings}: \emph{Distributed Word Representations and Word2Vec}.
 
 \end{document}

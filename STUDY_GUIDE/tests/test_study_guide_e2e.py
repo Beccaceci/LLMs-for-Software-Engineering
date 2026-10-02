@@ -348,8 +348,8 @@ class TestTier1FeatureCoverage(unittest.TestCase):
         expected_p1 = [
             "01_language_models_intro.tex",
             "02_deep_learning_foundations.tex",
-            "03_word_embeddings.tex",
-            "04_recurrent_neural_networks.tex",
+            "03_recurrent_neural_networks.tex",
+            "04_word_embeddings.tex",
             "05_transformer_architecture.tex",
             "06_scaling_laws_pretraining.tex",
             "07_instruction_tuning_alignment.tex",
@@ -558,28 +558,28 @@ class TestTier1FeatureCoverage(unittest.TestCase):
         self.assertIn("Backpropagation", content, "Ch 02 must formulate backpropagation chain rule")
 
     # --------------------------------------------------------------------------
-    # Features 22-25: Deck 03 (Word Embeddings)
+    # Features 22-25: Deck 03 (Word Embeddings - Chapter 04)
     # --------------------------------------------------------------------------
     def test_feature22_to_25_deck03_word_embeddings(self):
         """Features 22-25: Deck 03 content (One-hot limits, CBOW, Skip-Gram, Negative Sampling)."""
-        ch3 = CHAPTERS_DIR / "part1_foundations" / "03_word_embeddings.tex"
-        content = read_text_safe(ch3)
-        self.assertIn("CBOW", content, "Ch 03 must explain Continuous Bag-of-Words")
-        self.assertIn("Skip-Gram", content, "Ch 03 must explain Skip-Gram")
-        self.assertIn("Negative Sampling", content, "Ch 03 must formulate negative sampling objective")
-        self.assertTrue("mikolov" in content.lower(), "Ch 03 must cite Mikolov")
+        ch4 = CHAPTERS_DIR / "part1_foundations" / "04_word_embeddings.tex"
+        content = read_text_safe(ch4)
+        self.assertIn("CBOW", content, "Ch 04 must explain Continuous Bag-of-Words")
+        self.assertIn("Skip-Gram", content, "Ch 04 must explain Skip-Gram")
+        self.assertIn("Negative Sampling", content, "Ch 04 must formulate negative sampling objective")
+        self.assertTrue("mikolov" in content.lower(), "Ch 04 must cite Mikolov")
 
     # --------------------------------------------------------------------------
-    # Features 26-29: Deck 04 (Recurrent Neural Networks)
+    # Features 26-29: Deck 04 (Recurrent Neural Networks - Chapter 03)
     # --------------------------------------------------------------------------
     def test_feature26_to_29_deck04_recurrent_neural_networks(self):
         """Features 26-29: Deck 04 content (Recurrent cells, BPTT, LSTM/GRU gating, Seq2Seq)."""
-        ch4 = CHAPTERS_DIR / "part1_foundations" / "04_recurrent_neural_networks.tex"
-        content = read_text_safe(ch4)
-        self.assertIn("BPTT", content, "Ch 04 must formulate Backpropagation Through Time")
-        self.assertTrue("LSTM" in content or "Long Short-Term" in content, "Ch 04 must detail LSTM architecture")
-        self.assertTrue("GRU" in content or "Gated Recurrent" in content, "Ch 04 must detail GRU architecture")
-        self.assertTrue("hochreiter" in content.lower() or "cho" in content.lower(), "Ch 04 must cite Hochreiter or Cho")
+        ch3 = CHAPTERS_DIR / "part1_foundations" / "03_recurrent_neural_networks.tex"
+        content = read_text_safe(ch3)
+        self.assertIn("BPTT", content, "Ch 03 must formulate Backpropagation Through Time")
+        self.assertTrue("LSTM" in content or "Long Short-Term" in content, "Ch 03 must detail LSTM architecture")
+        self.assertTrue("GRU" in content or "Gated Recurrent" in content, "Ch 03 must detail GRU architecture")
+        self.assertTrue("hochreiter" in content.lower() or "cho" in content.lower(), "Ch 03 must cite Hochreiter or Cho")
 
     # --------------------------------------------------------------------------
     # Feature 30: Syllabus Scaffolding (Chapters 05-16)
@@ -996,7 +996,7 @@ class TestTier3CrossFeatureCombinations(unittest.TestCase):
         content = read_text_safe(MAIN_TEX)
         expected_chapters = [
             "01_language_models_intro", "02_deep_learning_foundations",
-            "03_word_embeddings", "04_recurrent_neural_networks",
+            "03_recurrent_neural_networks", "04_word_embeddings",
             "05_transformer_architecture", "06_scaling_laws_pretraining",
             "07_instruction_tuning_alignment", "08_peft_inference_optimization",
             "09_ai_in_software_engineering", "10_prompt_engineering_chaining",

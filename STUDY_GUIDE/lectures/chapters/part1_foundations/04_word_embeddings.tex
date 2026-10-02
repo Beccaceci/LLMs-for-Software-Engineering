@@ -1364,11 +1364,26 @@ w^* = \argmax_{w \in \mathcal{W} \setminus \{A, B, C\}} \cos(\vv_w, \vec{v}_{\te
 \end{equation}
 \end{examinsight}
 
-\subsection{Causal bridge to Chapter 4: the necessity of sequential recurrence}
-\label{subsec:bridge_to_chapter_4}
+\subsection{Causal bridge to Chapter 5: static embeddings, polysemy amnesia, and the attention revolution}
+\label{subsec:bridge_to_chapter_5}
 
-While distributed word vectors successfully map discrete vocabulary symbols into a structured, continuous semantic space, they suffer from a fundamental, insurmountable temporal limitation: \textbf{they treat language as a static collection of isolated tokens}. 
+While distributed word vectors (Word2Vec, FastText) successfully map discrete vocabulary symbols into a structured, continuous semantic metric space:
+\begin{enumerate}
+    \item \textbf{Continuous Differentiability}: They provide dense, low-dimensional vectors $\vv_w \in \R^d$ that feed directly into neural network matrix multiplications and gradient backpropagation.
+    \item \textbf{Emergent Geometry}: Vector distances and inner products encode semantic clustering and linear relational analogies ($\vv_{\text{king}} - \vv_{\text{man}} + \vv_{\text{woman}} \approx \vv_{\text{queen}}$).
+    \item \textbf{Subword Robustness}: Character $n$-grams (FastText) solve the out-of-vocabulary (OOV) barrier and compound word decomposition in software engineering identifiers.
+\end{enumerate}
 
-In natural language and software engineering source code, tokens do not exist in isolation. Language is an ordered, variable-length temporal sequence where token order, syntactic hierarchy, and long-range dependencies dictate execution and meaning. A static embedding layer has no memory: it cannot track whether a variable was declared before it was referenced, cannot resolve nested control scopes, and cannot retain state across an extended document. To model variable-length sequential context and compute dynamically stateful representations, we must advance from static spatial embeddings to temporal recurrent architectures: \textbf{Recurrent Neural Networks (RNNs)}, the subject of Chapter~\ref{ch:rnn_sequence_modeling}.
+\paragraph{The two fatal bottlenecks of static word embeddings.}
+Despite these capabilities, static word embeddings face two insurmountable structural limitations:
+\begin{enumerate}
+    \item \textbf{Polysemy Amnesia (Context-Independent Representation)}: In Word2Vec and FastText, each vocabulary token is assigned exactly \emph{one static vector} in $\R^d$, completely decoupled from its surrounding context. In natural language, the word \textit{"bank"} has entirely distinct meanings in a financial setting (\textit{"the bank approved the mortgage"}) versus a geographical setting (\textit{"he sat by the river bank"}). In software engineering, this pathology is even more severe: an identifier \texttt{"count"} may represent an integer variable, a loop accumulator, or a database query function. A static lookup table forces all these distinct semantic roles into a single, averaged compromise vector $\vv_w$.
+    \item \textbf{The Synthesis of Continuous Embeddings and Attention}: In Chapter~\ref{ch:rnn_sequence_modeling}, we observed that Recurrent Neural Networks attempted to build context sequentially, but were throttled by the $\mathcal{O}(T)$ sequential computation wall that prevents GPU sequence parallelization. Soft attention proved that dynamic, direct pairwise addressing could bypass sequential bottlenecks.
+\end{enumerate}
+
+\paragraph{The path forward: dynamic contextualized representations.}
+This motivates the ultimate synthesis of modern natural language processing: \emph{Can we combine continuous token embeddings with dynamic, constant-time $\mathcal{O}(1)$ self-attention to generate contextualized vector representations on the fly, without any recurrent sequential bottlenecks?}
+
+This breakthrough leads directly to Chapter~5: \emph{The Transformer Architecture} \cite{vaswani2017}---the architectural engine underlying all modern foundation models.
 
 \end{document}

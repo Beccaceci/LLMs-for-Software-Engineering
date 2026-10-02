@@ -892,7 +892,14 @@ During backpropagation, the additive residual connection ensures gradients flow 
 Even if the learned Jacobian $\frac{\partial \mathcal{F}}{\partial \vx}$ vanishes, the identity term $\mI$ guarantees an uninterrupted gradient conduit.
 
 \subsection{Exercise: Adapting pretrained ResNet-18 for CIFAR-10}
-The base \texttt{models.resnet18} has an output fully connected layer (\texttt{fc}) sized for 1000 ImageNet classes. In Cell 65, the student replaces this head with a new 10-class linear projection:
+The base \texttt{models.resnet18} has an output fully connected layer (\texttt{fc}) sized for 1000 ImageNet classes. In Cell 65, the student replaces this head with a new 10-class linear projection. Figure~\ref{fig:lab01_resnet_finetuning} illustrates the transfer learning pipeline, contrasting the pre-trained ImageNet source model against the adapted CIFAR-10 downstream architecture.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/lab01/resnet_finetuning_cifar10.png}
+\caption{Architectural topology of transfer learning and fine-tuning with ResNet-18 on CIFAR-10 (Section~1.7.2). (Top) The source ResNet-18 model pre-trained on ImageNet-1K ($1.28\text{M}$ images, $1{,}000$ categories) features $18$ residual convolutional layers and an original $1{,}000$-class classification head. (Middle) Classification head surgery replaces \texttt{pretrained\_model.fc} with a new linear projection $\mW \in \R^{10 \times 512},\; \vb \in \R^{10}$. (Bottom) End-to-end downstream fine-tuning on CIFAR-10 ($[3 \times 32 \times 32]$), propagating gradients through both the new head and the pre-trained feature extractor, boosting classification accuracy from $47.5\%$ (MLP from scratch) to $> 82.4\%$ in just $5$ epochs.}
+\label{fig:lab01_resnet_finetuning}
+\end{figure}
 
 \begin{lstlisting}[language=Python, caption={Loading pretrained ResNet-18 and replacing the classifier head (Cell 65).}, label={lst:lab01_resnet_cifar10}]
 from torchvision import models

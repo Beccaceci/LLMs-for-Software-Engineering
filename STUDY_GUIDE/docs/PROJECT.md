@@ -103,8 +103,8 @@ Every feature identified during the Survey phase is mapped to an implementation 
 │   ├── part1_foundations/
 │   │   ├── 01_language_models_intro.tex
 │   │   ├── 02_deep_learning_foundations.tex
-│   │   ├── 03_word_embeddings.tex
-│   │   ├── 04_recurrent_neural_networks.tex
+│   │   ├── 03_recurrent_neural_networks.tex
+│   │   ├── 04_word_embeddings.tex
 │   │   ├── 05_transformer_architecture.tex
 │   │   ├── 06_scaling_laws_pretraining.tex
 │   │   ├── 07_instruction_tuning_alignment.tex

@@ -1259,49 +1259,32 @@ Defining batch adjoint matrix $\bm{\Delta} = \frac{\partial \Loss}{\partial \mZ}
 These matrix equations form the computational workhorse executed across billions of parameters in modern GPU training clusters.
 
 
-\section{The continuous-discrete representation impasse: bridge to word embeddings}
+\section{The sequential computation impasse: bridge to recurrent neural networks}
 \label{sec:bridge_to_ch03}
 
-In this chapter, we have developed the atomic foundations of deep learning:
+In this chapter, we have formulated the mathematical and architectural foundations of deep feedforward neural networks (FCNNs / Multi-Layer Perceptrons):
 \begin{enumerate}
     \item \textbf{Continuous Units}: The artificial perceptron computes weighted inner products over real-valued vectors.
     \item \textbf{Non-Linearity}: Non-linear activations ($\sigma, \tanh, \relu, \gelu$) prevent multi-layer linear stacking collapse, folding space to solve linearly inseparable problems like XOR and enabling universal function approximation.
     \item \textbf{Principled Optimization}: Cross-entropy objective functions provide linear error signals without gradient saturation, and backpropagation calculates matrix adjoints across computational DAGs via vectorized matrix calculus.
 \end{enumerate}
 
-\paragraph{The representation impasse.}
-However, applying this continuous machinery to natural language and software source code exposes an immediate, fundamental impasse:
-\[
-\text{Deep neural networks are \textbf{differentiable continuous operators}: } f(\vx; \bm{\theta}) = \mW^\top \vx + \vb \quad (\vx \in \R^d).
-\]
-In stark contrast, human natural language and software source code are sequences of \textbf{discrete, categorical text symbols}:
-\[
-W = (w_1, w_2, \dots, w_N), \quad w_t \in \vocab = \{\text{\texttt{public}, \texttt{class}, \texttt{static}, \texttt{void}, \dots}\}.
-\]
-We cannot compute inner products $\vw^\top \vx$, calculate derivatives, or execute backpropagation on raw ASCII or Unicode strings.
-
-\paragraph{Why naive numerical encodings fail.}
-Two obvious baseline approaches fail catastrophically:
-\begin{itemize}
-    \item \textbf{Scalar Integer Indexing}: Mapping each vocabulary word to a scalar integer ($w_t \in \{1, 2, \dots, |\vocab|\}$) imposes an arbitrary, fictitious metric:
-    \[
-    \text{\texttt{class}} \to 42, \quad \text{\texttt{interface}} \to 43, \quad \text{\texttt{int}} \to 840.
-    \]
-    This forces the model to assume that $\text{\texttt{interface}}$ is geometrically adjacent to $\text{\texttt{class}}$ ($|43 - 42| = 1$), while $\text{\texttt{int}}$ is vastly distant ($|840 - 42| = 798$), corrupting optimization.
-    \item \textbf{Local One-Hot Encodings}: Representing each word as an indicator vector $\mathbf{e}_i \in \{0, 1\}^{|\vocab|}$ creates sparse vectors of massive dimensionality ($|\vocab| \ge 50{,}000$). Crucially, standard basis vectors are mutually orthogonal:
-    \[
-    \mathbf{e}_i^\top \mathbf{e}_j = 0 \quad \forall i \ne j, \quad d_E(\mathbf{e}_i, \mathbf{e}_j) = \sqrt{2}.
-    \]
-    Every word is equidistant from every other word, providing zero semantic similarity, zero parameter sharing during backpropagation, and crippling data efficiency.
-\end{itemize}
+\paragraph{The feedforward assumption and its sequential failure.}
+Throughout these formulations, feedforward networks operate under a fundamental structural assumption: the input is a static, fixed-dimensional Euclidean vector $\vx \in \R^{d_{\text{in}}}$, and the network maps this vector through a cascade of static linear projections $\mW_l \in \R^{d_l \times d_{l-1}}$ to produce a fixed-dimensional output $\vy \in \R^{d_{\text{out}}}$:
+\begin{equation}
+\label{eq:fcnn_static_cascade}
+\vy = \mathcal{F}(\vx; \Theta) = f_L(\mW_L \cdots f_1(\mW_1 \vx + \vb_1) \cdots + \vb_L).
+\end{equation}
+While this architecture is highly effective for tabular data and fixed-attribute classification, it immediately encounters a computational impasse when confronted with sequential data—such as human natural language, software source code tokens, execution traces, and temporal signals. Sequential data violates the core assumptions of feedforward processing in three fundamental ways:
+\begin{enumerate}
+    \item \textbf{Rigid Input Dimensionality}: Natural language sentences and source code blocks have elastic, variable lengths $T$. An FCNN strictly expects an input of dimension $d_{\text{in}}$, forcing artificial truncation or massive zero-padding that wastes computational throughput and memory.
+    \item \textbf{Zero Internal State and Temporal Memory}: Feedforward networks are memoryless. Each forward pass $\mathcal{F}(\vx)$ is independent and decoupled from prior inputs. They cannot maintain temporal context or resolve long-range grammatical and syntactic dependencies across multiple time steps.
+    \item \textbf{Absence of Parameter Sharing Across Positions}: In an FCNN, each position in the input is governed by separate weight parameters. If a syntactic construct (such as a variable declaration \texttt{"let x = 5;"} or a noun phrase \textit{"a large language model"}) appears at token position 1 versus token position 20, the FCNN must learn separate weight matrices for each position independently, destroying sample efficiency.
+\end{enumerate}
 
 \paragraph{The path forward.}
-To bridge this chasm between discrete symbolic languages and continuous neural operators, we must construct a dense, continuous, differentiable mapping:
-\[
-\phi: \vocab \longrightarrow \R^d \quad (d \ll |\vocab|),
-\]
-that maps discrete words into low-dimensional semantic vector spaces where geometric distance preserves syntactic and semantic relationships.
+To process variable-length sequences, maintain evolving context over time, and achieve translational invariance across sequence positions, deep learning requires a computational paradigm with internal recurrence and temporal weight sharing.
 
-This challenge leads directly to Chapter~\ref{ch:word_embeddings}: \emph{Distributed Word Representations and Word2Vec}.
+This architectural necessity leads directly to Chapter~\ref{ch:rnn_sequence_modeling}: \emph{Recurrent Neural Networks and Sequence Modeling}.
 
 \end{document}
