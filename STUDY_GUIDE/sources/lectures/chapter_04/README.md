@@ -25,6 +25,11 @@ This directory houses all required primary and external reference materials for 
   - **Why it matters**: Unveils the mechanics of Bengio's 2003 neural language model and embedding lookup tables.
   - **Key insights**: Explicitly demystifies `C = torch.randn((27, 2))` as a linear layer weight matrix without bias, showing `C[X]` as equivalent to $\mathbf{X} \mathbf{C}$ when $\mathbf{X}$ is one-hot encoded, and traces gradient backpropagation directly into embedding rows.
   - **Companion code**: [`makemore` repository](https://github.com/karpathy/makemore) (Part 2 MLP script, ~150 LOC in pure PyTorch).
+- Andrej Karpathy: ["Let's build the GPT Tokenizer" (2024)](https://www.youtube.com/watch?v=zduSFxRajkE)
+  - **Why it matters**: The definitive masterclass on subword tokenization, regular expression pre-tokenization boundaries, and tokenizer-induced LLM pathologies.
+  - **Key insights**: Explains why naive BPE fails on punctuation/numbers; details the regex pattern isolating contractions, words, and numbers; explains GPT-4's 3-digit capping rule ($\backslash\text{p}\{\text{N}\}\{1,3\}$) for arithmetic reasoning; demystifies tokenization quirks (spelling, reversed words, non-English fertility penalties, SolidGoldMagikarp glitch tokens, and special token prompt injection).
+  - **Companion code**: [`minbpe` repository](https://github.com/karpathy/minbpe) (minimal standalone BPE tokenizer in Python).
+  - **Local notes**: [`multimedia/enkk_karpathy_notes.md`](multimedia/enkk_karpathy_notes.md).
 - 3Blue1Brown (Grant Sanderson): ["Word Embeddings and Vector Arithmetic"](https://www.3blue1brown.com/)
   - **Why it matters**: Provides visual geometric intuition for high-dimensional hyperspheres, cosine angular separation, and linear relational translation vectors.
   - **Key insights**: Illustrates high-dimensional vector spaces, why dot products measure alignment on the hypersphere, and how linear offsets represent semantic relations.

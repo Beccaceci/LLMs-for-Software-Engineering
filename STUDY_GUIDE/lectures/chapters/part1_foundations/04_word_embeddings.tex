@@ -1613,6 +1613,143 @@ assert decoded_text == text, "Decoded text must match original string identicall
 print("Lossless decoding confirmed!")
 \end{lstlisting}
 
+\subsection{Regex pre-tokenization boundaries and LLM tokenization quirks: Andrej Karpathy's minbpe}
+\label{subsec:regex_pretokenization_karpathy}
+
+While Byte-Level BPE ensures that any Unicode byte stream can be mapped without out-of-vocabulary errors, executing BPE naively on raw text introduces severe structural pathologies. As dissected by Andrej Karpathy in his seminal tokenizer lecture and companion repository \texttt{minbpe} \cite{karpathy2024tokenizer}, production foundation models never execute pair merging directly across an unconstrained document. Instead, they enforce strict category isolation using \textbf{regular expression pre-tokenization}.
+
+\paragraph{The naive BPE category-bleed dilemma.}
+Under unconstrained Byte-Level BPE, the merge algorithm scans adjacent byte pairs across the entire text corpus and greedily merges whichever pair exhibits the highest co-occurrence frequency. Because punctuation marks (such as periods, commas, colons, and quotation marks) frequently terminate common English words, naive BPE readily merges letters and punctuation marks together.
+For instance, if the word \texttt{"dog"} frequently occurs at the end of sentences, naive BPE creates the merged token \texttt{"dog."}. Similarly, tokens like \texttt{"world!"}, \texttt{"user123"}, \texttt{"return;"}, and \texttt{"fn()"} coalesce into monolithic single tokens.
+
+This induces three catastrophic failure modes:
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Combinatorial vocabulary bloat}: Rather than maintaining independent vocabulary entries for words and punctuation marks, the vocabulary $\mathcal{V}$ becomes clogged with multiple affixed variants of every common root (\texttt{"dog"}, \texttt{"dog."}, \texttt{"dog,"}, \texttt{"dog!"}, \texttt{"dog?"}). With a fixed vocabulary budget (e.g., $50{,}000$ tokens), this wastes thousands of token slots on redundant combinations.
+    \item \textbf{Representation fragmentation and broken parameter sharing}: In the token embedding matrix $\mW_{\text{in}} \in \R^{V \times d}$, the vector row for \texttt{"dog."} is parameterized completely independently of the vector row for \texttt{"dog"}. During backpropagation, error gradients for the sentence-final token \texttt{"dog."} do not update the base representation of \texttt{"dog"}, fragmenting semantic knowledge and degrading out-of-distribution generalization.
+    \item \textbf{Whitespace and indentation collapse}: If whitespace characters merge indiscriminately across word boundaries (e.g., merging \texttt{"in"} and \texttt{" the"} into \texttt{"in the"}), the tokenizer struggles to parse non-standard spacing, unusual code indentation, or structured YAML/JSON data.
+\end{enumerate}
+
+\paragraph{The regex pre-tokenization invariant.}
+To eliminate category bleed, Radford et al.~\cite{radford2019} in GPT-2 and Karpathy~\cite{karpathy2024tokenizer} in \texttt{minbpe} introduced a mandatory pre-tokenization stage. The input document $S \in \Sigma^*$ is first partitioned by a deterministic regular expression $\mathcal{R}$ into an ordered sequence of $M$ disjoint text chunks:
+\begin{equation}
+\label{eq:regex_partition}
+S = c_1 \circ c_2 \circ \dots \circ c_M, \quad c_m \in \mathcal{L}(\mathcal{R}).
+\end{equation}
+
+The fundamental architectural invariant governing regex pre-tokenization is formulated as follows:
+\begin{center}
+\textbf{The Boundary Invariant:} \emph{BPE merges are strictly forbidden from crossing the boundary between adjacent regex chunks.}
+\end{center}
+Formally, let $\mathcal{M}: \mathcal{V} \times \mathcal{V} \to \mathcal{V}$ denote the learned BPE merge dictionary. A candidate pair $(a, b)$ is eligible for replacement if and only if both subwords originate within the same chunk:
+\begin{equation}
+\label{eq:regex_boundary_constraint}
+\text{eligible}(a, b) \iff \exists m \in \{1, \dots, M\} \quad \text{such that } (a \circ b) \sqsubseteq c_m.
+\end{equation}
+Consequently, cross-chunk merges are strictly forbidden:
+\begin{equation}
+\label{eq:regex_cross_category_zero}
+\forall a \in c_m, \; b \in c_{m+1} \quad \mathcal{M}(a, b) = \emptyset.
+\end{equation}
+Every chunk $c_m$ is tokenized into subwords independently, and the final sequence of token IDs is formed by concatenating the chunk-level token arrays:
+\begin{equation}
+\label{eq:regex_tokenization_concat}
+\text{\texttt{encode}}(S) = \text{\texttt{encode}}_{\text{BPE}}(c_1) \mathbin{\Vert} \text{\texttt{encode}}_{\text{BPE}}(c_2) \mathbin{\Vert} \dots \mathbin{\Vert} \text{\texttt{encode}}_{\text{BPE}}(c_M).
+\end{equation}
+Because the punctuation mark in \texttt{"dog."} is partitioned into a separate chunk $c_2 = \texttt{"."}$, the pair $(\texttt{"dog"}, \texttt{"."})$ is never recorded in the pair frequency histogram during tokenizer training, guaranteeing that words and punctuation remain strictly separated.
+
+\paragraph{Dissecting the GPT-2 and GPT-4 regex patterns.}
+The regular expression used in GPT-2 is formulated across its disjunctive categories as:
+\begin{align}
+\label{eq:gpt2_regex_pattern}
+\mathcal{R}_{\text{GPT-2}} &= \texttt{\textquotesingle s|\textquotesingle t|\textquotesingle re|\textquotesingle ve|\textquotesingle m|\textquotesingle ll|\textquotesingle d} \nonumber \\
+&\quad {}\lor \texttt{ ?\textbackslash p\{L\}+} \lor \texttt{ ?\textbackslash p\{N\}+} \lor \texttt{ ?[\textasciicircum\textbackslash s\textbackslash p\{L\}\textbackslash p\{N\}]+} \nonumber \\
+&\quad {}\lor \texttt{\textbackslash s+(?!\textbackslash S)} \lor \texttt{\textbackslash s+}
+\end{align}
+where $\backslash\text{p}\{\text{L}\}$ and $\backslash\text{p}\{\text{N}\}$ denote the Unicode categories for Letters and Numbers, respectively.
+In GPT-4, OpenAI refined the pre-tokenization pattern into:
+\begin{align}
+\label{eq:gpt4_regex_pattern}
+\mathcal{R}_{\text{GPT-4}} &= \texttt{\textquotesingle(?i:[sdmt]|ll|ve|re)} \lor \texttt{[\textasciicircum\textbackslash r\textbackslash n\textbackslash p\{L\}\textbackslash p\{N\}]?+\textbackslash p\{L\}+} \nonumber \\
+&\quad {}\lor \texttt{\textbackslash p\{N\}\{1,3\}} \lor \texttt{ ?[\textasciicircum\textbackslash s\textbackslash p\{L\}\textbackslash p\{N\}]++[\textbackslash r\textbackslash n]*} \nonumber \\
+&\quad {}\lor \texttt{\textbackslash s*[\textbackslash r\textbackslash n]} \lor \texttt{\textbackslash s+(?!\textbackslash S)} \lor \texttt{\textbackslash s+}
+\end{align}
+
+Table~\ref{tab:regex_pretokenization_clauses} details the linguistic and algorithmic function of each regex clause.
+
+\begin{table}[htbp]
+\centering
+\small
+\caption{Anatomy of regex pre-tokenization patterns in GPT-2 and GPT-4 \cite{radford2019,karpathy2024tokenizer}.}
+\label{tab:regex_pretokenization_clauses}
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{3.8cm} >{\raggedright\arraybackslash}p{2.6cm} >{\raggedright\arraybackslash}p{2.2cm} X}
+\toprule
+\textbf{Regex clause} & \textbf{Linguistic category} & \textbf{Example matches} & \textbf{Structural invariant preserved} \\
+\midrule
+\texttt{'s|'t|'re|...} & English contractions & \texttt{'s}, \texttt{'t}, \texttt{'re}, \texttt{'ll} & Isolates clitic suffixes so roots and contractions tokenize independently. \\
+\addlinespace
+\texttt{ ?\textbackslash p\{L\}+} & Unicode letters & \texttt{"hello"}, \texttt{" world"} & Keeps alphabetic words intact while preventing fusion with punctuation. \\
+\addlinespace
+\texttt{ ?\textbackslash p\{N\}+} (GPT-2) & Digits (unbounded) & \texttt{" 1"}, \texttt{" 42"}, \texttt{" 123456"} & Prevents letters and digits from merging; allows multi-digit merges. \\
+\addlinespace
+\texttt{\textbackslash p\{N\}\{1,3\}} (GPT-4) & Digits (capped at 3) & \texttt{"1"}, \texttt{"234"}, \texttt{"567"} & Restricts numbers to $\le 3$ digits, aligning tokens with decimal place values. \\
+\addlinespace
+\texttt{ ?[\textasciicircum\textbackslash s\textbackslash p\{L\}\textbackslash p\{N\}]+} & Punctuation and symbols & \texttt{"."}, \texttt{"!"}, \texttt{"=="}, \texttt{"-->"} & Groups compound operators/symbols without bleeding into words. \\
+\addlinespace
+\texttt{\textbackslash s+(?!\textbackslash S)} & Trailing whitespaces & \texttt{"  "}, \texttt{"\textbackslash t"} & Preserves indentation blocks and prevents trailing space fusion. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\paragraph{The GPT-4 digit capping refinement and arithmetic reasoning.}
+A profound insight emphasized by Karpathy~\cite{karpathy2024tokenizer} lies in the contrast between GPT-2's number clause \texttt{ ?\textbackslash p\{N\}+} and GPT-4's \texttt{\textbackslash p\{N\}\{1,3\}}.
+In GPT-2, the unconstrained quantifier \texttt{+} allowed numbers of arbitrary lengths to form a single regex chunk. Consequently, the tokenizer merged frequent multi-digit combinations unpredictably based on dataset frequency. For example, \texttt{"123456"} might be tokenized as \texttt{["12", "3456"]}, while \texttt{"923456"} might be tokenized as \texttt{["923", "456"]}.
+Because digit slice boundaries varied unpredictably across numbers, Transformer attention heads could not consistently align corresponding place values (ones, tens, hundreds, thousands) during multi-digit addition or multiplication, inducing frequent arithmetic failures.
+
+In GPT-4, the quantifier \texttt{\{1,3\}} caps every numeric segment to \textbf{at most 3 digits}. A number like $1{,}234{,}567$ is deterministically split into:
+\begin{equation}
+\label{eq:gpt4_digit_partition}
+\text{\texttt{"1234567"}} \xrightarrow{\mathcal{R}_{\text{GPT-4}}} [\text{\texttt{"1"}}, \; \text{\texttt{"234"}}, \; \text{\texttt{"567"}}].
+\end{equation}
+Because merges cannot cross chunk boundaries, no token can ever represent more than 3 decimal digits. Notice that these chunks align precisely with standard thousands separators in human mathematics ($1,234,567$). This ensures that numeric tokens reflect consistent orders of magnitude ($10^0$ to $10^2$, $10^3$ to $10^5$, etc.), providing uniform structural representations that significantly enhance the model's arithmetic and algorithmic computation capabilities.
+
+\begin{lstlisting}[language=Python, caption={Regex pre-tokenization boundary splitting under GPT-2 and GPT-4 patterns \cite{karpathy2024tokenizer}.}, label={lst:regex_pretokenization}]
+import regex as re
+
+# GPT-2 pre-tokenization regex pattern
+GPT2_SPLIT_PATTERN = r"""'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
+
+# GPT-4 pre-tokenization regex pattern (enforces 3-digit number capping)
+GPT4_SPLIT_PATTERN = r"""'(?i:[sdmt]|ll|ve|re)|[^\r\n\p{L}\p{N}]?+\p{L}+|\p{N}{1,3}| ?[^\s\p{L}\p{N}]++[\r\n]*|\s*[\r\n]|\s+(?!\S)|\s+"""
+
+sample_text = "Hello, world! 1234567 don't"
+
+# Extract regex-partitioned text chunks
+gpt2_chunks = re.findall(GPT2_SPLIT_PATTERN, sample_text)
+gpt4_chunks = re.findall(GPT4_SPLIT_PATTERN, sample_text)
+
+print("GPT-2 chunks:", gpt2_chunks)
+# Output: ['Hello', ',', ' world', '!', ' 1234567', ' don', "'t"]
+
+print("GPT-4 chunks:", gpt4_chunks)
+# Output: ['Hello', ',', ' world', '!', ' 123', '456', '7', ' don', "'t"]
+# Notice: ' 1234567' is broken into 3-digit chunks: [' 123', '456', '7']
+# Crucial Invariant: BPE merges are never permitted to cross chunk boundaries!
+\end{lstlisting}
+
+\begin{intuition}[Why LLMs behave weirdly: demystifying tokenization quirks]
+Many counter-intuitive behaviors exhibited by large language models are not deep cognitive failures of neural attention, but direct downstream artifacts of subword tokenization \cite{karpathy2024tokenizer}:
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Character spelling blindness and letter counting}: In natural conversations, models famously stumble when asked \emph{"How many `r's are in strawberry?"}. The tokenizer maps the string \texttt{"strawberry"} to two atomic subword token IDs: $[\text{\texttt{straw}}, \text{\texttt{berry}}]$ (e.g., tokens 496 and 675 in GPT-4). The Transformer's attention heads process two continuous vectors; the individual letters $s, t, r, a, w, b, e, r, r, y$ are completely opaque to the model unless it has explicitly memorized the character decomposition of each subword token during pretraining.
+    \item \textbf{String reversal}: Requesting a model to reverse a word (e.g., \texttt{"hello"} $\to$ \texttt{"olleh"}) is difficult because the model observes a single token for \texttt{"hello"}. Generating the reversed text requires projecting to a completely different sequence of subword or byte tokens, rather than simply reversing an input array.
+    \item \textbf{The non-English token fertility tax}: While English text achieves an average compression ratio of $\approx 1.2$ tokens per word, non-Latin scripts (e.g., Japanese, Arabic, Cyrillic, Hindi) require 3 to 4 raw bytes per character in UTF-8. Because pretraining corpora are overwhelmingly English ($>80\%$), the tokenizer acquires few subword merges for non-Latin scripts. Consequently, non-English text is fragmented into raw bytes, requiring $3\times$ to $8\times$ more tokens per sentence. This consumes context window capacity $4-8\times$ faster, increases autoregressive generation latency, and scales inference costs proportionately.
+    \item \textbf{Glitch tokens and uninitialized embeddings (\emph{SolidGoldMagikarp})}: In early foundation models, prompt strings like \texttt{"SolidGoldMagikarp"}, \texttt{"StreamerBot"}, or \texttt{"TheNitromeFan"} provoked bizarre hallucinations, hostile replies, or model crashes. This anomaly arose because the BPE tokenizer was trained on an unfiltered web crawl containing frequent Reddit usernames. However, the subsequent pretraining corpus for the neural network was filtered, stripping out Reddit user lists. Consequently, those token IDs remained in the vocabulary $\mathcal{V}$, but their corresponding rows in the embedding matrix $\mW_{\text{in}}$ received \textbf{zero gradient updates} during pretraining, stranding them at their random Gaussian initialization coordinates ($\mathbf{w} \sim \mathcal{N}(0, \sigma^2)$). When queried, these unnormalized outlier vectors produced anomalous internal activation spikes that disrupted layer normalization and softmax distributions.
+    \item \textbf{Special token leakage and delimiter prompt injection}: Control delimiters like \texttt{<|endoftext|>} or \texttt{<|fim\_middle|>} serve as internal signals. If user-submitted prompts are passed to tokenizers without escaping special tokens, an adversary can inject delimiter strings to prematurely close prompt contexts or bypass safety guardrails. Modern tokenizers disallow special tokens in user inputs by default (\texttt{allowed\_special=set()}), requiring explicit developer opt-in.
+\end{enumerate}
+\end{intuition}
+
+\paragraph{Connecting token streams to training objectives.}
+Having established how byte-level BPE and regular expression pre-tokenization transform arbitrary text into a clean, category-isolated stream of subword integer tokens $\mathbf{T} = [t_0, t_1, \dots, t_{N-1}]$, we must now address how this linear token stream is formatted for neural training. We proceed to the autoregressive sliding window formulation that constructs the input-target pairs $(\mX, \mY)$ powering modern foundation models.
+
 \subsection{Autoregressive data preparation: the sliding window input-target formulation}
 \label{subsec:sliding_window_sampling}
 
