@@ -1,5 +1,18 @@
 # Large Language Models for Software Engineering (LLM4SE)
 
+---
+
+> [!IMPORTANT]
+> ### 📦 Repository Relocated & Consolidated
+> This course is now officially maintained as part of the centralized **[COMPUTER-ENGINEERING](https://github.com/Beccaceci/COMPUTER-ENGINEERING)** repository at Politecnico di Torino.
+>
+> 📍 **New Location:** [`COMPUTER-ENGINEERING/courses/second_year/first_semester/LLM_FOR_SOFTWARE_ENGINEERING`](https://github.com/Beccaceci/COMPUTER-ENGINEERING/tree/main/courses/second_year/first_semester/LLM_FOR_SOFTWARE_ENGINEERING)
+>
+> All ongoing updates, compiled lecture notes, laboratory guides, and resolved exams are located in the unified repository.
+
+---
+
+
 [![Politecnico di Torino](https://img.shields.io/badge/University-Politecnico%20di%20Torino-002D62.svg?style=flat&logo=buffer&logoColor=white)](https://www.polito.it/)
 [![Course](https://img.shields.io/badge/Course-LLMs%20for%20Software%20Engineering-blue.svg?style=flat)](https://didattica.polito.it/)
 [![Study Guide](https://img.shields.io/badge/Study%20Guide-96%20Pages%20PDF-brightgreen.svg?style=flat&logo=adobeacrobatreader&logoColor=white)](STUDY_GUIDE/lectures/main.pdf)
