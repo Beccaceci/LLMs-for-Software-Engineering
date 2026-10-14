@@ -1,55 +1,1024 @@
 \documentclass[../../main.tex]{subfiles}
 \begin{document}
 
-\chapter{LLM pre-training, scaling laws, and history}
+\chapter{LLM pre-training, scaling laws, and the evolution of open models}
 \label{ch:scaling_laws_pretraining}
 
 \section{Chapter overview and learning outcomes}
-This chapter analyzes the pre-training paradigm that transforms uninitialized neural networks into foundation models. We review the historical evolution of Transformer architectures, dissect self-supervised objectives, examine subword tokenization algorithms, and formulate empirical scaling laws.
+\label{sec:scaling_laws_overview}
 
-Upon completing this chapter, you will be able to:
+In Chapter~\ref{ch:transformer_architecture}, we established the fundamental architectural mechanics of the Transformer: multi-head self-attention, feed-forward sub-layers, residual connections, and normalization layers. However, an uninitialized Transformer initialized with random weights yields complete syntactic and semantic chaos. The decisive breakthrough of modern natural language processing lies in the \textbf{pre-training paradigm}: training high-capacity neural architectures on vast, unannotated text corpora to acquire general-purpose linguistic, factual, and reasoning representations prior to downstream task adaptation.
+
+This chapter investigates the foundational trajectory that transformed sequence modeling from task-specific fine-tuning into the era of generalist foundation models. We begin by examining the architectural fork between encoder-only, encoder-decoder, and decoder-only models, tracing why causal auto-regressive generation became the dominant foundation model paradigm. We then dissect the evolutionary milestones of OpenAI's Generative Pre-trained Transformer series: GPT-1, GPT-2, and GPT-3. Next, we formalize the empirical scaling laws established by Kaplan et al.~\cite{kaplan2020}, analyzing how loss scales as a power law with compute, dataset size, and parameter count. Finally, we scrutinize DeepMind's Chinchilla revision by Hoffmann et al.~\cite{hoffmann2022}, proving why early hundred-billion-parameter models were significantly undertrained, and trace the resulting modern paradigm shift toward inference-optimal foundation models and open-weights ecosystems such as LLaMA and Mistral.
+
+Upon mastering the material in this chapter, you will be able to:
 \begin{itemize}
-    \item Trace the historical fork: Encoder-only (BERT \citep{devlin2019}), Encoder-Decoder (T5), and Decoder-only (GPT-2/3 \citep{radford2019,brown2020}).
-    \item Formalize pre-training objectives: Causal Language Modeling (CLM), Masked Language Modeling (MLM), and Fill-in-the-Middle (FIM).
-    \item Explain the Byte-Pair Encoding (BPE) algorithm and vocabulary construction.
-    \item Formulate the empirical scaling laws of Kaplan et al. \citep{kaplan2020}.
-    \item State the Chinchilla compute-optimal frontier derived by Hoffmann et al. \citep{hoffmann2022} ($N \propto \sqrt{C}, D \propto \sqrt{C}$).
-    \item Critically evaluate claims regarding "emergent abilities" versus smooth non-linear metric effects.
+    \item \textbf{Analyze the architectural fork}: Rigorously contrast encoder-only (BERT), encoder-decoder (T5), and decoder-only (GPT) paradigms in terms of attention connectivity, computational complexity, and generative suitability.
+    \item \textbf{Derive self-supervised pre-training objectives}: Formulate Causal Language Modeling (CLM), Masked Language Modeling (MLM), and Fill-in-the-Middle (FIM) mathematically, specifying exact tensor inputs, targets, and loss functions.
+    \item \textbf{Trace the GPT architectural evolution}: Detail the engineering and dataset shifts across GPT-1 (BooksCorpus, 117M params, supervised fine-tuning heads), GPT-2 (WebText, 1.5B params, pre-normalization, zero-shot emergence), and GPT-3 (Common Crawl filtering, 175B params, in-context learning).
+    \item \textbf{Formalize Kaplan scaling laws}: State the empirical power-law relations connecting cross-entropy loss to model parameters $N$, dataset size $D$, and FLOP budget $C$, explaining why early scaling favored model size over dataset expansion ($N \propto C^{0.73}, D \propto C^{0.27}$).
+    \item \textbf{Derive the Chinchilla compute-optimal frontier}: Reproduce the mathematical derivations of DeepMind's three analytical approaches (fixed model size envelopes, isoFLOP parabolas, and parametric loss surface optimization), proving why $N$ and $D$ must scale equally ($N_{\text{opt}} \propto \sqrt{C}, D_{\text{opt}} \propto \sqrt{C}$).
+    \item \textbf{Evaluate the inference-optimal paradigm}: Explain why modern open models (e.g., LLaMA, Mistral) intentionally train far beyond the compute-optimal Chinchilla frontier to minimize downstream inference latency and deployment memory.
 \end{itemize}
 
-\section{Self-supervised pre-training objectives}
-Pre-training trains a Transformer on massive corpora (trillions of tokens) without human labels. In Causal Language Modeling (CLM), the network minimizes negative log-likelihood:
+\begin{deepdive}[Curricular architecture and modular synthesis protocol]
+This chapter is organized into two pedagogically distinct yet causally linked halves:
+\begin{enumerate}
+    \item \textbf{Part I: The Emergence of Autoregressive LLMs (Sections~\ref{sec:architectural_fork}--\ref{sec:gpt3_architecture})}: Synthesized from the official course slides, primary literature (Radford et al.~\cite{radford2018,radford2019}, Kaplan et al.~\cite{kaplan2020}, Brown et al.~\cite{brown2020}), and definitive graduate textbooks (Jurafsky \& Martin, Simon Prince). It provides the exhaustive mathematical foundations of generative pre-training, BPE tokenization, early power laws, and in-context learning.
+    \item \textbf{Part II: The Scaling Frontier, Chinchilla Optimality, and Modern Open Models (Sections~\ref{sec:race_to_scale}--\ref{sec:open_weights_ecosystem})}: Derived directly from the verbatim transcription of the classroom lecture delivered by the professor, tracking the live analytical derivations of the three compute-optimal approaches, empirical validation against Gopher, and the transition into open-weights foundation models.
+\end{enumerate}
+\end{deepdive}
+
+% ==============================================================================
+% PART I: THE EMERGENCE OF AUTOREGRESSIVE FOUNDATION MODELS
+% ==============================================================================
+
+\section{The architectural fork: from task-specific fine-tuning to autoregressive generation}
+\label{sec:architectural_fork}
+
+\paragraph{The failure mode of classical supervised NLP.}
+Prior to the advent of large-scale pre-training, deep learning for natural language processing was dominated by supervised, task-specific architectures. Practitioners collected human-annotated datasets for individual tasks---such as sentiment analysis (SST-2), natural language inference (SNLI, MNLI), named entity recognition (CoNLL-2003), or question answering (SQuAD)---and trained specialized neural networks from scratch or initialized word vectors using static lookup tables such as Word2Vec or GloVe. 
+
+This paradigm suffered from three catastrophic structural bottlenecks:
+\begin{enumerate}
+    \item \textbf{The annotation bottleneck}: Supervised datasets require expensive, human-in-the-loop labeling. Real-world labeled corpora typically span only $10^4$ to $10^5$ samples. Such small training volumes severely constrain the parameter capacity of neural models, inducing severe overfitting when scaling beyond several million parameters.
+    \item \textbf{Static representation collapse}: Static embeddings map each word to a single spatial coordinate $\vw \in \R^d$, completely ignoring polysemy and local syntactic context (e.g., the word ``bank'' in ``river bank'' versus ``investment bank'').
+    \item \textbf{Architectural siloing}: Every distinct NLP task required custom output layers, specialized pooling operations, or task-specific bi-directional recurrent architectures, preventing positive transfer across related domains.
+\end{enumerate}
+
+\paragraph{The self-supervised pre-training paradigm.}
+The solution to these bottlenecks is \textbf{self-supervised learning}, wherein the supervisory signal is derived autonomously from raw, unannotated text without human labels. By exploiting the inherent sequential structure of natural language, models can be pre-trained on billions or trillions of tokens, learning grammatical syntax, world knowledge, semantic coherence, and logical reasoning patterns.
+
+Following the introduction of the Transformer by Vaswani et al.~\cite{vaswani2017}, the NLP community underwent a major architectural fork based on how the attention mechanism is masked and connected:
+\begin{itemize}
+    \item \textbf{Encoder-only architectures (e.g., BERT \cite{devlin2019}, RoBERTa)}:
+    Encoder-only models utilize full bidirectional self-attention across the sequence: every token attends to all previous, current, and subsequent tokens simultaneously. The attention mask $\mM \in \R^{T \times T}$ is all zeros (no masking). 
+    Pre-training relies on the \textbf{Masked Language Modeling (MLM)} objective: a random subset (typically 15\%) of tokens is corrupted (replaced by a special $\langle\text{MASK}\rangle$ token, random words, or kept unchanged), and the model must reconstruct the original tokens:
+    \begin{equation}
+    \label{eq:mlm_loss}
+    \Loss_{\text{MLM}}(\theta) = -\sum_{i \in \mathcal{M}} \log \Prob_\theta(w_i \mid \vw_{\setminus \mathcal{M}}),
+    \end{equation}
+    where $\mathcal{M}$ is the set of masked indices and $\vw_{\setminus \mathcal{M}}$ denotes the unmasked context. While encoder-only models excel at discriminative understanding tasks (sentence classification, extractive question answering, token classification), they suffer from a fatal drawback: \emph{they cannot generate text autoregressively in a single forward pass}. Generating a sequence of length $L$ requires $L$ separate forward iterations, and predicting a masked token conditional on future masked tokens violates probabilistic chain rules.
+    
+    \item \textbf{Encoder-decoder architectures (e.g., T5 \cite{raffel2020t5}, BART)}:
+    Encoder-decoder models retain the original Vaswani et al.~\cite{vaswani2017} duality. A bidirectional encoder processes the input prefix $\vx = [x_1, \dots, x_{T_{\text{in}}}]$, and an autoregressive decoder generates the target sequence $\vy = [y_1, \dots, y_{T_{\text{out}}}]$ token by token using causal self-attention and cross-attention over the encoder's top hidden states $\mH_{\text{enc}}$.
+    Pre-training typically uses a span corruption objective (e.g., in T5, replacing arbitrary spans of text with sentinel tokens $\langle X \rangle, \langle Y \rangle$ and training the decoder to emit the masked spans). This provides an elegant, unified ``text-to-text'' framework for sequence transduction (machine translation, document summarization). However, for pure open-ended text generation, maintaining two separate stacks doubles parameter memory overhead and requires executing cross-attention at every decoding step.
+    
+    \item \textbf{Decoder-only architectures (e.g., GPT \cite{radford2018}, GPT-2 \cite{radford2019}, GPT-3 \cite{brown2020})}:
+    Decoder-only models eliminate the encoder entirely, consisting of a single, stacked Transformer decoder equipped with \textbf{causal (lower-triangular) self-attention masking}:
+    \begin{equation}
+    \label{eq:causal_mask_matrix}
+    \mM_{i,j} = \begin{cases} 0 & \text{if } j \le i \\ -\infty & \text{if } j > i. \end{cases}
+    \end{equation}
+    The causal mask ensures that the representation of token $t$ depends strictly on tokens at positions $\le t$. Pre-training optimizes the \textbf{Causal Language Modeling (CLM)} objective, predicting the next token $w_t$ conditioned on historical prefix $w_{<t}$:
+    \begin{equation}
+    \label{eq:clm_objective_formal}
+    \Loss_{\text{CLM}}(\theta) = -\frac{1}{T} \sum_{t=1}^T \log \Prob_\theta(w_t \mid w_1, w_2, \dots, w_{t-1}).
+    \end{equation}
+\end{itemize}
+
+\begin{table}[htbp]
+\centering
+\small
+\caption{Comparison of the three primary Transformer architectural paradigms.}
+\label{tab:transformer_architectural_comparison}
+\begin{tabularx}{\textwidth}{lXXX}
+\toprule
+\textbf{Property} & \textbf{Encoder-Only (BERT)} & \textbf{Encoder-Decoder (T5)} & \textbf{Decoder-Only (GPT)} \\
+\midrule
+\textbf{Attention Pattern} & Fully bidirectional ($\mM = \mat{0}$) & Bidirectional encoder + Causal decoder + Cross-attn & Strictly causal lower-triangular ($\mM_{i,j} = -\infty$ for $j > i$) \\
+\addlinespace[3pt]
+\textbf{Pre-training Objective} & Masked LM ($\Loss_{\text{MLM}}$) + Next Sentence Prediction & Span corruption / Seq2Seq reconstruction & Causal LM / Next-token prediction ($\Loss_{\text{CLM}}$) \\
+\addlinespace[3pt]
+\textbf{Inference Mechanism} & Single-pass representation extraction & Autoregressive decoding over encoder representations & Autoregressive decoding with KV-cache \\
+\addlinespace[3pt]
+\textbf{Optimal Tasks} & Classification, NLI, NER, extractive QA & Translation, summarization, text transformation & Open-ended generation, reasoning, in-context learning \\
+\addlinespace[3pt]
+\textbf{KV-Cache Structure} & None (static forward pass) & Dual: static encoder KV + dynamic causal decoder KV & Unified dynamic causal KV cache \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\paragraph{Why decoder-only became the dominant foundation paradigm.}
+Although encoder-only and encoder-decoder models initially held state-of-the-art results across standard NLU benchmarks (such as GLUE and SuperGLUE), the generative AI revolution converged almost exclusively on the \textbf{decoder-only} architecture. This convergence stems from fundamental computational and algorithmic advantages:
+\begin{enumerate}
+    \item \textbf{Unified training and generative alignment}: Causal next-token prediction matches the physical inference process. Every training token serves as both input context and ground-truth target, maximizing data efficiency without requiring artificial mask tokens that induce train-test distribution mismatches.
+    \item \textbf{Simplified memory and KV caching}: In decoder-only models, key and value tensors for prior tokens are simply appended to a single, contiguous cache tensor ($\mK, \mV \in \R^{B \times H \times T \times d_k}$), avoiding the dual-cache synchronization required in encoder-decoder cross-attention.
+    \item \textbf{Emergence of in-context learning}: As model scale expands, the causal objective forces the model to encode implicit reasoning, syntactic parsing, and world knowledge into its left-to-right activation trajectory, enabling zero-shot and few-shot task execution without gradient updates.
+\end{enumerate}
+
+% ------------------------------------------------------------------------------
+\section{GPT-1: Generative pre-training and semi-supervised transfer}
+\label{sec:gpt1_architecture}
+
+\paragraph{The semi-supervised framework.}
+In 2018, Radford et al.~\cite{radford2018} published ``Improving Language Understanding by Generative Pre-Training'', introducing the original \textbf{GPT-1}. The central thesis of GPT-1 was a two-stage semi-supervised framework:
+\begin{enumerate}
+    \item \textbf{Stage 1: Unsupervised pre-training}: Train a high-capacity 12-layer decoder-only Transformer on a massive, unannotated corpus of contiguous text using causal next-token prediction to acquire general linguistic representations.
+    \item \textbf{Stage 2: Supervised fine-tuning}: Adapt the pre-trained model to specific downstream discriminative tasks by appending a lightweight task-specific linear classification head and fine-tuning all model weights on labeled data.
+\end{enumerate}
+
+\paragraph{Mathematical formalization of GPT-1 pre-training.}
+Let $\mathcal{U} = \{u_1, u_2, \dots, u_N\}$ denote an unlabeled corpus of discrete tokens. The unsupervised pre-training objective minimizes the negative log-likelihood over a sliding context window of size $k$:
 \begin{equation}
-\Loss_{\text{CLM}}(\theta) = -\frac{1}{T} \sum_{t=1}^T \log \Prob_\theta(w_t \mid w_{<t}).
+\label{eq:gpt1_unsupervised_loss}
+\Loss_1(\mathcal{U}) = -\sum_{i=1}^N \log \Prob(u_i \mid u_{i-k}, \dots, u_{i-1}; \Theta),
+\end{equation}
+where $\Theta$ represents the complete parameter set of the network.
+
+The forward computational pass through the GPT-1 architecture proceeds as follows:
+Given an input sequence of token indices $\vu = [u_{-k}, \dots, u_{-1}]$, the initial activation matrix $\mH_0 \in \R^{k \times d}$ is constructed by summing the token embedding matrix $\mW_e \in \R^{|\vocab| \times d}$ and the learned positional embedding matrix $\mW_p \in \R^{k \times d}$:
+\begin{equation}
+\label{eq:gpt1_input_representation}
+\mH_0 = \mU \mW_e + \mW_p,
+\end{equation}
+where $\mU \in \{0, 1\}^{k \times |\vocab|}$ is the one-hot indicator matrix of the input prefix.
+
+The activation tensor is then sequentially propagated through a stack of $L$ identical Transformer decoder blocks:
+\begin{equation}
+\label{eq:gpt1_layer_pass}
+\mH_l = \text{TransformerBlock}(\mH_{l-1}), \quad \forall l \in \{1, 2, \dots, L\}.
+\end{equation}
+Each GPT-1 block employs the original post-layer-normalization formulation:
+\begin{align}
+\mH'_l &= \LayerNorm\left( \mH_{l-1} + \MHA{\mH_{l-1}, \mH_{l-1}, \mH_{l-1}} \right), \\
+\mH_l &= \LayerNorm\left( \mH'_l + \text{FFN}(\mH'_l) \right),
+\end{align}
+where the Multi-Head Attention ($\MHA{\cdot}$) enforces causal masking $\mM_{i,j} = -\infty$ for $j > i$, and the position-wise feed-forward network uses the Gaussian Error Linear Unit ($\gelu$) activation:
+\begin{equation}
+\text{FFN}(\mX) = \gelu(\mX \mW_1 + \vb_1) \mW_2 + \vb_2, \quad \mW_1 \in \R^{d \times d_{\text{ff}}}, \; \mW_2 \in \R^{d_{\text{ff}} \times d}.
 \end{equation}
 
-\begin{definition}{Fill-in-the-Middle (FIM) objective}{fim_objective}
-For code generation, models often need to infill code between a prefix and suffix. The document $x$ is partitioned into Prefix ($P$), Middle ($M$), and Suffix ($S$), and rearranged into format:
+Finally, the categorical probability distribution over the vocabulary $\vocab$ for predicting the next token $u_i$ is computed by projecting the top hidden state $\mH_L[k] \in \R^d$ through the transpose of the embedding matrix (weight tying):
 \begin{equation}
-x_{\text{FIM}} = \langle\text{PRE}\rangle \, P \, \langle\text{SUF}\rangle \, S \, \langle\text{MID}\rangle \, M,
+\label{eq:gpt1_output_prob}
+\Prob(u_i \mid u_{i-k}, \dots, u_{i-1}) = \softmax\left( \mH_L[k] \mW_e^\top \right).
 \end{equation}
-enabling the standard causal decoder to predict $M$ conditioned on both $P$ and $S$.
-\end{definition}
 
-\section{Empirical scaling laws: Kaplan vs Chinchilla}
-\begin{theorem}{Compute-optimal scaling (Chinchilla)}{chinchilla_frontier}
-Given a compute budget $C \approx 6 N D$ FLOPs (for a standard Transformer forward-backward pass), Hoffmann et al. \citep{hoffmann2022} proved that to minimize cross-entropy loss $L(N, D)$, parameters $N$ and tokens $D$ should scale in equal proportion:
+\paragraph{Supervised fine-tuning with auxiliary language modeling.}
+In the second stage, the pre-trained Transformer is adapted to a labeled dataset $\mathcal{C}$, where each instance consists of an input sequence of tokens $\vx = [x_1, \dots, x_m]$ and a categorical target label $y \in \mathcal{Y}$.
+
+The sequence $\vx$ is passed through the pre-trained Transformer to obtain the final activation of the last token, $\vh_L^m \in \R^d$. A linear projection matrix $\mW_y \in \R^{d \times |\mathcal{Y}|}$ maps this hidden state to class logits:
 \begin{equation}
-\label{eq:chinchilla_opt}
-N_{\text{opt}} \propto C^{a}, \quad D_{\text{opt}} \propto C^{b}, \quad \text{with } a \approx b \approx 0.50.
+\label{eq:gpt1_supervised_prob}
+\Prob(y \mid x_1, \dots, x_m) = \softmax\left( \vh_L^m \mW_y \right).
+\end{equation}
+The supervised objective minimizes cross-entropy loss over $\mathcal{C}$:
+\begin{equation}
+\label{eq:gpt1_supervised_loss}
+\Loss_2(\mathcal{C}) = -\sum_{(\vx, y) \in \mathcal{C}} \log \Prob(y \mid x_1, \dots, x_m).
+\end{equation}
+
+Crucially, Radford et al.~\cite{radford2018} discovered that including an \textbf{auxiliary language modeling objective} during fine-tuning substantially improves generalization and prevents catastrophic forgetting of pre-trained syntactic representations:
+\begin{equation}
+\label{eq:gpt1_joint_loss}
+\Loss_3(\mathcal{C}) = \Loss_2(\mathcal{C}) + \lambda \Loss_1(\mathcal{C}),
+\end{equation}
+where $\lambda$ is a balancing hyperparameter (typically $\lambda = 0.5$).
+
+\paragraph{Task-specific input transformations.}
+A key architectural innovation of GPT-1 was the avoidance of custom architectural modifications for different downstream NLP tasks. Instead of designing specialized pooling or recurrent layers, all structured inputs were flattened into a single linear sequence using delimiter tokens (Start $\langle s \rangle$, Delimiter $\langle\text{delim}\rangle$, and Extract $\langle e \rangle$), as depicted in Figure~\ref{fig:gpt1_input_transformations}:
+\begin{itemize}
+    \item \textbf{Text Classification}: The input text is flanked by start and end delimiters: $[\langle s \rangle, \text{Sequence}, \langle e \rangle]$. The final state at $\langle e \rangle$ is fed into the classifier.
+    \item \textbf{Natural Language Inference (NLI)}: The premise and hypothesis are concatenated with a delimiter token: $[\langle s \rangle, \text{Premise}, \langle\text{delim}\rangle, \text{Hypothesis}, \langle e \rangle]$.
+    \item \textbf{Semantic Similarity / Paraphrasing}: Because similarity is symmetric, the input order should not matter. Two sequences are passed in parallel: $[\langle s \rangle, \text{Text 1}, \langle\text{delim}\rangle, \text{Text 2}, \langle e \rangle]$ and $[\langle s \rangle, \text{Text 2}, \langle\text{delim}\rangle, \text{Text 1}, \langle e \rangle]$. Their final extract representations are element-wise summed prior to classification.
+    \item \textbf{Multiple-Choice Question Answering}: For context $C$, question $Q$, and candidate answers $\{A_1, \dots, A_k\}$, $k$ separate sequences are formed: $[\langle s \rangle, C, \langle\text{delim}\rangle, Q, \langle\text{delim}\rangle, A_k, \langle e \rangle]$. Each sequence produces an extract representation projected to a scalar logit, normalized across all candidates via Softmax.
+\end{itemize}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    box/.style={draw=politoNavy, fill=skyBlue!40, rounded corners=3pt, font=\small\sffamily, align=center, inner sep=6pt, line width=0.8pt},
+    delim/.style={draw=crimsonRed, fill=crimsonRed!10, rounded corners=2pt, font=\footnotesize\ttfamily\bfseries, inner sep=4pt, line width=0.8pt},
+    arrow/.style={-{Stealth[scale=0.9]}, line width=1pt, draw=politoNavy}
+]
+
+% Classification
+\node[anchor=west, font=\bfseries\sffamily] at (0, 3.2) {Classification:};
+\node[delim] (c_start) at (3.5, 3.2) {$\langle s \rangle$};
+\node[box, right=4pt of c_start] (c_text) {Text Sequence};
+\node[delim, right=4pt of c_text] (c_end) {$\langle e \rangle$};
+\node[box, fill=thmGreenBg, draw=thmGreenLine, right=16pt of c_end] (c_trans) {Transformer};
+\node[box, fill=examAmberBg, draw=examAmberLine, right=16pt of c_trans] (c_clf) {Linear Classifier};
+\draw[arrow] (c_end) -- (c_trans);
+\draw[arrow] (c_trans) -- (c_clf);
+
+% Entailment
+\node[anchor=west, font=\bfseries\sffamily] at (0, 2.0) {Entailment (NLI):};
+\node[delim] (e_start) at (3.5, 2.0) {$\langle s \rangle$};
+\node[box, right=4pt of e_start] (e_prem) {Premise};
+\node[delim, right=4pt of e_prem] (e_del) {$\langle\text{delim}\rangle$};
+\node[box, right=4pt of e_del] (e_hyp) {Hypothesis};
+\node[delim, right=4pt of e_hyp] (e_end) {$\langle e \rangle$};
+\node[box, fill=thmGreenBg, draw=thmGreenLine, right=16pt of e_end] (e_trans) {Transformer};
+\node[box, fill=examAmberBg, draw=examAmberLine, right=16pt of e_trans] (e_clf) {Linear Classifier};
+\draw[arrow] (e_end) -- (e_trans);
+\draw[arrow] (e_trans) -- (e_clf);
+
+% Similarity
+\node[anchor=west, font=\bfseries\sffamily] at (0, 0.8) {Similarity:};
+\node[delim] (s_start) at (3.5, 0.8) {$\langle s \rangle$};
+\node[box, right=4pt of s_start] (s_t1) {Text 1};
+\node[delim, right=4pt of s_t1] (s_del) {$\langle\text{delim}\rangle$};
+\node[box, right=4pt of s_del] (s_t2) {Text 2};
+\node[delim, right=4pt of s_t2] (s_end) {$\langle e \rangle$};
+\node[box, fill=thmGreenBg, draw=thmGreenLine, right=16pt of s_end] (s_trans) {Transformer};
+\node[circle, draw=politoNavy, fill=white, inner sep=2pt, right=12pt of s_trans] (s_plus) {$+$};
+\node[box, fill=examAmberBg, draw=examAmberLine, right=12pt of s_plus] (s_clf) {Linear Classifier};
+\draw[arrow] (s_end) -- (s_trans);
+\draw[arrow] (s_trans) -- (s_plus);
+\draw[arrow] (s_plus) -- (s_clf);
+
+\end{tikzpicture}
+\caption{GPT-1 task-specific input transformations. By formatting structured inputs with special delimiter tokens ($\langle s \rangle, \langle\text{delim}\rangle, \langle e \rangle$), a universal Transformer backbone processes diverse NLP tasks without custom architectural modifications.}
+\label{fig:gpt1_input_transformations}
+\end{figure}
+
+\paragraph{GPT-1 architectural specifications and training setup.}
+The physical configuration of GPT-1 was established as follows:
+\begin{itemize}
+    \item \textbf{Model Dimensions}: $L = 12$ layers, $H = 12$ attention heads, hidden embedding dimension $d = 768$, and intermediate feed-forward dimension $d_{\text{ff}} = 3072$, totaling approximately $117 \times 10^6$ parameters (117M).
+    \item \textbf{Context and Positional Embeddings}: Maximum context length $T = 512$ tokens, using learned absolute positional embeddings $\mW_p \in \R^{512 \times 768}$.
+    \item \textbf{Tokenization}: Byte-Pair Encoding (BPE) vocabulary with 40,000 merge operations.
+    \item \textbf{Pre-training Corpus}: The \textbf{BooksCorpus} dataset, containing over 7,000 unpublished fiction books totaling approximately 5~GB of raw text. Crucially, BooksCorpus provided long, contiguous passages of prose, enabling the model to condition on extended historical context and learn long-range semantic dependencies.
+\end{itemize}
+
+% ------------------------------------------------------------------------------
+\section{GPT-2: Language models are unsupervised multitask learners}
+\label{sec:gpt2_architecture}
+
+\paragraph{The zero-shot multitask hypothesis.}
+While GPT-1 demonstrated the power of pre-training, it still relied fundamentally on supervised fine-tuning: for every target task, practitioners had to collect labeled examples, initialize new linear projection heads, and perform backpropagation to update the model weights.
+
+In 2019, Radford et al.~\cite{radford2019} released GPT-2 with the landmark paper ``Language Models are Unsupervised Multitask Learners''. GPT-2 introduced a radical paradigm shift: \textbf{zero fine-tuning}. The authors hypothesized that sufficiently high-capacity language models trained on diverse, naturalistic text corpora naturally learn to perform multiple downstream tasks \emph{without any parameter updates} ($\nabla_\theta = \mathbf{0}$).
+
+Mathematically, supervised learning estimates the conditional distribution $\Prob(\text{target} \mid \text{input})$. Multitask learning conditions additionally on the task identifier: $\Prob(\text{target} \mid \text{input}, \text{task})$. Radford et al. posited that in natural language, both the input and the task description can be framed as a single unified sequence of tokens. For example:
+\begin{itemize}
+    \item \textbf{Machine Translation}: $\vx = \text{"Translate English to French: The book is on the table =>"}$
+    \item \textbf{Summarization}: $\vx = \text{"[Article text] TL;DR:"}$
+    \item \textbf{Reading Comprehension}: $\vx = \text{"[Passage] Q: What color was the car? A:"}$
+\end{itemize}
+By simply continuing the sequence autoregressively, the language model solves the specified task.
+
+\paragraph{Dataset curation: the WebText corpus.}
+Pre-training GPT-1 on BooksCorpus limited the model's exposure to diverse writing styles, non-fiction reasoning, code, and dialogue. To support generalist multitask emergence, GPT-2 required a radically larger and more diverse corpus.
+
+However, naive web scraping (such as raw Common Crawl) contains vast amounts of low-quality text, repetitive programmatic spam, duplicate marketing copy, and machine-translated gibberish. Radford et al. engineered an elegant, human-curated filtering heuristic:
+\begin{itemize}
+    \item They scraped all outbound web links submitted to the social news platform \textbf{Reddit}.
+    \item They filtered exclusively for links originating from posts that received at least \textbf{3 karma upvotes}.
+    \item The karma threshold served as an automated human curation heuristic, selecting content that human users found interesting, informative, or well-written.
+    \item The resulting dataset, named \textbf{WebText}, encompassed text from over 45 million links, totaling approximately 40~GB of high-quality text (an $8\times$ expansion over BooksCorpus).
+    \item Importantly, Wikipedia articles were explicitly filtered out of WebText to test whether the model could generalize to unseen encyclopedic domains during evaluation.
+\end{itemize}
+
+\paragraph{Architectural evolution from GPT-1 to GPT-2.}
+While preserving the core causal decoder-only Transformer backbone, GPT-2 introduced critical architectural refinements to stabilize training at larger scales, as illustrated in Figure~\ref{fig:prenorm_vs_postnorm}:
+\begin{enumerate}
+    \item \textbf{Pre-Layer Normalization (Pre-LN)}: In GPT-1 (Post-LN), normalization occurred after the residual addition: $\vx_{l} = \LayerNorm(\vx_{l-1} + \text{SubLayer}(\vx_{l-1}))$. At deep layer counts ($L \ge 24$), gradients passing through the unnormalized residual additions can explode or vanish during early training phases. GPT-2 adopted Pre-LN, applying normalization to the input of each sub-block:
+    \begin{equation}
+    \label{eq:pre_layer_norm}
+    \vx'_{l} = \vx_{l-1} + \text{SubLayer}(\LayerNorm(\vx_{l-1})).
+    \end{equation}
+    An additional final LayerNorm was appended after the final self-attention layer prior to the projection head.
+    \item \textbf{Residual projection scaling}: To prevent variance from accumulating across the residual stream as depth increases, the weights of the residual projection layers at initialization were scaled by a factor of:
+    \begin{equation}
+    \label{eq:residual_scaling}
+    \gamma = \frac{1}{\sqrt{2 N_{\text{layer}}}},
+    \end{equation}
+    where $N_{\text{layer}}$ is the total number of decoder blocks.
+    \item \textbf{Byte-level Byte-Pair Encoding (BPE)}: GPT-1 used character-level BPE with 40,000 merges, which frequently encountered out-of-vocabulary ($\langle\text{UNK}\rangle$) tokens when processing foreign characters or code symbols. GPT-2 implemented \textbf{byte-level BPE} operating over raw UTF-8 bytes with a vocabulary of 50,257 tokens. This prevented any token from being mapped to out-of-vocabulary, while regex heuristics prevented BPE from merging across distinct character categories (such as punctuation and alphabetic characters).
+    \item \textbf{Expanded context and batch capacity}: Context length was doubled from $T = 512$ to $T = 1024$ tokens, and the training batch size was scaled to 512 sequences (524,288 tokens per batch).
+\end{enumerate}
+
+\begin{figure}[htbp]
+\centering
+\begin{subfigure}[b]{0.45\textwidth}
+\centering
+\begin{tikzpicture}[
+    box/.style={draw=politoNavy, fill=skyBlue!40, rounded corners=3pt, font=\small\sffamily, align=center, inner sep=5pt, minimum width=2.6cm, line width=0.8pt},
+    norm/.style={draw=crimsonRed, fill=crimsonRed!15, rounded corners=3pt, font=\small\sffamily\bfseries, align=center, inner sep=5pt, minimum width=2.6cm, line width=0.8pt},
+    arrow/.style={-{Stealth[scale=0.9]}, line width=1pt, draw=politoNavy}
+]
+\node[font=\bfseries\sffamily] at (1.5, 5.2) {Post-LN (GPT-1)};
+\node[box] (sub) at (1.5, 3.8) {SubLayer\\(Self-Attn / MLP)};
+\node[circle, draw=politoNavy, fill=white, inner sep=2pt] (add) at (1.5, 2.5) {$+$};
+\node[norm] (ln) at (1.5, 1.2) {LayerNorm};
+
+\draw[arrow] (1.5, 4.8) -- (sub);
+\draw[arrow] (sub) -- (add);
+\draw[arrow] (add) -- (ln);
+\draw[arrow] (ln) -- (1.5, 0.2);
+\draw[arrow] (1.5, 4.6) -- ++(1.5, 0) -- ++(0, -2.1) -- (add);
+\end{tikzpicture}
+\caption{Post-LN (GPT-1): Normalization follows residual addition.}
+\label{fig:post_ln}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.45\textwidth}
+\centering
+\begin{tikzpicture}[
+    box/.style={draw=politoNavy, fill=skyBlue!40, rounded corners=3pt, font=\small\sffamily, align=center, inner sep=5pt, minimum width=2.6cm, line width=0.8pt},
+    norm/.style={draw=crimsonRed, fill=crimsonRed!15, rounded corners=3pt, font=\small\sffamily\bfseries, align=center, inner sep=5pt, minimum width=2.6cm, line width=0.8pt},
+    arrow/.style={-{Stealth[scale=0.9]}, line width=1pt, draw=politoNavy}
+]
+\node[font=\bfseries\sffamily] at (1.5, 5.2) {Pre-LN (GPT-2 / Modern)};
+\node[norm] (ln) at (1.5, 3.8) {LayerNorm};
+\node[box] (sub) at (1.5, 2.5) {SubLayer\\(Self-Attn / MLP)};
+\node[circle, draw=politoNavy, fill=white, inner sep=2pt] (add) at (1.5, 1.2) {$+$};
+
+\draw[arrow] (1.5, 4.8) -- (ln);
+\draw[arrow] (ln) -- (sub);
+\draw[arrow] (sub) -- (add);
+\draw[arrow] (add) -- (1.5, 0.2);
+\draw[arrow] (1.5, 4.6) -- ++(1.5, 0) -- ++(0, -3.4) -- (add);
+\end{tikzpicture}
+\caption{Pre-LN (GPT-2): Normalization precedes sub-layer computation.}
+\label{fig:pre_ln}
+\end{subfigure}
+\caption{Structural comparison between Post-LN and Pre-LN Transformer blocks. Pre-LN maintains a clean identity residual highway, preventing vanishing and exploding gradients in deep networks.}
+\label{fig:prenorm_vs_postnorm}
+\end{figure}
+
+\paragraph{Model family scaling and zero-shot performance.}
+GPT-2 was released across four distinct model scales, demonstrating continuous, predictable performance scaling as parameter count grew:
+\begin{itemize}
+    \item \textbf{GPT-2 Small}: 117M parameters ($L = 12, d = 768, H = 12$) --- identical in size to GPT-1.
+    \item \textbf{GPT-2 Medium}: 345M parameters ($L = 24, d = 1024, H = 16$).
+    \item \textbf{GPT-2 Large}: 762M parameters ($L = 36, d = 1280, H = 20$).
+    \item \textbf{GPT-2 Extra Large (1.5B)}: 1542M parameters ($L = 48, d = 1600, H = 25$).
+\end{itemize}
+
+Empirically, Radford et al.~\cite{radford2019} observed that \emph{perplexity decreased log-linearly with model capacity across all evaluation benchmarks}. Furthermore, without any task-specific fine-tuning:
+\begin{itemize}
+    \item On language modeling benchmarks (WikiText-103, LAMBADA), GPT-2 established new state-of-the-art perplexities in zero-shot settings, beating supervised models.
+    \item On reading comprehension (CoQA), the 1.5B model achieved an F1 score of 55, matching or outperforming baseline supervised models.
+    \item On French-to-English translation, prompting with simple natural language exemplars yielded 11.5 BLEU, outperforming several unsupervised translation baselines despite having almost no French in WebText.
+\end{itemize}
+
+\paragraph{The staged release controversy.}
+In February 2019, OpenAI announced GPT-2 alongside a controversial decision: they declined to release the full 1.5B parameter weights, citing concerns over dual-use technology and potential malicious applications, such as the automated generation of deceptive political disinformation, spam, and synthetic abusive content. They initially published only the 117M model and technical paper. 
+
+Over the subsequent nine months, OpenAI conducted staged incremental releases: the 345M model in May 2019, the 762M model in August 2019, and finally the complete 1.5B model in November 2019. While this staged release drew sharp initial criticism from open-source advocates, it marked the historical inception of AI safety discourse, model governance protocols, and modern alignment concerns surrounding high-capacity foundation models.
+
+% ------------------------------------------------------------------------------
+\section{Empirical scaling laws: the Kaplan formulation}
+\label{sec:kaplan_scaling_laws}
+
+\paragraph{The quest for predictive principles.}
+Prior to 2020, scaling neural networks was largely an empirical art driven by intuition and trial-and-error. Researchers lacked quantitative formulas to answer fundamental engineering questions: \emph{If compute budget increases by $100\times$, how much should we expand model parameters versus training dataset size? Does network depth matter more than width? Is training to full convergence optimal?}
+
+In January 2020, Kaplan et al.~\cite{kaplan2020} from OpenAI published the landmark paper ``Scaling Laws for Neural Language Models''. By training dozens of autoregressive Transformer models spanning over four orders of magnitude in compute, three orders of magnitude in dataset size, and three orders of magnitude in parameter count, the authors demonstrated that \textbf{language model performance follows precise, predictable power laws} over immense dynamic ranges.
+
+\paragraph{The fundamental power laws.}
+When model performance is not bottlenecked by any single resource constraint (such as data exhaustion or inadequate parameter capacity), the test cross-entropy loss $\Loss$ adheres to power-law scaling relationships:
+\begin{align}
+\label{eq:kaplan_param_scaling}
+\Loss(N) &\approx \left( \frac{N_c}{N} \right)^{\alpha_N}, \quad \text{for unlimited data } D \text{ and compute } C, \\
+\label{eq:kaplan_data_scaling}
+\Loss(D) &\approx \left( \frac{D_c}{D} \right)^{\alpha_D}, \quad \text{for unlimited parameters } N \text{ and compute } C, \\
+\label{eq:kaplan_compute_scaling}
+\Loss(C) &\approx \left( \frac{C_c}{C} \right)^{\alpha_C}, \quad \text{for optimal allocation of } N \text{ and } D,
+\end{align}
+where:
+\begin{itemize}
+    \item $N$ is the number of non-embedding parameters.
+    \item $D$ is the number of training tokens.
+    \item $C$ is the total training compute expressed in floating-point operations (FLOPs).
+    \item $N_c, D_c, C_c$ are normalization constants, and $\alpha_N, \alpha_D, \alpha_C$ are scaling exponents.
+\end{itemize}
+Kaplan et al. empirically estimated the power-law exponents for autoregressive language modeling as:
+\begin{equation}
+\alpha_N \approx 0.076, \quad \alpha_D \approx 0.095, \quad \alpha_C \approx 0.050.
+\end{equation}
+
+\paragraph{Weak dependence on architectural hyperparameters.}
+A striking finding of Kaplan et al. was that performance depends \textbf{very weakly} on detailed architectural hyperparameters:
+\begin{itemize}
+    \item \textbf{Depth versus width}: For a fixed parameter count $N$, varying the ratio between the number of layers $n_{\text{layer}}$ and the hidden embedding dimension $d_{\text{model}}$ over a wide range has negligible impact on cross-entropy loss.
+    \item \textbf{Attention heads}: Varying the number of attention heads $H$ (or per-head dimension $d_k$) produces virtually identical loss trajectories.
+    \item \textbf{Feed-forward dimension}: Altering the feed-forward multiplier $d_{\text{ff}} / d_{\text{model}}$ produces minimal deviation.
+\end{itemize}
+The fundamental implication is that \textbf{scale dominates shape}: macroscopic resource allocation ($N, D, C$) dictates model performance, while microscopic architectural tuning yields only minor second-order effects.
+
+\paragraph{Transformer floating-point arithmetic ($C \approx 6ND$).}
+To analyze compute-optimal allocation, we must establish the physical relationship between floating-point operations, model parameters, and training tokens.
+
+\begin{theorem}{Transformer compute budget}{transformer_flop_budget}
+For a standard Transformer decoder consisting of $N$ non-embedding parameters trained on $D$ tokens, the total training compute $C$ (in FLOPs) is given by:
+\begin{equation}
+\label{eq:6nd_formulation}
+C \approx 6 N D.
 \end{equation}
 \end{theorem}
 
-\begin{examinsight}[Exam comparison: Kaplan (2020) vs Hoffmann (2022)]
-Students frequently face exam questions contrasting the OpenAI scaling laws (Kaplan et al., 2020) with DeepMind's Chinchilla findings (Hoffmann et al., 2022).
+\begin{proof}
+Consider a general linear matrix multiplication $\mY = \mX \mW$, where input activations $\mX \in \R^{B \times d_{\text{in}}}$ and weight matrix $\mW \in \R^{d_{\text{in}} \times d_{\text{out}}}$. 
+Computing each scalar entry of $\mY$ requires $d_{\text{in}}$ multiplications and $d_{\text{in}}$ additions, totaling $2 d_{\text{in}}$ floating-point operations. The matrix has $d_{\text{in}} \times d_{\text{out}}$ parameters and produces $B \times d_{\text{out}}$ outputs. Thus, processing 1 token through $\mW$ requires:
+\begin{equation}
+\text{FLOPs}_{\text{forward}} = 2 \times (\text{number of parameters}).
+\end{equation}
+Summing across all linear projections in the multi-head attention blocks ($\mW_Q, \mW_K, \mW_V, \mW_O$) and feed-forward networks ($\mW_1, \mW_2$), the forward pass requires:
+\begin{equation}
+C_{\text{forward}} \approx 2 N \text{ FLOPs per token}.
+\end{equation}
+In the backward pass (backpropagation), gradients must be computed with respect to both the activations (to propagate error backward) and the weight parameters (to update weights):
 \begin{itemize}
-    \item \textbf{Kaplan et al. (2020)}: Concluded that model size should scale much faster than dataset size ($N \propto C^{0.73}, D \propto C^{0.27}$). This led to over-parameterized models like GPT-3 (175B parameters trained on only 300B tokens).
-    \item \textbf{Hoffmann et al. (2022)}: Corrected the learning rate schedule analysis, demonstrating that $N$ and $D$ should scale \textbf{equally} ($N \propto \sqrt{C}, D \propto \sqrt{C}$). A compute-optimal 70B model requires $\approx 1.4$ trillion tokens.
+    \item Gradient with respect to activations: $\frac{\partial \Loss}{\partial \mX} = \frac{\partial \Loss}{\partial \mY} \mW^\top \implies 2 N \text{ FLOPs per token}$.
+    \item Gradient with respect to weights: $\frac{\partial \Loss}{\partial \mW} = \mX^\top \frac{\partial \Loss}{\partial \mY} \implies 2 N \text{ FLOPs per token}$.
 \end{itemize}
-\end{examinsight}
+Thus, the backward pass requires twice the compute of the forward pass:
+\begin{equation}
+C_{\text{backward}} \approx 4 N \text{ FLOPs per token}.
+\end{equation}
+Summing forward and backward passes yields the standard total:
+\begin{equation}
+C_{\text{total}} = C_{\text{forward}} + C_{\text{backward}} \approx 2 N D + 4 N D = 6 N D.
+\end{equation}
+\end{proof}
 
-\begin{deepdive}[From GPT-3 to modern foundation models]
-Brown et al. \citep{brown2020} demonstrated that scaling pure autoregressive models yields striking few-shot and in-context learning capabilities without parameter updates. Modern open-weights foundation models adhere to Chinchilla scaling principles, training models for many more tokens beyond the compute-optimal frontier to optimize downstream inference efficiency.
-\end{deepdive}
+\paragraph{The Kaplan compute allocation rule.}
+Given a fixed compute budget $C \approx 6ND$, how should resources be divided between model size $N$ and token count $D$?
+Kaplan et al. derived the following empirical optimal scaling relationships:
+\begin{equation}
+\label{eq:kaplan_optimal_scaling}
+N_{\text{opt}} \propto C^{0.73}, \quad B_{\text{opt}} \propto C^{0.24}, \quad S_{\text{opt}} \propto C^{0.03},
+\end{equation}
+where $B$ is the critical batch size and $S$ is the number of optimization steps. 
+Since dataset size is the product of batch size and steps, $D = B \times S$:
+\begin{equation}
+\label{eq:kaplan_dataset_scaling}
+D_{\text{opt}} = B_{\text{opt}} \times S_{\text{opt}} \propto C^{0.24 + 0.03} = C^{0.27}.
+\end{equation}
+
+\begin{intuition}[The Kaplan takeaway: scale models, not data]
+The exponents $N \propto C^{0.73}$ and $D \propto C^{0.27}$ deliver a startling engineering conclusion:
+If the computational budget $C$ is scaled by a factor of $10\times$:
+\begin{itemize}
+    \item Model parameters should expand by: $10^{0.73} \approx 5.37\times$.
+    \item Training tokens should expand by only: $10^{0.27} \approx 1.86\times$.
+    \item Optimization steps increase by: $10^{0.03} \approx 1.07\times$.
+\end{itemize}
+Kaplan et al. explicitly advised the field: \emph{``As computational budget $C$ increases, it should be spent primarily on larger models, without dramatic increases in training time or dataset size.''}
+\end{intuition}
+
+This paper became the gospel of the AI industry between 2020 and 2022. It directly catalyzed the global race to build massive models with hundreds of billions of parameters, while keeping training datasets relatively static at roughly 300 billion tokens.
+
+% ------------------------------------------------------------------------------
+\section{GPT-3: In-context learning and the few-shot revolution}
+\label{sec:gpt3_architecture}
+
+\paragraph{The jump to 175 billion parameters.}
+Armed with Kaplan's scaling laws, OpenAI developed and released \textbf{GPT-3} in June 2020 with the monumental paper ``Language Models are Few-Shot Learners'' by Brown et al.~\cite{brown2020}. 
+GPT-3 scaled the autoregressive Transformer architecture by an order of magnitude:
+\begin{itemize}
+    \item \textbf{Parameters}: 175 billion ($175 \times 10^9$) parameters---over $100\times$ larger than GPT-2 Extra Large (1.5B).
+    \item \textbf{Architecture}: $L = 96$ layers, $H = 96$ attention heads, hidden state dimension $d = 12,288$, context window $T = 2048$ tokens.
+    \item \textbf{Alternating Dense and Locally Banded Sparse Attention}: Similar to the Sparse Transformer, GPT-3 alternated between standard dense multi-head attention and locally banded sparse attention patterns to accelerate long-sequence processing.
+\end{itemize}
+
+\paragraph{Massive dataset filtering and composition.}
+To train a 175B model without catastrophic overfitting, OpenAI curated a pre-training corpus spanning hundreds of billions of tokens. Recognizing that raw web crawls contain overwhelming quantities of low-quality text, the authors built an aggressive multi-stage filtering pipeline:
+\begin{enumerate}
+    \item \textbf{Quality Classifier Filtering}: A high-quality reference corpus (WebText) was used to train a logistic regression classifier with word and sentence-level features to distinguish high-quality prose from low-quality web garbage. Common Crawl was filtered through this classifier, discarding over 98\% of raw pages (compressing 45~TB of raw text into 570~GB of filtered text).
+    \item \textbf{Fuzzy MinHash Deduplication}: MinHash LSH was applied to remove duplicate and near-duplicate web documents.
+    \item \textbf{High-Quality Dataset Blending}: The final pre-training mixture combined Filtered Common Crawl (410B tokens), WebText2 (19B tokens), Books1 (12B tokens), Books2 (55B tokens), and English Wikipedia (3B tokens), totaling approximately 300 billion training tokens. Sources were sampled according to perceived quality rather than raw volume (e.g., Wikipedia was sampled $3.4\times$ per epoch, whereas Common Crawl was sampled $0.44\times$).
+\end{enumerate}
+
+\paragraph{The in-context learning paradigm: zero-shot, one-shot, and few-shot.}
+The central discovery of GPT-3 was the triumph of \textbf{In-Context Learning (ICL)}. 
+Prior to GPT-3, applying a pre-trained model to a task required fine-tuning:
+\begin{equation}
+\label{eq:fine_tuning_update}
+\theta_{t+1} = \theta_t - \eta \nabla_\theta \Loss_{\text{task}}(\theta_t),
+\end{equation}
+updating millions of parameters via gradient descent on task-specific training data.
+
+In contrast, in-context learning leaves the model parameters \textbf{completely frozen}:
+\begin{equation}
+\label{eq:icl_frozen_weights}
+\nabla_\theta = \mathbf{0}.
+\end{equation}
+The model is prompted with a natural language task description and zero, one, or several input-output demonstration exemplars entirely within the input prompt context $\vx_{\text{prompt}}$, as illustrated in Figure~\ref{fig:in_context_learning_modalities}:
+\begin{itemize}
+    \item \textbf{Zero-Shot}: The model receives only a natural language instruction describing the task:
+    \begin{lstlisting}[style=terminalOutput]
+Translate English to French:
+cheese =>
+    \end{lstlisting}
+    \item \textbf{One-Shot}: The model receives the instruction followed by exactly one demonstration exemplar:
+    \begin{lstlisting}[style=terminalOutput]
+Translate English to French:
+sea otter => loutre de mer
+cheese =>
+    \end{lstlisting}
+    \item \textbf{Few-Shot}: The model receives the instruction and $k$ demonstration pairs (typically $10 \le k \le 100$, bounded by the maximum context window $T = 2048$):
+    \begin{lstlisting}[style=terminalOutput]
+Translate English to French:
+sea otter => loutre de mer
+peppermint => menthe poivree
+plush giraffe => girafe en peluche
+cheese =>
+    \end{lstlisting}
+\end{itemize}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    modebox/.style={draw=politoNavy, fill=skyBlue!30, rounded corners=4pt, font=\small\sffamily, align=left, inner sep=8pt, line width=0.9pt},
+    header/.style={font=\bfseries\sffamily\color{politoNavy}}
+]
+
+% Zero-Shot
+\node[modebox, text width=4.4cm] (zero) at (0, 0) {
+    \textbf{Zero-Shot}\\[4pt]
+    \footnotesize
+    \textbf{Prompt:}\\
+    \texttt{Translate English to French:}\\
+    \texttt{cheese =>}\\[4pt]
+    \textbf{Model output:} \textcolor{thmGreen}{\texttt{fromage}}\\
+    \rule{\linewidth}{0.4pt}\\
+    No exemplars provided. Conditioned solely on instruction.
+};
+
+% One-Shot
+\node[modebox, text width=4.4cm, right=14pt of zero] (one) {
+    \textbf{One-Shot}\\[4pt]
+    \footnotesize
+    \textbf{Prompt:}\\
+    \texttt{Translate English to French:}\\
+    \texttt{sea otter => loutre de mer}\\
+    \texttt{cheese =>}\\[4pt]
+    \textbf{Model output:} \textcolor{thmGreen}{\texttt{fromage}}\\
+    \rule{\linewidth}{0.4pt}\\
+    Exactly 1 exemplar demonstrates formatting and task semantics.
+};
+
+% Few-Shot
+\node[modebox, text width=4.4cm, right=14pt of one] (few) {
+    \textbf{Few-Shot}\\[4pt]
+    \footnotesize
+    \textbf{Prompt:}\\
+    \texttt{Translate English to French:}\\
+    \texttt{sea otter => loutre de mer}\\
+    \texttt{peppermint => menthe poivree}\\
+    \texttt{cheese =>}\\[4pt]
+    \textbf{Model output:} \textcolor{thmGreen}{\texttt{fromage}}\\
+    \rule{\linewidth}{0.4pt}\\
+    $k$ exemplars allow in-context meta-learning without gradient descent.
+};
+
+\end{tikzpicture}
+\caption{The three in-context learning evaluation modalities introduced in GPT-3. Model weights remain strictly frozen ($\nabla_\theta = \mathbf{0}$) across all three regimes.}
+\label{fig:in_context_learning_modalities}
+\end{figure}
+
+\paragraph{Empirical takeaways: scaling and the few-shot revolution.}
+The empirical findings of Brown et al.~\cite{brown2020} yielded several profound takeaways that redefined NLP research:
+\begin{enumerate}
+    \item \textbf{The power of few-shot prompting}: Across virtually every benchmark, the performance gap between zero-shot and one-shot was massive, with few-shot prompting achieving substantial further gains. Providing even a single demonstration exemplar dramatically clarifies the expected output format and task semantics.
+    \item \textbf{Beating fine-tuned state of the art}: On demanding closed-book QA benchmarks such as TriviaQA (64.3\% accuracy) and WebQuestions, GPT-3 175B in the few-shot setting \textbf{matched or exceeded state-of-the-art models that had been explicitly fine-tuned on the task training set} (e.g., T5-11B). Scaling the model eliminated the need for task-specific fine-tuning datasets.
+    \item \textbf{Emergent reasoning abilities}: While smaller models (under 10B parameters) achieved near-zero accuracy on complex multi-digit arithmetic (e.g., 3-digit addition, subtraction), anagram unscrambling, and synthetic word manipulation, GPT-3 175B demonstrated sudden, qualitative leaps in accuracy.
+\end{enumerate}
+
+% ==============================================================================
+% PART II: THE SCALING FRONTIER, CHINCHILLA OPTIMALITY, AND THE OPEN ECOSYSTEM
+% ==============================================================================
+
+\section{The race to half-trillion parameter giants (2020--2022)}
+\label{sec:race_to_scale}
+
+Following the release of GPT-3 and the widespread adoption of Kaplan's scaling laws ($N \propto C^{0.73}, D \propto C^{0.27}$), the global AI research community entered a period of frantic model expansion. Research institutions concluded that the primary path to superior intelligence was expanding parameter count while holding training tokens roughly constant at approximately 300 billion tokens.
+
+Between 2020 and early 2022, several colossal models were trained:
+\begin{itemize}
+    \item \textbf{Jurassic-1 (AI21 Labs, 2021) \cite{lieber2021jurassic}}:
+    A 178-billion-parameter autoregressive model featuring an expanded vocabulary of 250,000 subword tokens (including multi-word expressions) and trained on 300 billion tokens.
+    \item \textbf{Gopher (DeepMind, Dec 2021) \cite{rae2021gopher}}:
+    A 280-billion-parameter model ($L = 80, d = 16,384, H = 128$) trained on the MassiveText corpus (300 billion tokens) using $5.76 \times 10^{23}$ FLOPs. The Gopher publication spanned an unprecedented 120 pages: pages 1--7 presented the architecture, while pages 8--120 documented an exhaustive analysis of capabilities, hallucinations, bias, and toxic text generation, establishing the modern format for foundation model technical reports.
+    \item \textbf{Megatron-Turing NLG (Microsoft \& NVIDIA, Oct 2021) \cite{smith2022mtnlg}}:
+    A massive 530-billion-parameter model ($L = 105, d = 20,480, H = 128$) trained on 270 billion tokens. Training MT-NLG pushed distributed hardware to its limits, requiring 3D parallelism: combining 8-way Megatron tensor parallelism, 35-way pipeline parallelism across DeepSpeed, and 8-way data parallelism across 2,240 NVIDIA A100 GPUs.
+    \item \textbf{PaLM (Google Pathways, April 2022) \cite{chowdhery2023palm}}:
+    A 540-billion-parameter model ($L = 118, d = 18,432, H = 48$) trained on 780 billion tokens across 6,144 TPU v4 chips using the Pathways system. PaLM introduced SwiGLU activations, parallel attention-MLP layers, and Rotary Position Embeddings (RoPE), achieving breakthrough performance on mathematical reasoning (GSM8K) and code generation.
+\end{itemize}
+
+\begin{table}[htbp]
+\centering
+\small
+\caption{The race to scale: Landmark dense foundation models trained between 2020 and 2022.}
+\label{tab:giant_models_comparison}
+\begin{tabularx}{\textwidth}{lXcccc}
+\toprule
+\textbf{Model} & \textbf{Organization} & \textbf{Release} & \textbf{Params ($N$)} & \textbf{Tokens ($D$)} & \textbf{Compute ($C$ FLOPs)} \\
+\midrule
+\textbf{GPT-3} & OpenAI & Jun 2020 & 175B & 300B & $3.15 \times 10^{23}$ \\
+\textbf{Jurassic-1} & AI21 Labs & Sep 2021 & 178B & 300B & $3.20 \times 10^{23}$ \\
+\textbf{Megatron-Turing} & NVIDIA / MS & Oct 2021 & 530B & 270B & $8.58 \times 10^{23}$ \\
+\textbf{Gopher} & DeepMind & Dec 2021 & 280B & 300B & $5.76 \times 10^{23}$ \\
+\textbf{PaLM} & Google & Apr 2022 & 540B & 780B & $2.53 \times 10^{24}$ \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Every one of these landmark architectures followed the Kaplan paradigm: model parameters had grown by $4.5\times$ (from 117M in GPT-1 to 540B in PaLM), yet the training datasets remained stubbornly constrained to 300--780 billion tokens. 
+
+% ------------------------------------------------------------------------------
+\section{DeepMind Chinchilla: resolving the undertraining dilemma}
+\label{sec:chinchilla_optimality}
+
+\paragraph{The breakthrough publication.}
+In March 2022, Jordan Hoffmann, Sebastian Borgeaud, Arthur Mensch, and colleagues at DeepMind published one of the most influential papers in modern artificial intelligence: \textbf{``Training Compute-Optimal Large Language Models''} \cite{hoffmann2022}.
+
+The central claim of the Chinchilla paper shattered the prevailing industry consensus:
+\begin{quote}
+\emph{``We find that current large language models are significantly under-trained, a consequence of the recent focus on scaling language models whilst keeping the amount of training data constant\dots For every doubling of model size, the number of training tokens should also be doubled.''}
+\end{quote}
+
+DeepMind proved that the conclusions of Kaplan et al.~\cite{kaplan2020} were mathematically and empirically flawed. OpenAI had concluded that $N \propto C^{0.73}$ and $D \propto C^{0.27}$, which placed overwhelming priority on parameter growth. DeepMind proved that the true compute-optimal allocation requires \textbf{equal scaling}:
+\begin{equation}
+\label{eq:equal_scaling_rule}
+N_{\text{opt}} \propto \sqrt{C}, \quad D_{\text{opt}} \propto \sqrt{C}.
+\end{equation}
+
+\paragraph{Why did Kaplan et al. get it wrong?}
+How could a rigorous empirical study by OpenAI reach an incorrect scaling law? DeepMind identified two critical methodological flaws in Kaplan's experimental setup:
+\begin{enumerate}
+    \item \textbf{Suboptimal learning rate schedules}: Kaplan et al. held the cosine learning rate schedule length fixed to a constant number of steps (or decayed learning rates according to a generic schedule) rather than tuning the schedule length to match the exact training duration of each run. In cosine decay schedules, a significant fraction of loss reduction occurs during the final decay phase down to 10\% of the maximum learning rate. Evaluating models before or after this optimal decay window systematically penalized smaller models, making them appear less compute-efficient than they actually were.
+    \item \textbf{Non-embedding FLOP definitions}: Kaplan et al. excluded embedding matrix parameters when calculating compute budgets, which distorted the relative parameter-to-token ratio at smaller model scales.
+\end{enumerate}
+
+% ------------------------------------------------------------------------------
+\section{The three analytical approaches to compute optimality}
+\label{sec:three_approaches}
+
+To determine the true compute-optimal scaling frontier, Hoffmann et al.~\cite{hoffmann2022} conducted an exhaustive empirical campaign, training over 400 models varying in size from 70 million to over 16 billion parameters and trained on 5 billion to 500 billion tokens. To ensure incontrovertible mathematical validity, they derived the scaling frontier using \textbf{three independent, complementary analytical approaches}.
+
+\paragraph{Approach 1: Fixed model size envelopes (minimum loss fitting).}
+In the first approach, the authors trained a family of models with fixed parameter sizes $N \in \{70\text{M}, \dots, 16\text{B}\}$ across varying training token durations. 
+
+For each individual model size $N$, training traces out a smooth curve of cross-entropy loss as a function of consumed compute $C = 6ND$:
+\begin{enumerate}
+    \item For any specified compute budget $C_0$ (e.g., $C_0 = 10^{20}$ FLOPs), we inspect all model curves intersecting this budget.
+    \item We identify the specific model parameter count $N$ that achieves the \textbf{global minimum loss} $\min \Loss$ at $C_0$.
+    \item We record the pair $(N_{\text{opt}}, C_0)$ and the corresponding token count $D_{\text{opt}} = C_0 / (6 N_{\text{opt}})$.
+    \item Repeating this across all compute budgets from $10^{18}$ to $10^{22}$ FLOPs, we fit power-law relationships:
+    \begin{equation}
+    \label{eq:approach1_fits}
+    N_{\text{opt}} = G C^a, \quad D_{\text{opt}} = H C^b.
+    \end{equation}
+\end{enumerate}
+Empirically, Approach 1 yielded:
+\begin{equation}
+a = 0.50, \quad b = 0.50.
+\end{equation}
+When projected to the computational budget of Gopher ($C = 5.76 \times 10^{23}$ FLOPs), Approach 1 indicated that the optimal model size was \textbf{67 billion parameters}, requiring \textbf{1.43 trillion tokens}---not 280 billion parameters trained on 300 billion tokens!
+
+\paragraph{Approach 2: IsoFLOP profiles (parabolic vertex fitting).}
+In the second approach, DeepMind fixed the total compute budget $C \in \{10^{18}, 10^{19}, 10^{20}, 10^{21}, 10^{22}\}$ FLOPs and systematically varied the trade-off between parameter count $N$ and dataset size $D = C / (6N)$.
+
+For each IsoFLOP slice, the final training loss was plotted against parameter count $N$ on a logarithmic scale. Empirically, the data forms an exact \textbf{parabola} (a convex bowl):
+\begin{itemize}
+    \item If $N$ is too small (left side of parabola), the model has insufficient capacity to absorb the information in $D$ tokens, causing high loss due to under-parameterization.
+    \item If $N$ is too large (right side of parabola), the model is severely undertrained because $D = C / (6N)$ is too small, causing high loss due to data starvation.
+\end{itemize}
+
+The loss within an IsoFLOP slice is modeled by fitting a quadratic polynomial in $\log N$:
+\begin{equation}
+\label{eq:isoflop_parabola}
+\log \Loss(N) = c_0 + c_1 \log N + c_2 (\log N)^2, \quad \text{with } c_2 > 0.
+\end{equation}
+The optimal model size corresponds precisely to the \textbf{vertex (minimum)} of the parabola:
+\begin{equation}
+\label{eq:parabola_vertex}
+\frac{\partial \log \Loss}{\partial \log N} = c_1 + 2 c_2 \log N = 0 \implies \log N_{\text{opt}} = -\frac{c_1}{2 c_2} \implies N_{\text{opt}} = \exp\left(-\frac{c_1}{2 c_2}\right).
+\end{equation}
+
+By extracting $N_{\text{opt}}$ for each IsoFLOP curve and fitting power-law relations $N_{\text{opt}} \propto C^a$ and $D_{\text{opt}} \propto C^b$, Approach 2 yielded:
+\begin{equation}
+a = 0.49, \quad b = 0.51.
+\end{equation}
+For Gopher's compute budget, Approach 2 determined that the compute-optimal model size was \textbf{63 billion parameters} trained on \textbf{1.53 trillion tokens}.
+
+\paragraph{Approach 3: Parametric loss surface modeling (Lagrangian optimization).}
+The third approach formulated an analytical parametric model of the loss surface $\Loss(N, D)$ over all training runs simultaneously.
+
+\begin{theorem}{Parametric scaling law formulation}{parametric_scaling_law}
+The expected cross-entropy loss $\Loss(N, D)$ for an autoregressive language model with $N$ parameters trained on $D$ tokens can be decomposed into an irreducible linguistic entropy and power-law penalties for finite capacity and finite data:
+\begin{equation}
+\label{eq:chinchilla_parametric_loss}
+\hat{\Loss}(N, D) = E + \frac{A}{N^\alpha} + \frac{B}{D^\beta},
+\end{equation}
+where:
+\begin{itemize}
+    \item $E$ is the \textbf{irreducible entropy} of natural text (the theoretical floor of cross-entropy loss).
+    \item $\frac{A}{N^\alpha}$ represents the risk penalty due to \textbf{finite model capacity}.
+    \item $\frac{B}{D^\beta}$ represents the risk penalty due to \textbf{finite training dataset size}.
+    \item $A, B, E, \alpha, \beta$ are positive constants.
+\end{itemize}
+\end{theorem}
+
+Fitting this functional form over all 400+ experimental runs using Huber loss minimization yielded:
+\begin{equation}
+\label{eq:chinchilla_fitted_parameters}
+E \approx 1.69, \quad A \approx 406.4, \quad B \approx 410.7, \quad \alpha \approx 0.34, \quad \beta \approx 0.28.
+\end{equation}
+
+We can now mathematically derive the compute-optimal allocation by solving a \textbf{constrained optimization problem}:
+\begin{equation}
+\min_{N, D} \hat{\Loss}(N, D) = E + A N^{-\alpha} + B D^{-\beta} \quad \text{subject to } 6ND = C.
+\end{equation}
+
+\begin{proof}
+Formulate the Lagrangian function with multiplier $\lambda$:
+\begin{equation}
+\label{eq:chinchilla_lagrangian}
+\mathcal{L}_{\text{Lagrange}}(N, D, \lambda) = E + A N^{-\alpha} + B D^{-\beta} + \lambda (6ND - C).
+\end{equation}
+Setting the first-order partial derivatives with respect to $N$ and $D$ to zero:
+\begin{align}
+\label{eq:lagrange_deriv_n}
+\frac{\partial \mathcal{L}_{\text{Lagrange}}}{\partial N} &= -\alpha A N^{-\alpha-1} + 6\lambda D = 0 \implies 6\lambda N D = \alpha A N^{-\alpha}, \\
+\label{eq:lagrange_deriv_d}
+\frac{\partial \mathcal{L}_{\text{Lagrange}}}{\partial D} &= -\beta B D^{-\beta-1} + 6\lambda N = 0 \implies 6\lambda N D = \beta B D^{-\beta}.
+\end{align}
+Equating the two expressions for $6\lambda N D$:
+\begin{equation}
+\label{eq:fundamental_chinchilla_balance}
+\alpha A N^{-\alpha} = \beta B D^{-\beta}.
+\end{equation}
+Equation~\eqref{eq:fundamental_chinchilla_balance} establishes the \textbf{fundamental economic optimality condition}: at the compute-optimal frontier, the marginal reduction in loss obtained by spending compute on model parameters must exactly balance the marginal reduction in loss obtained by spending compute on additional tokens.
+
+To express $N_{\text{opt}}$ and $D_{\text{opt}}$ purely in terms of total compute $C$, substitute $D = \frac{C}{6N}$ into Equation~\eqref{eq:fundamental_chinchilla_balance}:
+\begin{equation}
+\alpha A N^{-\alpha} = \beta B \left( \frac{C}{6N} \right)^{-\beta} = \beta B 6^\beta C^{-\beta} N^\beta.
+\end{equation}
+Grouping powers of $N$:
+\begin{equation}
+N^{\alpha + \beta} = \frac{\alpha A}{\beta B 6^\beta} C^\beta \implies N_{\text{opt}}(C) = \left( \frac{\alpha A}{\beta B 6^\beta} \right)^{\frac{1}{\alpha + \beta}} C^{\frac{\beta}{\alpha + \beta}}.
+\end{equation}
+By symmetry, substituting $N = \frac{C}{6D}$ yields the optimal dataset size:
+\begin{equation}
+D_{\text{opt}}(C) = \left( \frac{\beta B}{\alpha A 6^\alpha} \right)^{\frac{1}{\alpha + \beta}} C^{\frac{\alpha}{\alpha + \beta}}.
+\end{equation}
+
+Substituting the empirically fitted exponents $\alpha \approx 0.34$ and $\beta \approx 0.28$:
+\begin{align}
+a &= \frac{\beta}{\alpha + \beta} = \frac{0.28}{0.34 + 0.28} = \frac{0.28}{0.62} \approx 0.45, \\
+b &= \frac{\alpha}{\alpha + \beta} = \frac{0.34}{0.34 + 0.28} = \frac{0.34}{0.62} \approx 0.55.
+\end{align}
+\end{proof}
+
+\begin{figure}[htbp]
+\centering
+\begin{subfigure}[b]{0.48\textwidth}
+\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}
+\begin{axis}[
+    width=8cm,
+    height=6cm,
+    xmode=log,
+    ymode=log,
+    xmin=1e20, xmax=1e26,
+    ymin=1e8, ymax=1e13,
+    xlabel={Compute Budget $C$ (FLOPs)},
+    ylabel={Optimal Count},
+    grid=both,
+    grid style={line width=.2pt, draw=gray!20},
+    major grid style={line width=.4pt, draw=gray!40},
+    legend pos=north west,
+    legend style={font=\footnotesize, fill=white, fill opacity=0.85},
+    title={\small Compute-Optimal Allocation: Kaplan vs Chinchilla},
+    title style={font=\sffamily\bfseries}
+]
+% Kaplan N ~ C^0.73
+\addplot[crimsonRed, line width=1.2pt, domain=1e20:1e26] {1.3e-6 * x^0.73};
+\addlegendentry{Kaplan $N \propto C^{0.73}$}
+
+% Kaplan D ~ C^0.27
+\addplot[crimsonRed, dashed, line width=1.2pt, domain=1e20:1e26] {8e4 * x^0.27};
+\addlegendentry{Kaplan $D \propto C^{0.27}$}
+
+% Chinchilla N ~ C^0.50
+\addplot[steelBlue, line width=1.4pt, domain=1e20:1e26] {0.09 * x^0.50};
+\addlegendentry{Chinchilla $N \propto \sqrt{C}$}
+
+% Chinchilla D ~ C^0.50
+\addplot[steelBlue, dashed, line width=1.4pt, domain=1e20:1e26] {1.8 * x^0.50};
+\addlegendentry{Chinchilla $D \propto \sqrt{C}$}
+
+% Points for Gopher and Chinchilla
+\node[circle, fill=crimsonRed, inner sep=1.8pt, label={[font=\tiny, crimsonRed]above:Gopher 280B}] at (axis cs:5.76e23, 2.8e11) {};
+\node[circle, fill=steelBlue, inner sep=1.8pt, label={[font=\tiny, steelBlue]below:Chinchilla 70B}] at (axis cs:5.76e23, 7.0e10) {};
+\end{axis}
+\end{tikzpicture}%
+}
+\caption{Scaling exponents: Kaplan favors massive parameters ($a=0.73$), while Chinchilla proves balanced scaling ($a \approx b \approx 0.50$).}
+\label{fig:scaling_curves_comparison}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.48\textwidth}
+\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}
+\begin{axis}[
+    width=8cm,
+    height=6cm,
+    xmode=log,
+    xmin=1e9, xmax=1e12,
+    ymin=1.8, ymax=2.6,
+    xlabel={Model Parameters $N$},
+    ylabel={Cross-Entropy Loss $\Loss$},
+    grid=both,
+    grid style={line width=.2pt, draw=gray!20},
+    major grid style={line width=.4pt, draw=gray!40},
+    legend pos=north east,
+    legend style={font=\footnotesize, fill=white, fill opacity=0.85},
+    title={\small IsoFLOP Parabolic Loss Profiles},
+    title style={font=\sffamily\bfseries}
+]
+% IsoFLOP Curve 1: C = 1e22
+\addplot[politoNavy!60, line width=1pt, domain=2e9:5e10, samples=50] {2.15 + 0.15*(ln(x/1e10))^2};
+\addlegendentry{$C = 10^{22}$ FLOPs}
+
+% IsoFLOP Curve 2: C = 5.76e23 (Gopher compute)
+\addplot[politoNavy, line width=1.4pt, domain=1e10:5e11, samples=60] {1.92 + 0.12*(ln(x/7e10))^2};
+\addlegendentry{$C = 5.76 \times 10^{23}$ FLOPs}
+
+% Efficient frontier line
+\addplot[crimsonRed, dashed, line width=1.1pt] coordinates {
+    (1e10, 2.15)
+    (7e10, 1.92)
+};
+\addlegendentry{Efficient frontier}
+
+% Annotation for Gopher vs Chinchilla
+\node[circle, fill=crimsonRed, inner sep=1.8pt, label={[font=\tiny, crimsonRed]right:Gopher (Suboptimal)}] at (axis cs:2.8e11, 2.15) {};
+\node[circle, fill=thmGreen, inner sep=2pt, label={[font=\tiny, thmGreen]below:Chinchilla (Optimal)}] at (axis cs:7e10, 1.92) {};
+\end{axis}
+\end{tikzpicture}%
+}
+\caption{IsoFLOP profile at Gopher budget: Gopher sits on the undertrained right wing; Chinchilla sits at the parabolic minimum.}
+\label{fig:isoflop_curves}
+\end{subfigure}
+\caption{Analytical derivations of compute-optimal language modeling from DeepMind's Chinchilla study \cite{hoffmann2022}.}
+\label{fig:chinchilla_analytical_visualizations}
+\end{figure}
+
+\paragraph{Empirical demonstration: the Chinchilla 70B model.}
+To empirically validate their theoretical derivations, DeepMind trained \textbf{Chinchilla}:
+\begin{itemize}
+    \item \textbf{Identical Compute Budget}: Chinchilla was allocated exactly the same compute budget as Gopher ($5.76 \times 10^{23}$ FLOPs).
+    \item \textbf{Parameters}: 70 billion parameters ($L = 80, d = 8192, H = 64$)---exactly \textbf{one-quarter the size of Gopher} (280B).
+    \item \textbf{Training Tokens}: 1.4 trillion ($1.4 \times 10^{12}$) tokens---over \textbf{four times more data than Gopher} (300B).
+\end{itemize}
+
+The empirical evaluation results were decisive:
+\begin{itemize}
+    \item Chinchilla uniformly \textbf{outperformed Gopher (280B), GPT-3 (175B), Jurassic-1 (178B), and Megatron-Turing NLG (530B)} across virtually every downstream evaluation benchmark.
+    \item On the Massive Multitask Language Understanding (MMLU) benchmark, Chinchilla achieved an average score of 67.5\%, outperforming Gopher (60.0\%) by 7.5 percentage points.
+    \item On commonsense reasoning, reading comprehension, and math benchmarks (GSM8K), Chinchilla established comprehensive state-of-the-art results.
+    \item Crucially, because Chinchilla had only 70B parameters, its \textbf{inference latency was dramatically lower and memory consumption was cut by 75\%}, requiring only two NVIDIA A100 GPUs instead of eight.
+\end{itemize}
+
+% ------------------------------------------------------------------------------
+\section{The inference-optimal paradigm and the return to compact architectures}
+\label{sec:inference_optimal_paradigm}
+
+\paragraph{The limitation of Chinchilla: training compute vs inference cost.}
+The Chinchilla scaling law is formulated strictly to minimize cross-entropy loss for a \emph{fixed training compute budget} $C_{\text{train}}$. However, in real-world software engineering and production deployment, language models operate under a radically different economic objective.
+
+Once trained, a foundation model is deployed as an API or embedded on edge devices, serving billions of inference queries over its operational lifespan:
+\begin{equation}
+\label{eq:total_lifecycle_compute}
+C_{\text{lifecycle}} = C_{\text{train}} + Q \times C_{\text{inference}},
+\end{equation}
+where $Q$ is the total number of inference queries served, and $C_{\text{inference}} \approx 2 N L_{\text{gen}}$ FLOPs per query.
+
+If a model serves hundreds of millions of user queries:
+\begin{itemize}
+    \item Deploying a 280B or 175B model requires multi-GPU tensor parallelism (e.g., 8 $\times$ 80GB A100 GPUs) simply to store the model weights and key-value cache in VRAM.
+    \item A 7B or 8B model requires only 16~GB of memory in 16-bit precision (or under 5~GB under 4-bit INT4 quantization), enabling execution on a single consumer GPU, smartphone, or laptop.
+    \item Therefore, \textbf{training a smaller model far past the Chinchilla compute-optimal frontier is economically optimal for downstream inference}!
+\end{itemize}
+
+This realization triggered the \textbf{return to compact models}: training high-quality 7B, 8B, and 13B models on massive token volumes (2 to 15 trillion tokens) rather than scaling parameter counts into the hundreds of billions.
+
+% ------------------------------------------------------------------------------
+\section{The open-weights foundation model ecosystem}
+\label{sec:open_weights_ecosystem}
+
+The shift toward training compact models on massive datasets catalyzed an explosion in open-weights foundation models, democratizing access to state-of-the-art LLMs.
+
+\paragraph{1. The LLaMA family (Meta AI).}
+Starting in early 2023, Meta AI introduced the \textbf{LLaMA} (Large Language Model Meta AI) family, establishing the gold standard for open-weights architectures:
+\begin{itemize}
+    \item \textbf{LLaMA 1 (Feb 2023) \cite{touvron2023llama}}:
+    Trained across four sizes: 7B, 13B, 33B, and 65B on 1.0T to 1.4T tokens. LLaMA demonstrated that training exclusively on publicly available datasets (Common Crawl, GitHub, Wikipedia, ArXiv, StackExchange) could match or exceed proprietary closed models like GPT-3.
+    LLaMA modernized the Transformer architecture with three critical innovations:
+    \begin{enumerate}
+        \item \textbf{RMSNorm (Root Mean Square Normalization)}: Replacing standard LayerNorm to eliminate mean-centering, saving 7\% of memory bandwidth:
+        \begin{equation}
+        \RMSNorm(\vx) = \frac{\vx}{\sqrt{\frac{1}{d} \sum_{i=1}^d x_i^2 + \epsilon}} \odot \bm{\gamma}.
+        \end{equation}
+        \item \textbf{SwiGLU Activation Function}: Replacing standard ReLU or GELU with Swish-Gated Linear Units \cite{shazeer2020glu}:
+        \begin{equation}
+        \swiglu(\vx) = (\vx \mW \odot \silu(\vx \mV)) \mW_2, \quad \silu(z) = z \cdot \sigma(z).
+        \end{equation}
+        \item \textbf{Rotary Position Embeddings (RoPE)} \cite{su2024roformer}: Injecting positional information by rotating query and key vectors in complex 2D subspaces, enabling natural length extrapolation.
+    \end{enumerate}
+
+    \item \textbf{Llama 2 (July 2023) \cite{touvron2023llama2}}:
+    Scaled training tokens to 2.0 trillion tokens across 7B, 13B, and 70B sizes. Llama 2 doubled the context window to 4096 tokens and introduced \textbf{Grouped-Query Attention (GQA)} on the 70B model, sharing single key and value heads across groups of query heads to drastically compress KV-cache memory during autoregressive generation. Meta also released official instruction-tuned models (Llama-2-Chat) aligned with Reinforcement Learning from Human Feedback (RLHF).
+    
+    \item \textbf{Llama 3 (April 2024) and Llama 3.1 (July 2024) \cite{dubey2024llama3}}:
+    Pushed inference-optimal overtraining to the absolute extreme:
+    \begin{itemize}
+        \item The 8B and 70B models were trained on over \textbf{15 trillion tokens}---overtrained by more than $50\times$ beyond the Chinchilla compute-optimal frontier!
+        \item Implemented a massive 128,256-token tiktoken tokenizer, boosting compression efficiency on code and multilingual text by 15\%.
+        \item Llama 3.1 introduced the frontier \textbf{405B flagship model} trained on 16 trillion tokens across 16,000 NVIDIA H100 GPUs, supporting a native 128k context window and rivaling top proprietary models (GPT-4, Claude 3.5 Sonnet).
+    \end{itemize}
+
+    \item \textbf{Llama 3.2 (September 2024)}:
+    Expanded the family into edge deployment with lightweight 1B and 3B models optimized for on-device mobile hardware, alongside multimodal vision foundation models (11B and 90B).
+    
+    \item \textbf{Specialized Variants (e.g., Code Llama)}:
+    Fine-tuned specifically on 500B tokens of source code, supporting the Fill-in-the-Middle (FIM) objective for real-time code infilling and completion in software engineering IDEs.
+\end{itemize}
+
+\paragraph{Licensing and the democratized frontier.}
+Meta released the LLaMA weights under a bespoke permissive license that catalyzed academic and industrial adoption while establishing a strategic defensive moat: usage is entirely free for research and commercial deployment, \emph{provided the licensee's product serves fewer than 700 million monthly active users} (set at 100 million in earlier drafts). As highlighted in lecture, this threshold served as an explicit barrier against massive hyperscale competitors (such as Google and Amazon) utilizing LLaMA to power their commercial search ecosystems without reciprocal licensing, while ensuring universal free access for startups, universities, and independent practitioners.
+
+\paragraph{2. Mistral AI: Architectural efficiency and sparse mixture-of-experts.}
+Founded in Paris in 2023, Mistral AI introduced architectural innovations focusing on maximum compute efficiency:
+\begin{itemize}
+    \item \textbf{Mistral 7B (October 2023) \cite{jiang2023mistral}}:
+    Outperformed Llama 2 13B across all benchmarks despite having half the parameter count. Key mechanisms included:
+    \begin{enumerate}
+        \item \textbf{Sliding Window Attention (SWA)}: Each token attends only to the preceding $W = 4096$ tokens at each layer. Across $L$ layers, information propagates through an effective receptive field of $L \times W$, achieving linear $\mathcal{O}(T \times W)$ computational and cache memory complexity.
+        \item \textbf{Rolling Buffer Cache}: Storing keys and values in a fixed-size circular cache of capacity $W$, overwriting slots modulo $W$ to eliminate memory growth on infinite generation streams.
+        \item \textbf{Grouped-Query Attention (GQA)}: Standard across all model sizes (8 query heads per KV head).
+    \end{enumerate}
+    \item \textbf{Mixtral 8x7B (December 2023)}:
+    Pioneered open-weights \textbf{Sparse Mixture-of-Experts (MoE)}. While the model contains 46.7 billion total parameters, a learned router routes each token to only 2 out of 8 feed-forward experts per layer. Consequently, only \textbf{12.9 billion parameters are active per token}, delivering the inference latency and compute cost of a 13B model while matching the performance of a 70B dense model.
+    \item \textbf{Pixtral}: A 12B multimodal model supporting native image and video understanding alongside text.
+\end{itemize}
+
+\paragraph{3. Other prominent open foundation families.}
+\begin{itemize}
+    \item \textbf{EleutherAI (GPT-Neo, GPT-J, GPT-NeoX-20B)}: Early non-profit open-source pioneers that reproduced GPT-3-scale architectures, creating the Pile dataset (825~GB) and establishing open benchmarks to accelerate transparent AI alignment research.
+    \item \textbf{Falcon Series (Technology Innovation Institute, UAE) \cite{almazrouei2023falcon}}: Released 7B, 40B, and 180B parameter models trained on \textbf{RefinedWeb}, demonstrating that meticulously filtered web text alone could produce state-of-the-art reasoning without proprietary curation. Crucially, Falcon addressed the acute tokenization penalty suffered by non-English languages (specifically Arabic). In standard English-centric BPE tokenizers, Arabic morphological structures fragment into excessive byte sequences (often 4 to 8 tokens per word), drastically compressing the effective context window and inflating generation costs. Falcon engineered a custom balanced tokenizer to overcome this bottleneck. Furthermore, the institute pioneered hybrid architectures combining \textbf{State Space Models (Mamba)} with attention layers, exploring sub-quadratic alternatives to standard Transformers.
+    \item \textbf{GLM (General Language Model, Zhipu AI \& Tsinghua University)}: An autoregressive blank infilling architecture trained on massive bilingual corpora, achieving top-tier proficiency across both English and Chinese.
+\end{itemize}
+
+\paragraph{The macro-evolutionary tree of foundation models (2017--2024).}
+Stepping back to analyze the macro-evolution of neural language models reveals an illuminating structural pattern across the three original 2017 branches:
+\begin{enumerate}
+    \item \textbf{Encoder-only lineage (BERT, RoBERTa, ModernBERT)}: Experienced rapid proliferation between 2018 and 2020. However, this lineage subsequently plateaued: because bidirectional representations cannot perform single-pass autoregressive text generation or in-context few-shot prompting, encoder-only models were relegated to specialized classification and embedding extraction.
+    \item \textbf{Encoder-decoder lineage (T5, T0, GLM)}: Maintained a consistent presence for sequence transformation tasks (translation, summarization), but remained constrained by the computational and memory overhead of maintaining dual encoder and decoder KV-caches during open-ended inference.
+    \item \textbf{Decoder-only lineage (GPT-1/2/3, Chinchilla, LLaMA, Mistral)}: Underwent an explosive divergence, capturing virtually all frontier compute and research investment. By casting every cognitive task as causal next-token prediction, decoder-only models established universal general-purpose reasoning.
+\end{enumerate}
+
+Simultaneously, the field underwent a critical philosophical bifurcation regarding accessibility: while GPT-1 and GPT-2 were released with open weights, GPT-3 marked the transition of leading frontier models toward proprietary, closed-API commercialization. The modern open-weights movement—spearheaded by Meta AI, Mistral AI, and EleutherAI—has successfully restored academic reproducibility and democratized high-performance foundation models on commodity hardware.
+
+\begin{figure}[htbp]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[
+    node distance=1.0cm and 0.8cm,
+    stage/.style={draw=politoNavy, fill=skyBlue!30, rounded corners=4pt, font=\small\sffamily, align=center, inner sep=6pt, line width=0.8pt},
+    era/.style={draw=crimsonRed, fill=crimsonRed!10, rounded corners=4pt, font=\small\sffamily\bfseries, align=center, inner sep=6pt, line width=0.8pt},
+    open/.style={draw=thmGreen, fill=thmGreenBg, rounded corners=4pt, font=\small\sffamily, align=center, inner sep=6pt, line width=0.8pt},
+    arrow/.style={-{Stealth[scale=0.9]}, line width=1pt, draw=politoNavy}
+]
+
+% Timeline nodes
+\node[stage] (gpt1) {\textbf{GPT-1 (2018)}\\117M params\\BooksCorpus (5GB)\\Pre-train + Fine-tune};
+\node[stage, right=1.2cm of gpt1] (gpt2) {\textbf{GPT-2 (2019)}\\1.5B params\\WebText (40GB)\\Zero-Shot Emergence};
+\node[era, right=1.2cm of gpt2] (kaplan) {\textbf{Kaplan Laws (2020)}\\$N \propto C^{0.73}, D \propto C^{0.27}$\\``Scale models, not data''};
+
+\node[stage, below=1.2cm of kaplan] (gpt3) {\textbf{GPT-3 (2020)}\\175B params\\Filtered Common Crawl\\In-Context Learning (0/1/few)};
+\node[era, left=1.2cm of gpt3] (race) {\textbf{The Giant Era (2021)}\\Gopher (280B), MT-NLG (530B)\\PaLM (540B)\\Trained on $\sim$300B tokens};
+\node[era, left=1.2cm of race] (chinchilla) {\textbf{Chinchilla (2022)}\\70B params (1.4T tokens)\\$N \propto \sqrt{C}, D \propto \sqrt{C}$\\``Oversized \& Undertrained''};
+
+\node[open, below=1.2cm of chinchilla] (inference) {\textbf{Inference-Optimal Paradigm}\\Train smaller models longer\\Minimize serving latency \& VRAM};
+\node[open, right=1.2cm of inference] (llama) {\textbf{LLaMA Family (Meta)}\\7B to 405B params\\Trained on 1T to 16T tokens\\SwiGLU, RoPE, RMSNorm, GQA};
+\node[open, right=1.2cm of llama] (mistral) {\textbf{Mistral \& MoE}\\7B SWA, Mixtral 8x7B\\Sparse expert routing\\High compute efficiency};
+
+% Arrows
+\draw[arrow] (gpt1) -- (gpt2);
+\draw[arrow] (gpt2) -- (kaplan);
+\draw[arrow] (kaplan) -- (gpt3);
+\draw[arrow] (gpt3) -- (race);
+\draw[arrow] (race) -- (chinchilla);
+\draw[arrow] (chinchilla) -- (inference);
+\draw[arrow] (inference) -- (llama);
+\draw[arrow] (llama) -- (mistral);
+
+\end{tikzpicture}%
+}
+\caption{The historical evolution of foundation models: from the early pre-training paradigm (GPT-1/2), through the parameter-scaling race driven by Kaplan et al., to the Chinchilla compute-optimal correction and the modern open-weights inference-optimal ecosystem.}
+\label{fig:llm_history_evolution_timeline}
+\end{figure}
 
 \end{document}
