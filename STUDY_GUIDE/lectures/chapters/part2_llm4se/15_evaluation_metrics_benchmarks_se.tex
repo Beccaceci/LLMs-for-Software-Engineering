@@ -41,8 +41,8 @@ The naive estimator $1 - (1 - c/n)^k$ suffers from severe bias for small $n$. Ch
 with the convention that if $n - c < k$, the ratio $\frac{\binom{n-c}{k}}{\binom{n}{k}} = 0$, hence $\PassAtK{k} = 1.0$.
 \end{theorem}
 
-\begin{examinsight}[Exam derivation: combinatorial probability of Pass@k]
-Oral and written exams frequently ask students to derive Equation~\eqref{eq:pass_at_k_unbiased}:
+\paragraph{Combinatorial probability derivation of Pass@k.}
+The unbiased estimator in Equation~\eqref{eq:pass_at_k_unbiased} is derived as follows:
 \begin{enumerate}
     \item The total number of ways to choose a subset of $k$ samples from $n$ generated candidates is $\binom{n}{k}$.
     \item A problem \textbf{fails} under $\PassAtK{k}$ if and only if \emph{all} $k$ selected samples are incorrect.
@@ -51,7 +51,7 @@ Oral and written exams frequently ask students to derive Equation~\eqref{eq:pass
     \item The probability that \textbf{at least one} sample passes is $1 - \frac{\binom{n-c}{k}}{\binom{n}{k}}$.
 \end{enumerate}
 This derivation requires zero approximations and produces completely unbiased estimates.
-\end{examinsight}
+
 
 \begin{deepdive}[Benchmark contamination and decontamination]
 Because modern LLMs pre-train on terabytes of public GitHub repositories, test benchmarks such as HumanEval or LeetCode problems may have been present in pre-training corpora. Evaluating on contaminated data yields misleadingly inflated $\PassAtK{k}$ scores. State-of-the-art evaluation requires $n$-gram decontamination filtering, syntactic perturbation, or dynamic test execution on freshly committed repositories.

@@ -24,16 +24,15 @@ While traditional tools like EvoSuite excel at optimizing branch coverage, they 
 A test case consists of an input state $I$ and an oracle function $\Omega: \mathcal{O} \to \{\text{Pass}, \text{Fail}\}$ that determines whether program output $O = P(I)$ satisfies the intended specification. When the true specification is implicit, informal, or absent, generating an accurate oracle $\Omega$ without hallucinating incorrect behavior constitutes the \emph{Test Oracle Problem}.
 \end{definition}
 
-\begin{examinsight}[Exam highlight: patch overfitting in APR]
-A critical exam topic in Software Engineering with AI is \textbf{Patch Overfitting}.
-An automated tool or LLM generates a patch $\Delta P$ that passes all existing unit tests ($T_{\text{test}}$). However, the patch is incorrect because:
+\paragraph{The patch overfitting challenge in APR.}
+In Automated Program Repair (APR), patch overfitting occurs when an automated tool or LLM generates a patch $\Delta P$ that passes all existing unit tests ($T_{\text{test}}$). However, the patch is incorrect because:
 \begin{itemize}
     \item It hardcodes return values for specific test inputs (\emph{plausible but incorrect}).
     \item It deletes critical functionality that tests failed to cover.
     \item It alters edge-case behavior not exercised by the test suite.
 \end{itemize}
 Always emphasize that passing an existing test suite is a \emph{necessary but insufficient} condition for patch correctness.
-\end{examinsight}
+
 
 \section{Spectrum-based fault localization (SBFL)}
 Before an LLM can fix a bug in a 100,000-line codebase, the suspicious source lines must be localized.

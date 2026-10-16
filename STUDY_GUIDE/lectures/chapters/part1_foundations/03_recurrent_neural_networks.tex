@@ -36,7 +36,7 @@ Because an FCNN does not share weights across sequence positions, it is wildly i
 \paragraph{3. The output is expected to be fixed in size.}
 The output dimensionality is rigidly determined by the number of rows in the final projection matrix $\mW_{\text{out}}$. In many sequential tasks (such as machine translation, text summarization, and dialogue generation), the output sequence length is unknown a priori and varies dynamically based on the input:
 \begin{center}
-English (5 words): \textit{``It is indeed sunny today''} $\implies$ Italian (4 words): \textit{``Effettivamente oggi è soleggiato''}.
+English (5 words): \textit{``It is indeed sunny today''} $\implies$ Italian (4 words): \textit{``Effettivamente oggi \`e soleggiato''}.
 \end{center}
 An FCNN cannot dynamically adjust its output layer to emit variable-length token sequences.
 
@@ -301,7 +301,7 @@ During text generation, the RNN emits an unnormalized logit vector $\vz_t = \mW_
 \end{equation}
 The temperature controls the entropy and randomness of the emitted sequence:
 \begin{itemize}
-    \item \textbf{Low Temperature ($T \to 0$ / Greedy Decoding)}: Exaggerates differences between logits. The largest logit absorbs almost all probability mass ($p_{\max} \to 1$). The model makes confident, conservative predictions, but frequently falls into pathological mode collapse—getting trapped in infinite repetitive loops (e.g., \texttt{"the the the the"} or repeating identical sentence fragments).
+    \item \textbf{Low Temperature ($T \to 0$ / Greedy Decoding)}: Exaggerates differences between logits. The largest logit absorbs almost all probability mass ($p_{\max} \to 1$). The model makes confident, conservative predictions, but frequently falls into pathological mode collapse---getting trapped in infinite repetitive loops (e.g., \texttt{"the the the the"} or repeating identical sentence fragments).
     \item \textbf{Balanced Temperature ($T \in [0.6, 0.8]$)}: Preserves the syntactic and morphological structure discovered by the network while introducing sufficient stochastic diversity to produce coherent, rich generations. In empirical experiments demonstrated in \cite{karpathy2015rnn}, character-level LSTMs trained at $T=0.7$ generated structurally sound Shakespearean plays (including character names, stage directions, and poetic meter), syntactically compilable C code from the Linux kernel, and valid algebraic geometry LaTeX documents.
     \item \textbf{High Temperature ($T > 1.2$)}: Flattens the probability distribution toward a uniform distribution ($p_c \to 1/V$). The network makes chaotic, exploratory predictions, generating misspelled words, hallucinated punctuation, and unpronounceable character noise.
 \end{itemize}
@@ -527,15 +527,14 @@ The GRU cell operates through two coupled mechanisms illustrated in Figure~\ref{
 \label{fig:gru_cell}
 \end{figure}
 
-\begin{examinsight}[Parameter counting: vanilla RNN vs.~LSTM vs.~GRU]
-A classic written examination question asks students to compare the exact parameter counts of recurrent cells for hidden dimension $d$ and input dimension $m$:
+\paragraph{Parameter count comparison: vanilla RNN vs.~LSTM vs.~GRU.}
+Comparing the exact parameter counts of recurrent cells for hidden dimension $d$ and input dimension $m$ clarifies the architectural trade-offs across sequence models:
 \begin{itemize}
     \item \textbf{Vanilla RNN}: Contains 1 transition set $(\mW_{hh}, \mW_{xh}, \vb_h) \implies d^2 + dm + d = d(d + m + 1)$.
     \item \textbf{GRU}: Contains 3 gate sets $(\mathbf{z}_t, \mathbf{r}_t, \tilde{\vh}_t) \implies 3 \times d(d + m + 1)$.
     \item \textbf{LSTM}: Contains 4 gate sets $(\mathbf{f}_t, \mathbf{i}_t, \tilde{\vc}_t, \mathbf{o}_t) \implies 4 \times d(d + m + 1)$.
 \end{itemize}
-The GRU reduces parameters by $25\%$ compared to LSTM while exhibiting comparable empirical performance on moderate sequence lengths.
-\end{examinsight}
+The GRU reduces parameters by $25\%$ compared to the LSTM while exhibiting comparable empirical performance across diverse sequence modeling benchmarks.
 
 \section{Sequence-to-sequence (Seq2Seq) and encoder-decoder pipelines}
 \label{sec:seq2seq}
@@ -545,7 +544,7 @@ Thus far, we have considered models where each input step produces exactly one o
 \begin{enumerate}
     \item \textbf{Unequal Sequence Lengths}: In machine translation, source and target languages rarely match in word count:
     \begin{center}
-    English (5 words): \textit{[it] [is] [indeed] [sunny] [today]} $\implies$ Italian (4 words): \textit{[effettivamente] [oggi] [è] [soleggiato]}.
+    English (5 words): \textit{[it] [is] [indeed] [sunny] [today]} $\implies$ Italian (4 words): \textit{[effettivamente] [oggi] [\`e] [soleggiato]}.
     \end{center}
     A one-to-one recurrent model would process 5 tokens and be forced to produce 5 output tokens.
     \item \textbf{Non-Monotonic Alignment and Causal Blindness}: Natural languages exhibit different word orders. In the example above, the Italian word \textit{``effettivamente''} must be emitted at step 1, but its English counterpart \textit{``indeed''} does not appear until step 3! In a standard one-to-one model, the cell cannot see the future, rendering early word generation impossible.
@@ -594,7 +593,7 @@ To overcome these limitations, the \textbf{Encoder-Decoder (Seq2Seq)} architectu
 \node[toknode] (y1) at (9.0, 3.2) {oggi};
 
 \node[decnode] (d2) at (11.4, 1.6) {$\text{LSTM}_{\text{dec}}$};
-\node[toknode] (y2) at (11.4, 3.2) {è};
+\node[toknode] (y2) at (11.4, 3.2) {\`e};
 
 \node[decnode] (d3) at (13.8, 1.6) {$\text{LSTM}_{\text{dec}}$};
 \node[toknode] (y3) at (13.8, 3.2) {$\langle\text{EOS}\rangle$};

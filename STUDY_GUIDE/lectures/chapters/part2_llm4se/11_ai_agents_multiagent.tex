@@ -52,10 +52,9 @@ Single agents often suffer from context overload and role drift when managing en
     \item \textbf{QA Engineer}: Generates edge-case unit tests and runs verification suites.
 \end{itemize}
 
-\begin{examinsight}[Exam trap: agent loops and halting conditions]
-A frequent exam question explores failure modes in autonomous SE agent loops.
-Without strict halting conditions (e.g., maximum recursion depth, monotonic error decrease, loop detection in tool calls), agents can easily enter infinite cycles—repeatedly fixing one test while breaking another. Production-grade SE agents must incorporate loop-breaking heuristics and budget constraints.
-\end{examinsight}
+\paragraph{Halting conditions and failure modes in agent loops.}
+Without strict halting conditions (e.g., maximum recursion depth, monotonic error decrease, loop detection in tool calls), agents can easily enter infinite cycles---repeatedly fixing one test while breaking another. Production-grade SE agents must incorporate loop-breaking heuristics and budget constraints.
+
 
 \begin{deepdive}[SWE-bench: the gold standard for autonomous SE agents]
 Jimenez et al. \citep{jimenez2024swebench} introduced \textbf{SWE-bench}, a rigorous benchmark of 2,294 real-world GitHub issues extracted from prominent Python repositories (e.g., Django, SymPy, Scikit-learn). Given an issue description, the agent must inspect the repository, locate the bug across thousands of files, write a patch, and pass hidden unit tests without human intervention.

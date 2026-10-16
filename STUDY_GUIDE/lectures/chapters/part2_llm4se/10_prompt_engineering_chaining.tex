@@ -42,9 +42,9 @@ y^* = \argmax_{y} \sum_{i=1}^N \mathbf{1}\left( y^{(i)} = y \right).
 \end{equation}
 \end{definition}
 
-\begin{examinsight}[Exam highlight: code equivalence in self-consistency]
-In natural language, majority voting groups identical strings. In software engineering, two syntactically distinct code solutions may be functionally identical (semantic equivalence). On exams, highlight that self-consistency over code must group candidates by passing identical test suites, rather than raw string equality.
-\end{examinsight}
+\paragraph{Semantic code equivalence in self-consistency.}
+In natural language, majority voting groups identical strings. In software engineering, two syntactically distinct code solutions may be functionally identical (semantic equivalence). Self-consistency over code must therefore group candidates by passing identical test suites, rather than raw string equality.
+
 
 \begin{deepdive}[Repository-level RAG and contextual search]
 Real-world software engineering takes place in large repositories spanning hundreds of thousands of lines of code. Naive fixed-size text chunking breaks AST syntactic boundaries, leading to severe hallucination. State-of-the-art code RAG decomposes code at syntax tree boundaries (classes, functions), indexes them into vector databases using code-specialized embedding models, and dynamically re-ranks relevant context into prompt chains.

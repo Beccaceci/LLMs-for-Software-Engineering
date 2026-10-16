@@ -1302,68 +1302,6 @@ such that all pairwise Euclidean distances are preserved within a distortion fac
 \end{theorem}
 For a vocabulary of $N = 100{,}000$ tokens and distortion tolerance $\epsilon = 0.2$, $\log(10^5) / 0.04 \approx 287$, precisely justifying why $d = 300$ serves as the golden standard for dense static word vectors.
 
-\subsection{Vector databases and Approximate Nearest Neighbor (ANN) search}
-\label{subsec:vector_databases}
-
-In modern software engineering, distributed embeddings power semantic code search and Retrieval-Augmented Generation (RAG) across millions of functions and documentation files. Evaluating brute-force cosine comparisons across $N = 10^7$ stored vectors requires $\mathcal{O}(N \cdot d)$ operations, resulting in unacceptable search latencies ($>500\,\text{ms}$).
-
-To achieve sub-millisecond retrieval, modern vector databases (e.g., Chroma, FAISS, Milvus, Qdrant) implement \textbf{Approximate Nearest Neighbor (ANN)} indexing algorithms \cite{enkk2023embeddings}:
-\begin{enumerate}
-    \item \textbf{Hierarchical Navigable Small World (HNSW) Graphs}: Constructs a multi-layer graph topology inspired by the ``six degrees of separation'' principle. The top layers contain sparse long-range highway edges that skip across semantic clusters, while the bottom layer contains dense local nearest-neighbor connections. Search begins at the top layer with greedy routing and transitions downward, achieving logarithmic $\mathcal{O}(\log N)$ query complexity with $>98\%$ recall.
-    \item \textbf{Inverted File with Product Quantization (IVF-PQ)}: Partitions the vector space into $K$ Voronoi cells using $k$-means clustering, while Product Quantization divides each $d$-dimensional vector into $M$ sub-vectors and quantizes them into compact discrete codebooks. This compresses embeddings by $8\times$ to $32\times$, allowing millions of code embeddings to reside entirely in high-speed RAM with symmetric distance lookup tables.
-\end{enumerate}
-
-\subsection{Python implementation and the query filtering caveat}
-\label{subsec:python_gist}
-
-In the course demonstration on Word2Vec and FastText semantic arithmetic \cite{giobergia2024gist}, a clean Python implementation is presented for answering relational analogy queries:
-
-\begin{lstlisting}[language=Python, caption={Implementation of relational vector arithmetic and candidate filtering in Python \cite{giobergia2024gist}.}, label={lst:giobergia_gist}]
-import numpy as np
-
-def analogy_query(model, word_a, word_b, word_c, top_k=5):
-    """
-    Computes: word_a is to word_b as word_c is to ?
-    Target vector: v = v_b - v_a + v_c
-    """
-    vec_a = model.get_vector(word_a)
-    vec_b = model.get_vector(word_b)
-    vec_c = model.get_vector(word_c)
-    
-    # Linear relational translation
-    target_vec = vec_b - vec_a + vec_c
-    
-    # Query nearest neighbors by cosine similarity
-    candidates = model.most_similar(positive=[target_vec], topn=top_k + 3)
-    
-    # CRITICAL PRACTICAL RULE: Exclude input query words
-    query_tokens = {word_a.lower(), word_b.lower(), word_c.lower()}
-    filtered_results = [
-        (word, score) for word, score in candidates 
-        if word.lower() not in query_tokens
-    ]
-    return filtered_results[:top_k]
-
-# Example: Germany is to Berlin as Spain is to ?
-# target = v_Berlin - v_Germany + v_Spain -> Madrid
-results = analogy_query(model, "germany", "berlin", "spain")
-print("Top prediction:", results[0][0])  # Output: 'madrid'
-\end{lstlisting}
-
-\begin{examinsight}[The query token exclusion caveat in vector arithmetic]
-A recurrent practical and examination trap involves candidate ranking in vector arithmetic:
-\begin{equation}
-\label{eq:target_vector_exam}
-\vec{v}_{\text{target}} = \vec{v}_{\text{Berlin}} - \vec{v}_{\text{Germany}} + \vec{v}_{\text{Spain}}.
-\end{equation}
-Because words naturally have significant baseline norm and self-correlation, if an unconstrained nearest neighbor search is performed across the entire vocabulary $\mathcal{W}$, the query token $\vec{v}_{\text{Spain}}$ or $\vec{v}_{\text{Berlin}}$ will frequently have the highest dot product with $\vec{v}_{\text{target}}$!
-Practitioners must explicitly filter out the input prompt words ($\mathcal{W} \setminus \{A, B, C\}$), forcing the cosine argmax to search exclusively among genuine unconditioned candidates:
-\begin{equation}
-\label{eq:filtered_argmax}
-w^* = \argmax_{w \in \mathcal{W} \setminus \{A, B, C\}} \cos(\vv_w, \vec{v}_{\text{target}}).
-\end{equation}
-\end{examinsight}
-
 \section{Modern subword tokenization and input pipelines for foundation models}
 \label{sec:modern_tokenization_pipeline}
 
@@ -1393,7 +1331,7 @@ Figure~\ref{fig:modern_tokenization_pipeline} illustrates this end-to-end data p
 % Vertical flow nodes
 \node[block] (raw) at (0, 0) {\textbf{1. Raw Text Stream}\\[2pt]\footnotesize\ttfamily "Hello, world! <|endoftext|>"};
 
-\node[tokblock] (bpe) at (0, -1.8) {\textbf{2. Byte-Level BPE Tokenizer}\\[2pt]\footnotesize\ttfamily ['Hello', ',', 'Ġworld', '!', '<|endoftext|>']};
+\node[tokblock] (bpe) at (0, -1.8) {\textbf{2. Byte-Level BPE Tokenizer}\\[2pt]\footnotesize\ttfamily ['Hello', ',', '{	extvisiblespace}world', '!', '<|endoftext|>']};
 
 \node[tokblock] (ids) at (0, -3.6) {\textbf{3. Token ID Mapping ($\vocab \to \mathbb{Z}$)}\\[2pt]\footnotesize\ttfamily [15496, 11, 995, 0, 50256]};
 
@@ -1611,7 +1549,7 @@ Notice that \texttt{"pugs"} \textbf{never appeared in the training corpus as a c
     \text{\texttt{encode}}(\text{\texttt{"pugs"}}) = [\text{\texttt{'p'}}, \; \text{\texttt{'ug'}}, \; \text{\texttt{'s'}}].
     \end{equation}
 \end{enumerate}
-The Out-of-Vocabulary barrier is overcome: the model represents the novel word via known morphological primitives—the initial consonant $\text{\texttt{'p'}}$, the shared stem $\text{\texttt{'ug'}}$, and the plural suffix $\text{\texttt{'s'}}$.
+The Out-of-Vocabulary barrier is overcome: the model represents the novel word via known morphological primitives---the initial consonant $\text{\texttt{'p'}}$, the shared stem $\text{\texttt{'ug'}}$, and the plural suffix $\text{\texttt{'s'}}$.
 
 Figure~\ref{fig:bpe_merge_tree} visualizes both the bottom-up hierarchical merge tree constructed during training and the top-down decomposition of unseen words at inference time.
 
@@ -1719,9 +1657,9 @@ By definition of the Unicode transformation format (UTF-8), any arbitrary charac
 Because the base alphabet $\mathcal{V}_0$ contains all 256 possible 8-bit byte values, every byte sequence can be parsed. If an input string contains an unseen compound word, a programming syntax construct, a severe typo, or an unknown emoji, the tokenizer attempts to apply merged subword rules; if no higher-level merge rule applies, the tokenizer simply falls back to emitting individual byte tokens from $\mathcal{V}_0$. Because no input byte can ever fall outside $\{0x00, \dots, 0xFF\}$, no token can ever be unmapped. The token $\text{\texttt{<|unk|>}}$ is completely eliminated. $\blacksquare$
 
 \paragraph{Lossless whitespace preservation.}
-Standard natural language processing pipelines strip whitespace or split on spaces, making exact detokenization ambiguous. In Byte-Level BPE, whitespaces are treated as regular characters/bytes. In GPT-2 and Hugging Face tokenizers, a leading whitespace is mapped to a special character (e.g., `\texttt{Ġ}' or byte $0x20$), binding the space directly to the succeeding word:
+Standard natural language processing pipelines strip whitespace or split on spaces, making exact detokenization ambiguous. In Byte-Level BPE, whitespaces are treated as regular characters/bytes. In GPT-2 and Hugging Face tokenizers, a leading whitespace is mapped to a special character (e.g., `\texttt{{	extvisiblespace}}' or byte $0x20$), binding the space directly to the succeeding word:
 \begin{center}
-\texttt{"Hello world"} $\stackrel{\text{BBPE}}{\Longrightarrow}$ \texttt{['Hello', 'Ġworld']}
+\texttt{"Hello world"} $\stackrel{\text{BBPE}}{\Longrightarrow}$ \texttt{['Hello', '{	extvisiblespace}world']}
 \end{center}
 This guarantees that tokenization is \textbf{strictly lossless and fully invertible}:
 \begin{equation}
@@ -1759,12 +1697,12 @@ print("Lossless decoding confirmed!")
 \end{lstlisting}
 
 \paragraph{Transition to continuous vector representations.}
-Having established how Byte-Level BPE eliminates the out-of-vocabulary barrier and deterministically encodes raw text streams into discrete integer token IDs $\mathbf{T} = [t_0, t_1, \dots, t_{L-1}] \in \mathbb{Z}^L$, we now confront the final representational bridge: how do discrete numerical indices enter the continuous, differentiable computational graph of modern neural networks? In the following section, we examine the projection of token IDs into continuous embedding space and the indispensable synthesis of positional information.
+Having established how Byte-Level BPE eliminates the out-of-vocabulary barrier and deterministically encodes raw text streams into discrete integer token IDs $\mathbf{T} = [t_0, t_1, \dots, t_{L-1}] \in \mathbb{Z}^L$, we now confront the final representational bridge: how do discrete numerical indices enter the continuous, differentiable computational graph of modern neural networks? In the following subsections, we first establish the high-level architecture of the language model input pipeline, and then embark on an exhaustive investigation into positional representations.
 
-\subsection{From token IDs to composite inputs: token embeddings and positional encoding synthesis}
-\label{subsec:embedding_positional_synthesis}
+\subsection{From token IDs to composite inputs: high-level architecture of the foundation model input pipeline}
+\label{subsec:embedding_pipeline_highlevel}
 
-Having transformed raw text into sequences of discrete token IDs $\mathbf{T} \in \mathbb{Z}^L$ (batched into mini-batch integer tensors $\mathbf{X} \in \mathbb{Z}^{B \times L}$), we arrive at the final computational phase of input preparation: mapping discrete integer token IDs into continuous, differentiable vector representations equipped with sequential order.
+Having transformed raw text into sequences of discrete token IDs $\mathbf{T} \in \mathbb{Z}^L$ (batched into mini-batch integer tensors $\mathbf{X} \in \mathbb{Z}^{B \times L}$), modern foundation models execute a unified input preparation pipeline that maps discrete token indices into continuous, differentiable vector representations equipped with sequential order prior to Transformer ingestion.
 
 \paragraph{1. Delimiter and architectural control tokens.}
 Before projecting indices into continuous embedding space, language models inject dedicated \textbf{special control tokens} into the sequence to regulate generation boundaries and downstream task execution:
@@ -1793,114 +1731,19 @@ Passing batch tensor $\mathbf{X} \in \mathbb{Z}^{B \times L}$ retrieves the corr
 \end{equation}
 where slice $(\mathbf{E}_{\text{tok}})_{b, t, :} = \vw_{X_{b, t}} \in \R^d$ is the $d$-dimensional embedding vector for the token at position $t$ in batch item $b$.
 
-\paragraph{3. The permutation invariance dilemma: why positional encoding is mandatory.}
-However, feeding $\mathbf{E}_{\text{tok}}$ alone into a Transformer causes a fundamental failure.
-Unlike Recurrent Neural Networks (which process tokens sequentially step-by-step through a temporal recurrence relation) or Convolutional Neural Networks (which slide localized spatial filters over adjacent coordinates), the core mathematical operator of Transformers—\textbf{Self-Attention}—is strictly \textbf{permutation-invariant}:
-\begin{theorem}{Permutation invariance of self-attention}{attention_permutation_invariance}
-Let $\mX \in \R^{L \times d}$ be an input sequence of $L$ vectors, and let $\mP \in \{0, 1\}^{L \times L}$ be an arbitrary permutation matrix. Under standard dot-product self-attention $\text{\texttt{Attention}}(\mX) = \softmax\left(\frac{\mX \mW_Q (\mX \mW_K)^\top}{\sqrt{d_k}}\right) \mX \mW_V$, the operator is equivariant to permutation:
-\begin{equation}
-\label{eq:attention_permutation_proof}
-\text{\texttt{Attention}}(\mP \mX) = \mP \, \text{\texttt{Attention}}(\mX).
-\end{equation}
-\end{theorem}
-In the absence of positional markers, self-attention treats input tokens as an \emph{unordered multiset} of vectors. Consider the two contrasting sentences examined in the course lecture:
-\begin{center}
-\textbf{Input 1}: \textit{``I ate an apple''} \quad $\Longrightarrow$ \quad $\{\mathbf{e}_{\text{I}}, \mathbf{e}_{\text{ate}}, \mathbf{e}_{\text{an}}, \mathbf{e}_{\text{apple}}\}$ \\
-\textbf{Input 2}: \textit{``An apple, I ate''} \quad $\Longrightarrow$ \quad $\{\mathbf{e}_{\text{an}}, \mathbf{e}_{\text{apple}}, \mathbf{e}_{\text{I}}, \mathbf{e}_{\text{ate}}\}$
-\end{center}
-Because both inputs comprise the exact same multiset of token embeddings, an unaugmented Transformer evaluates identical attention weighted sums over them. To the model, subject, verb, and object become entirely ambiguous. To preserve sequential order and syntax, positional information must be injected explicitly.
-
-\paragraph{4. Additive synthesis of the composite Transformer input.}
-Rather than concatenating positional coordinates (which would increase the latent dimensionality from $d$ to $d + d_{\text{pos}}$ and expand parameter counts across all subsequent linear projections), the standard Transformer paradigm combines lexical identity and positional location via \textbf{elementwise addition}:
+\paragraph{3. High-level additive synthesis of the composite Transformer input.}
+To endow the model with sequential awareness, the input pipeline combines the lexical token representation $\mathbf{E}_{\text{tok}}$ and a dedicated positional tensor $\mathbf{E}_{\text{pos}} \in \R^{1 \times L \times d}$ via \textbf{elementwise addition} rather than concatenation:
 \begin{equation}
 \label{eq:composite_input_tensor}
 \mathbf{X}_{\text{in}} = \mathbf{E}_{\text{tok}} + \mathbf{E}_{\text{pos}} \in \R^{B \times L \times d},
 \end{equation}
-where for each batch sample $b$ and temporal coordinate $pos \in \{0, 1, \dots, L-1\}$:
+where for each batch sample $b \in \{0, \dots, B-1\}$ and temporal coordinate $pos \in \{0, \dots, L-1\}$:
 \begin{equation}
 (\mathbf{X}_{\text{in}})_{b, pos, :} = \vw_{X_{b, pos}} + \vp_{pos} \in \R^d.
 \end{equation}
-Because vector addition in $\R^d$ is elementwise, the composite vector $(\mathbf{X}_{\text{in}})_{b, pos, :}$ encodes both \emph{what} token was observed (semantic identity $\vw_{X_{b, pos}}$) and \emph{where} it appeared in the sequence (temporal coordinate $\vp_{pos}$).
+Listing~\ref{lst:token_pos_embeddings} demonstrates how this composite synthesis is executed concretely in PyTorch using tensor broadcasting.
 
-\paragraph{5. Sinusoidal positional encodings.}
-In the seminal architecture introduced in \cite{vaswani2017}, the positional vectors $\vp_{pos} \in \R^d$ are deterministic, parameter-free functions computed from trigonometric sinusoids of varying frequencies:
-\begin{definition}{Sinusoidal positional encoding}{sinusoidal_pe}
-For a token at integer coordinate $pos \in \{0, 1, \dots, L-1\}$ and channel index $i \in \{0, 1, \dots, \frac{d}{2}-1\}$, the components of the positional vector $\vp_{pos} = \text{\texttt{PE}}_{(pos, :)} \in \R^d$ are defined by:
-\begin{align}
-\label{eq:sinusoidal_pe_even}
-\text{\texttt{PE}}_{(pos, 2i)} &= \sin\left(\frac{pos}{10000^{2i / d}}\right), \\
-\label{eq:sinusoidal_pe_odd}
-\text{\texttt{PE}}_{(pos, 2i+1)} &= \cos\left(\frac{pos}{10000^{2i / d}}\right).
-\end{align}
-\end{definition}
-Each dimension $2i$ and $2i+1$ corresponds to a sinusoid whose wavelength forms a geometric progression from $2\pi$ (at $i=0$) to $2\pi \cdot 10000 \approx 62{,}832$ (at $i = \frac{d}{2}-1$).
-
-\begin{examinsight}[Exact numerical worked example: computing sinusoidal coordinates]
-To master this formulation for examinations, consider the concrete numerical configuration presented in the course lecture: sequence position $pos = 1$ (the second token, under $0$-indexed coordinates) within a standard latent embedding space of dimension $d = 768$:
-\begin{enumerate}
-    \item \textbf{Lowest channel pair ($i = 0$, high-frequency regime)}:
-    \begin{align}
-        2i = 0 &\implies \text{\texttt{PE}}_{(1, 0)} = \sin\left(\frac{1}{10000^{0 / 768}}\right) = \sin(1) \approx 0.8415, \\
-        2i+1 = 1 &\implies \text{\texttt{PE}}_{(1, 1)} = \cos\left(\frac{1}{10000^{0 / 768}}\right) = \cos(1) \approx 0.5403.
-    \end{align}
-    \item \textbf{Subsequent even channel ($i = 2$, channel index $2i = 4$)}:
-    \begin{align}
-        2i = 4 \implies \text{\texttt{PE}}_{(1, 4)} &= \sin\left(\frac{1}{10000^{4 / 768}}\right) = \sin\left(\frac{1}{10000^{0.005208}}\right) \nonumber \\
-        &\approx \sin\left(\frac{1}{1.0490}\right) = \sin(0.9533) \approx 0.8153.
-    \end{align}
-\end{enumerate}
-These exact values ($0.8415$, $0.5403$, and $0.8153$) illustrate how the trigonometric arguments shift smoothly across embedding indices, providing each positional coordinate with an unambiguous, deterministic signature.
-\end{examinsight}
-
-\paragraph{6. Mathematical properties of sinusoidal encodings.}
-Sinusoidal positional encodings satisfy three pivotal theoretical properties:
-\begin{enumerate}
-    \item \textbf{Positional uniqueness}: Because each channel $i$ oscillates at a distinct frequency $\omega_i = 1 / 10000^{2i/d}$, no two positional vectors are identical within the operational horizon. The vectors remain distinct for at least $2\pi \cdot 10000 \approx 62{,}832$ positions before periodic recurrence can occur.
-    \item \textbf{Smooth metric similarity and distance decay}: The inner product $\vp_{pos_1}^\top \vp_{pos_2}$ and cosine similarity depend smoothly on the relative displacement $|pos_1 - pos_2|$. Adjacent tokens possess high directional similarity, which decays monotonically as distance increases, forming a prominent bright diagonal in the Gram similarity matrix.
-    \item \textbf{Linear relative shift property}: For any fixed spatial offset $k$, the positional encoding vector at position $pos + k$ can be computed as a direct linear transformation of the vector at position $pos$:
-    \begin{theorem}{Linear relative transformation property}{linear_shift_pe}
-    For any frequency $\omega_i = 10000^{-2i/d}$ and spatial offset $k \in \mathbb{Z}$, there exists an orthogonal rotation matrix $\mM_{i, k} \in \R^{2 \times 2}$ independent of $pos$ such that:
-    \begin{equation}
-    \label{eq:linear_pe_rotation}
-    \begin{bmatrix} \text{\texttt{PE}}_{(pos+k, 2i)} \\ \text{\texttt{PE}}_{(pos+k, 2i+1)} \end{bmatrix} = \begin{bmatrix} \cos(\omega_i k) & \sin(\omega_i k) \\ -\sin(\omega_i k) & \cos(\omega_i k) \end{bmatrix} \begin{bmatrix} \text{\texttt{PE}}_{(pos, 2i)} \\ \text{\texttt{PE}}_{(pos, 2i+1)} \end{bmatrix}.
-    \end{equation}
-    \end{theorem}
-    \begin{proof}
-    Applying the standard trigonometric angle addition identities:
-    \begin{align}
-    \sin(\omega_i(pos + k)) &= \sin(\omega_i pos)\cos(\omega_i k) + \cos(\omega_i pos)\sin(\omega_i k), \\
-    \cos(\omega_i(pos + k)) &= \cos(\omega_i pos)\cos(\omega_i k) - \sin(\omega_i pos)\sin(\omega_i k).
-    \end{align}
-    Expressing this system in matrix notation yields Equation~\eqref{eq:linear_pe_rotation}. Consequently, self-attention layers can readily learn to attend to relative positions through linear projection operations.
-    \end{proof}
-\end{enumerate}
-
-\paragraph{7. Learned positional embeddings (GPT convention).}
-An alternative approach, adopted by architectures such as GPT-2 and GPT-3 \cite{radford2019, brown2020}, treats positional encodings as trainable parameter weights rather than fixed sinusoidal functions:
-\begin{equation}
-\label{eq:pos_embedding_layer}
-\mW_{\text{pos}} \in \R^{L_{\max} \times d}.
-\end{equation}
-Each integer coordinate $p \in \{0, 1, \dots, L_{\max}-1\}$ indexes a row vector $\vp_p = (\mW_{\text{pos}})_{p, :} \in \R^d$ optimized via gradient descent alongside token embeddings.
-
-\begin{table}[htbp]
-\centering
-\small
-\caption{Architectural comparison: sinusoidal positional encodings vs. learned positional embeddings.}
-\label{tab:pe_comparison}
-\begin{tabularx}{\textwidth}{lXX}
-\toprule
-\textbf{Property} & \textbf{Sinusoidal encodings \cite{vaswani2017}} & \textbf{Learned embeddings \cite{radford2019}} \\
-\midrule
-\textbf{Parameters} & $0$ trainable weights (fully deterministic) & $L_{\max} \times d$ trainable parameters \\
-\textbf{Extrapolation} & Can theoretically extrapolate to sequence lengths $> L_{\max}$ & Strictly confined to context length $L \le L_{\max}$ \\
-\textbf{Relative shift} & Exact orthogonal rotation $\mM_{i, k}$ provable analytically & Must be approximated empirically from data \\
-\textbf{Empirical performance} & Comparable translation BLEU in \cite{vaswani2017} & Standard in modern autoregressive decoders \\
-\bottomrule
-\end{tabularx}
-\end{table}
-
-\begin{lstlisting}[language=Python, caption={PyTorch synthesis of token embeddings and learned positional embeddings \cite{raschka2024llm}.}, label={lst:token_pos_embeddings}]
+\begin{lstlisting}[language=Python, caption={PyTorch synthesis of token embeddings and positional embeddings \cite{raschka2024llm}.}, label={lst:token_pos_embeddings}]
 import torch
 
 vocab_size = 50257     # GPT-2 BPE vocabulary size
@@ -1910,7 +1753,7 @@ context_length = 4     # Sequence length L
 # 1. Allocate trainable token embedding layer
 token_embedding_layer = torch.nn.Embedding(vocab_size, output_dim)
 
-# 2. Allocate trainable absolute positional embedding layer
+# 2. Allocate positional embedding layer (e.g., learned or precomputed sinusoidal)
 pos_embedding_layer = torch.nn.Embedding(context_length, output_dim)
 
 # Example batch of token IDs: [batch_size=2, context_length=4]
@@ -1933,28 +1776,340 @@ print("Pos Embeddings Shape:  ", pos_embeddings.shape)    # torch.Size([4, 256])
 print("Final Composite Shape: ", input_embeddings.shape)  # torch.Size([2, 4, 256])
 \end{lstlisting}
 
-\subsection{Causal bridge to Chapter 5: from static token lookups to the Transformer attention revolution}
-\label{subsec:bridge_to_chapter_5}
+\paragraph{Causal motivation for a deep dive into positional representations.}
+While Equation~\eqref{eq:composite_input_tensor} and Listing~\ref{lst:token_pos_embeddings} summarize the high-level computational contract of the LM input pipeline, they raise foundational questions: \emph{Why is the positional tensor $\mathbf{E}_{\text{pos}}$ strictly mandatory? Why do naive indexing schemes fail catastrophically? And what mathematical principles govern its construction?} We now dedicate the next subsection to an exhaustive investigation into positional representations.
 
-Throughout this chapter, we have traced the evolution of vector space representations:
+\subsection{Positional representations: intuition, mathematical formulation, and implementations}
+\label{subsec:positional_representations_deep}
+
+\paragraph{1. The permutation invariance dilemma: why positional encoding is mandatory.}
+In classical Recurrent Neural Networks (RNNs), sequential order is implicitly baked into the architecture: the hidden state transitions recurrently via $\vh_t = f(\vh_{t-1}, \vx_t)$, guaranteeing that token $\vx_t$ is processed strictly after token $\vx_{t-1}$. In Convolutional Neural Networks (CNNs), sequential order is preserved through localized spatial receptive fields.
+
+In contrast, the cornerstone mathematical operator of the Transformer---\textbf{Self-Attention}---is strictly \textbf{permutation-equivariant}:
+\begin{theorem}{Permutation equivariance of self-attention}{attention_permutation_invariance}
+Let $\mX \in \R^{L \times d}$ be an input sequence of $L$ vectors, and let $\mP \in \{0, 1\}^{L \times L}$ be an arbitrary permutation matrix (a square matrix having exactly one entry $1$ per row and column, satisfying $\mP^\top = \mP^{-1}$). Under standard dot-product self-attention:
+\begin{equation}
+\label{eq:standard_attention_op}
+\text{\texttt{Attention}}(\mX) = \softmax\left(\frac{\mX \mW_Q (\mX \mW_K)^\top}{\sqrt{d_k}}\right) \mX \mW_V,
+\end{equation}
+the operator is equivariant to input permutation:
+\begin{equation}
+\label{eq:attention_permutation_proof}
+\text{\texttt{Attention}}(\mP \mX) = \mP \, \text{\texttt{Attention}}(\mX).
+\end{equation}
+\end{theorem}
+\begin{proof}
+Let $\mX' = \mP \mX$. The query and key projections evaluate to $\mQ' = \mP \mX \mW_Q$ and $\mK' = \mP \mX \mW_K$. The unscaled attention score matrix becomes:
+\begin{equation}
+\mQ' (\mK')^\top = (\mP \mX \mW_Q) (\mP \mX \mW_K)^\top = \mP (\mX \mW_Q \mW_K^\top \mX^\top) \mP^\top.
+\end{equation}
+Because the Softmax function is evaluated independently along each row, applying a permutation matrix $\mP$ on the left permutes the rows, while $\mP^\top$ on the right permutes the columns:
+\begin{equation}
+\softmax\left(\frac{\mP (\mX \mW_Q \mW_K^\top \mX^\top) \mP^\top}{\sqrt{d_k}}\right) = \mP \, \softmax\left(\frac{\mX \mW_Q \mW_K^\top \mX^\top}{\sqrt{d_k}}\right) \mP^\top.
+\end{equation}
+Finally, multiplying by the value projection $\mV' = \mP \mX \mW_V$:
+\begin{align}
+\text{\texttt{Attention}}(\mP \mX) &= \left[ \mP \, \softmax\left(\frac{\mX \mW_Q \mW_K^\top \mX^\top}{\sqrt{d_k}}\right) \mP^\top \right] (\mP \mX \mW_V) \nonumber \\
+&= \mP \, \softmax\left(\frac{\mX \mW_Q \mW_K^\top \mX^\top}{\sqrt{d_k}}\right) (\mP^\top \mP) \mX \mW_V \nonumber \\
+&= \mP \, \text{\texttt{Attention}}(\mX),
+\end{align}
+where the identity $\mP^\top \mP = \mathbf{I}$ collapses the internal permutation. $\blacksquare$
+\end{proof}
+
+\paragraph{The unordered multiset collapse.}
+Theorem~\ref{thm:attention_permutation_invariance} establishes that if we permute the input tokens, the output vectors undergo the exact same permutation with \emph{identical values}. The attention mechanism treats the input sequence as an \textbf{unordered multiset} (a ``bag of vectors'') with zero intrinsic knowledge of temporal order!
+
+To understand the catastrophic consequence of this property, consider the two contrasting sentences analyzed in the course lecture:
+\begin{center}
+\textbf{Sentence 1}: \textit{``I ate an apple''} \quad $\Longrightarrow$ \quad $\{\mathbf{e}_{\text{I}}, \mathbf{e}_{\text{ate}}, \mathbf{e}_{\text{an}}, \mathbf{e}_{\text{apple}}\}$ \\
+\textbf{Sentence 2}: \textit{``An apple, I ate''} \quad $\Longrightarrow$ \quad $\{\mathbf{e}_{\text{an}}, \mathbf{e}_{\text{apple}}, \mathbf{e}_{\text{I}}, \mathbf{e}_{\text{ate}}\}$
+\end{center}
+Or similarly:
+\begin{center}
+\textbf{Sentence A}: \textit{``The dog bit the man''} \quad $\Longrightarrow$ \quad $\{\mathbf{e}_{\text{The}}, \mathbf{e}_{\text{dog}}, \mathbf{e}_{\text{bit}}, \mathbf{e}_{\text{the}}, \mathbf{e}_{\text{man}}\}$ \\
+\textbf{Sentence B}: \textit{``The man bit the dog''} \quad $\Longrightarrow$ \quad $\{\mathbf{e}_{\text{The}}, \mathbf{e}_{\text{man}}, \mathbf{e}_{\text{bit}}, \mathbf{e}_{\text{the}}, \mathbf{e}_{\text{dog}}\}$
+\end{center}
+In both pairs, the sentences express fundamentally different or opposite semantic realities. Yet, because each pair comprises the exact same multiset of token embeddings, an unaugmented Transformer evaluates identical attention weights. To the model, subject, verb, and object become entirely conflated. Sequential order must therefore be injected into the representations explicitly.
+
+\paragraph{Why naive positional representations fail.}
+Before arriving at the modern formulation, it is vital to understand why naive indexing schemes break down:
 \begin{enumerate}
-    \item \textbf{Local Encodings Failed}: One-hot vectors $\ve_i \in \{0, 1\}^V$ suffered from orthogonality ($d_E = \sqrt{2}, \cos = 0$), memory explosion, and zero parameter sharing.
-    \item \textbf{Continuous Dense Embeddings}: Word2Vec and FastText learned dense vector manifolds $\R^d$ where geometric proximity encodes semantic clustering and linear relational translations.
-    \item \textbf{Byte-Level BPE}: Solved the Out-of-Vocabulary catastrophe by decomposing arbitrary text into subword units down to 256 UTF-8 base bytes, guaranteeing $\Prob(\text{OOV}) = 0$ with lossless roundtrip detokenization.
-    \item \textbf{Continuous Embedding Projection \& Positional Injection}: Projected discrete token IDs into dense latent embeddings and synthesized composite position-aware input tensors $\mathbf{X}_{\text{in}} = \mathbf{E}_{\text{tok}} + \mathbf{E}_{\text{pos}} \in \R^{B \times L \times d}$ to overcome the permutation invariance of self-attention.
+    \item \textbf{Naive Integer Addition ($pos \in \{0, 1, 2, \dots, L-1\}$)}: If we add scalar indices $pos$ to token embeddings, early tokens receive tiny perturbations ($+0, +1$), while token $2048$ receives $+2048$. Because embedding vectors are initialized with mean $0$ and unit variance, large coordinates overwhelm the semantic representations completely, and models fail to generalize to sequence lengths beyond training.
+    \item \textbf{Normalized Coordinates ($pos / L \in [0, 1]$)}: Normalizing positions by sequence length bounds values within $[0, 1]$. However, the physical meaning of a step size becomes variable: in a 10-token sentence, an offset of $\Delta = 0.1$ corresponds to an adjacent word, whereas in a 1000-token document, $\Delta = 0.1$ spans 100 words. The model cannot learn consistent relative distances.
+    \item \textbf{Coordinate Concatenation ($[\vw_t; \vp_t]$)}: Concatenating positional coordinates expands embedding dimensionality to $d + d_{\text{pos}}$, increasing parameter counts across all subsequent projection matrices ($\mW_Q, \mW_K, \mW_V, \mW_O$) and preventing seamless parameter sharing.
 \end{enumerate}
 
-\paragraph{The remaining representational impasse: static isolation.}
-Despite these remarkable advances in data preparation, a profound theoretical limitation remains:
+\paragraph{2. The geometric clock intuition (the ``Clock Way of Thought'').}
+How can we construct an encoding that remains strictly bounded within $[-1, 1]$, assigns a unique signature to every position, and preserves consistent geometric notions of distance?
+
+\begin{intuition}[From binary counting to continuous multi-scale clocks]
+Consider how a digital computer represents numbers using bounded bits $\{0, 1\}$. In a 3-bit binary counter:
+\begin{itemize}
+    \item The lowest bit (Bit 0) alternates every single step: $0, 1, 0, 1, 0, 1 \dots$ (high-frequency wave).
+    \item The middle bit (Bit 1) alternates every two steps: $0, 0, 1, 1, 0, 0 \dots$ (medium-frequency wave).
+    \item The highest bit (Bit 2) alternates every four steps: $0, 0, 0, 0, 1, 1 \dots$ (low-frequency wave).
+\end{itemize}
+Every integer receives an unambiguous signature, even though individual bits are bounded in $\{0, 1\}$. However, discrete step functions are non-differentiable. \textbf{Sinusoidal positional encoding is the smooth, continuous, differentiable generalization of binary counting!}
+
+Rather than binary square waves, we assign continuous trigonometric waves oscillating at geometrically decreasing frequencies across embedding channels:
+\begin{itemize}
+    \item \textbf{Fast Clocks (Seconds Hand)}: Oscillate rapidly across low dimension indices, capturing fine-grained local syntax and adjacent word order.
+    \item \textbf{Medium Clocks (Minutes Hand)}: Oscillate at intermediate frequencies, capturing phrase and clause boundaries.
+    \item \textbf{Slow Clocks (Hours Hand)}: Oscillate extremely slowly across high dimension indices, capturing document-level flow and paragraphs.
+\end{itemize}
+\end{intuition}
+
+\paragraph{The clock hand problem: why sine alone fails.}
+Why can we not simply use sine waves with varying frequencies?
+Consider an analog clock where you can only observe the vertical height of the hand ($Y = \sin \theta$). Because $\sin(\theta) = \sin(\pi - \theta)$, the hand is at the exact same vertical height at 2:00 and 10:00! Furthermore, $\sin(0) = \sin(\pi) = 0$. A single 1D wave suffers from severe directional ambiguity (aliasing).
+
+To establish an unambiguous position, we need both coordinates of the clock face:
+\begin{equation}
+(X, Y) = (\cos \theta, \sin \theta).
+\end{equation}
+Together, $(\sin \theta, \cos \theta)$ traces a point along the unit circle $S^1$. On a 2D circle, every angular orientation $\theta \in [0, 2\pi)$ has an unambiguous coordinate! This is why Transformer positional encodings alternate $\sin$ and $\cos$ across dimension pairs.
+
+Figure~\ref{fig:clock_positional_intuition} illustrates this multi-frequency clock mechanism and demonstrates how pairing sine and cosine eliminates 1D wave aliasing.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    scale=0.82, every node/.style={transform shape},
+    clockface/.style={circle, draw=politoNavy, very thick, minimum size=2.2cm, fill=white},
+    hand/.style={-{Stealth[length=5pt]}, thick, draw=politoNavy},
+    sublabel/.style={font=\scriptsize\sffamily, align=center, text=bodyDark}
+]
+    % CLOCK 1: FAST CLOCK (+90 deg / step)
+    % pos 0
+    \node[clockface] (c1_0) at (0, 0) {};
+    \draw[hand] (0,0) -- (0, 0.85); % 12:00
+    \node[sublabel, below=0.15cm of c1_0] {Position 0\\$\theta = 0^\circ$\\$(0.0, 1.0)$};
+
+    % pos 1
+    \node[clockface] (c1_1) at (2.6, 0) {};
+    \draw[hand] (2.6,0) -- (3.45, 0); % 3:00
+    \node[sublabel, below=0.15cm of c1_1] {Position 1\\$\theta = 90^\circ$\\$(1.0, 0.0)$};
+
+    % pos 2
+    \node[clockface] (c1_2) at (5.2, 0) {};
+    \draw[hand] (5.2,0) -- (5.2, -0.85); % 6:00
+    \node[sublabel, below=0.15cm of c1_2] {Position 2\\$\theta = 180^\circ$\\$(0.0, -1.0)$};
+
+    % pos 3
+    \node[clockface] (c1_3) at (7.8, 0) {};
+    \draw[hand] (7.8,0) -- (6.95, 0); % 9:00
+    \node[sublabel, below=0.15cm of c1_3] {Position 3\\$\theta = 270^\circ$\\$(-1.0, 0.0)$};
+
+    \node[above=0.25cm of c1_1.north east, font=\small\sffamily\bfseries\color{steelBlue}] {Fast Clock ($\omega_0 = 90^\circ/\text{step}$, High Frequency: Local Syntax)};
+
+    % CLOCK 2: SLOW CLOCK (+30 deg / step)
+    % pos 0
+    \node[clockface] (c2_0) at (0, -3.2) {};
+    \draw[hand, draw=deepdiveTeal] (0, -3.2) -- (0, -2.35);
+    \node[sublabel, below=0.15cm of c2_0] {Position 0\\$\theta = 0^\circ$\\$(0.0, 1.0)$};
+
+    % pos 1
+    \node[clockface] (c2_1) at (2.6, -3.2) {};
+    \draw[hand, draw=deepdiveTeal] (2.6, -3.2) -- ++(60:0.85);
+    \node[sublabel, below=0.15cm of c2_1] {Position 1\\$\theta = 30^\circ$\\$(0.5, 0.87)$};
+
+    % pos 2
+    \node[clockface] (c2_2) at (5.2, -3.2) {};
+    \draw[hand, draw=deepdiveTeal] (5.2, -3.2) -- ++(30:0.85);
+    \node[sublabel, below=0.15cm of c2_2] {Position 2\\$\theta = 60^\circ$\\$(0.87, 0.5)$};
+
+    % pos 3
+    \node[clockface] (c2_3) at (7.8, -3.2) {};
+    \draw[hand, draw=deepdiveTeal] (7.8, -3.2) -- ++(0:0.85);
+    \node[sublabel, below=0.15cm of c2_3] {Position 3\\$\theta = 90^\circ$\\$(1.0, 0.0)$};
+
+    \node[above=0.25cm of c2_1.north east, font=\small\sffamily\bfseries\color{deepdiveTeal}] {Slow Clock ($\omega_1 = 30^\circ/\text{step}$, Low Frequency: Global Context)};
+
+    % 1D vs 2D Aliasing Box
+    \node[clockface, minimum size=2.6cm, draw=crimsonRed] (circle_alias) at (11.5, -1.6) {};
+    \draw[thick, dashed, draw=bodyGray] (10.2, -1.6) -- (12.8, -1.6);
+    \draw[thick, dashed, draw=bodyGray] (11.5, -2.9) -- (11.5, -0.3);
+    \filldraw[crimsonRed] (11.5, -1.6) ++(60:1.0) circle (2pt) node[above right, font=\tiny\sffamily\bfseries] {2:00 ($\sin = 0.87$)};
+    \filldraw[crimsonRed] (11.5, -1.6) ++(120:1.0) circle (2pt) node[above left, font=\tiny\sffamily\bfseries] {10:00 ($\sin = 0.87$)};
+    \draw[dotted, thick, crimsonRed] (11.5, -1.6) ++(120:1.0) -- ++(1.0, 0);
+    \draw[hand, draw=crimsonRed] (11.5, -1.6) -- ++(60:0.95);
+    \node[sublabel, below=0.2cm of circle_alias] {\textbf{The 1D Aliasing Trap}\\At 2:00 and 10:00, height $\sin\theta = 0.87$ is identical!\\Pairing $(\sin, \cos)$ yields unique coordinates:\\$(X_1, Y_1) = (0.5, 0.87) \neq (-0.5, 0.87) = (X_2, Y_2)$.};
+
+\end{tikzpicture}
+\caption{The geometric clock intuition behind positional encodings. Each dimension pair acts as an analog clock hand rotating at an angular frequency $\omega_i$. Fast clocks disambiguate immediate neighbors (local syntax), while slow clocks preserve long-range sequence context. Pairing $\sin$ and $\cos$ prevents 1D wave aliasing by establishing a unique 2D coordinate on the unit circle $S^1$.}
+\label{fig:clock_positional_intuition}
+\end{figure}
+
+\paragraph{3. Taxonomy of positional representations in language models.}
+Modern architectures implement positional awareness through three primary paradigms:
+\begin{enumerate}
+    \item \textbf{Fixed Sinusoidal Positional Encodings \cite{vaswani2017}}: Fully deterministic, parameter-free functions computed from geometric progressions of trigonometric frequencies.
+    \item \textbf{Learned Absolute Positional Embeddings \cite{gehring2017, radford2019, devlin2019}}: Trainable parameter weights stored in an embedding matrix $\mW_{\text{pos}} \in \R^{L_{\max} \times d}$ optimized via backpropagation (used in GPT-2, GPT-3, and BERT).
+    \item \textbf{Relative and Rotary Positional Embeddings (RoPE / ALiBi) \cite{shaw2018, su2024roformer, press2022alibi}}: Encodings that inject positional information directly into attention scores as a function of relative distance $|i - j|$. Notably, Rotary Position Embedding (RoPE) \cite{su2024roformer} directly generalizes the 2D rotation matrix property of sinusoidal encodings into query and key representations.
+\end{enumerate}
+
+\paragraph{4. Sinusoidal positional encodings: step-by-step mathematical derivation.}
+In the seminal architecture introduced in \cite{vaswani2017}, positional coordinates are generated deterministically:
+\begin{definition}{Sinusoidal positional encoding}{sinusoidal_pe}
+For a token at temporal sequence coordinate $pos \in \{0, 1, \dots, L-1\}$ and channel index $i \in \{0, 1, \dots, \frac{d}{2}-1\}$, the components of the positional vector $\vp_{pos} = \text{\texttt{PE}}_{(pos, :)} \in \R^d$ are defined by:
+\begin{align}
+\label{eq:sinusoidal_pe_even}
+\text{\texttt{PE}}_{(pos, 2i)} &= \sin\left(\frac{pos}{10000^{2i / d}}\right), \\
+\label{eq:sinusoidal_pe_odd}
+\text{\texttt{PE}}_{(pos, 2i+1)} &= \cos\left(\frac{pos}{10000^{2i / d}}\right).
+\end{align}
+\end{definition}
+
+Let us examine every term in this formulation:
+\begin{itemize}
+    \item $pos$: The integer position of the token within the sequence ($0, 1, 2, \dots, L-1$).
+    \item $i$: The frequency channel index ($0 \le i < d/2$).
+    \item $2i$ and $2i+1$: Even indices receive sine values, odd indices receive cosine values.
+    \item Angular frequency $\omega_i$: Defined as $\omega_i = \frac{1}{10000^{2i / d}} = 10000^{-2i/d}$.
+    \item Wavelength $\lambda_i$: The wavelength $\lambda_i = \frac{2\pi}{\omega_i} = 2\pi \cdot 10000^{2i / d}$ forms a geometric progression:
+    \begin{align}
+    \text{At } i = 0: \quad &\lambda_0 = 2\pi \cdot 10000^0 = 2\pi \approx 6.28 \text{ tokens}, \\
+    \text{At } i = \frac{d}{2} - 1: \quad &\lambda_{\max} \approx 2\pi \cdot 10000^1 \approx 62{,}832 \text{ tokens}.
+    \end{align}
+    \item \textbf{Why the base 10000?} As highlighted by the professor, $10{,}000$ guarantees that within typical context lengths (up to $\approx 60{,}000$ tokens), the slowest frequency does not complete a single cycle. This guarantees that every position vector in the operational horizon is globally unique.
+\end{itemize}
+
+\paragraph{Mathematical properties and proofs.}
+Sinusoidal positional encodings satisfy three pivotal theoretical properties:
+\begin{enumerate}
+    \item \textbf{Positional uniqueness}: Because each channel $i$ oscillates at a distinct frequency $\omega_i$, no two positional vectors are identical. The vectors remain distinct for at least $2\pi \cdot 10000 \approx 62{,}832$ positions before periodic recurrence can occur.
+    \item \textbf{The linear relative shift property}: For any fixed spatial offset $k \in \mathbb{Z}$, the positional vector at position $pos + k$ can be computed as a direct linear transformation of the vector at position $pos$:
+    \begin{theorem}{Linear relative transformation property}{linear_shift_pe}
+    For any frequency $\omega_i = 10000^{-2i/d}$ and spatial offset $k \in \mathbb{Z}$, there exists an orthogonal rotation matrix $\mM_{i, k} \in \R^{2 \times 2}$ independent of $pos$ such that:
+    \begin{equation}
+    \label{eq:linear_pe_rotation}
+    \begin{bmatrix} \text{\texttt{PE}}_{(pos+k, 2i)} \\ \text{\texttt{PE}}_{(pos+k, 2i+1)} \end{bmatrix} = \begin{bmatrix} \cos(\omega_i k) & \sin(\omega_i k) \\ -\sin(\omega_i k) & \cos(\omega_i k) \end{bmatrix} \begin{bmatrix} \text{\texttt{PE}}_{(pos, 2i)} \\ \text{\texttt{PE}}_{(pos, 2i+1)} \end{bmatrix}.
+    \end{equation}
+    \end{theorem}
+    \begin{proof}
+    Applying the standard trigonometric angle addition identities:
+    \begin{align}
+    \sin(\omega_i(pos + k)) &= \sin(\omega_i pos)\cos(\omega_i k) + \cos(\omega_i pos)\sin(\omega_i k), \\
+    \cos(\omega_i(pos + k)) &= \cos(\omega_i pos)\cos(\omega_i k) - \sin(\omega_i pos)\sin(\omega_i k).
+    \end{align}
+    Expressing this system in matrix notation yields Equation~\eqref{eq:linear_pe_rotation}. Because the rotation matrix $\mM_{i, k}$ depends strictly on offset $k$ and is independent of absolute position $pos$, linear attention projection layers ($\mW_Q, \mW_K$) can easily learn to attend to relative positions. $\blacksquare$
+    \end{proof}
+    \item \textbf{Metric similarity and distance decay}:
+    In self-attention, query and key vectors interact via inner products. The dot product between the 2D positional components of two tokens at positions $p_1$ and $p_2$ evaluates to:
+    \begin{equation}
+    \label{eq:pe_dot_product}
+    \vp_{p_1}^{(i)} \cdot \vp_{p_2}^{(i)} = \sin(\omega_i p_1)\sin(\omega_i p_2) + \cos(\omega_i p_1)\cos(\omega_i p_2) = \cos(\omega_i (p_1 - p_2)).
+    \end{equation}
+    The dot product depends \textbf{strictly on the relative distance $\Delta p = p_1 - p_2$}:
+    \begin{itemize}
+        \item When $p_1 = p_2$, $\cos(0) = 1$ (maximum correlation along the diagonal).
+        \item As $|p_1 - p_2|$ increases, the similarity smoothly decays.
+    \end{itemize}
+    In the course lecture, the professor demonstrated this property empirically by computing the complete pairwise cosine similarity matrix across $500$ positions:
+    \begin{itemize}
+        \item The 2D Gram matrix exhibits a bright, luminous main diagonal ($\cos = 1$).
+        \item A horizontal slice along row $pos = 100$ reveals a sharp symmetric peak at index $100$, followed by a smooth, monotonic decay as distance $|pos - 100|$ expands.
+    \end{itemize}
+\end{enumerate}
+
+\paragraph{Concrete numerical calculation of sinusoidal coordinates.}
+To illustrate this formulation concretely, consider the numerical configuration presented in the course lecture: sequence position $pos = 1$ (the second token, under $0$-indexed coordinates) within a standard latent embedding space of dimension $d = 768$:
+\begin{enumerate}
+    \item \textbf{Lowest channel pair ($i = 0$, high-frequency regime)}:
+    \begin{align}
+        2i = 0 &\implies \text{\texttt{PE}}_{(1, 0)} = \sin\left(\frac{1}{10000^{0 / 768}}\right) = \sin(1) \approx 0.8415, \\
+        2i+1 = 1 &\implies \text{\texttt{PE}}_{(1, 1)} = \cos\left(\frac{1}{10000^{0 / 768}}\right) = \cos(1) \approx 0.5403.
+    \end{align}
+    \item \textbf{Subsequent even channel ($i = 2$, channel index $2i = 4$)}:
+    \begin{align}
+        2i = 4 \implies \text{\texttt{PE}}_{(1, 4)} &= \sin\left(\frac{1}{10000^{4 / 768}}\right) = \sin\left(\frac{1}{10000^{0.005208}}\right) \nonumber \\
+        &\approx \sin\left(\frac{1}{1.0490}\right) = \sin(0.9533) \approx 0.8153.
+    \end{align}
+\end{enumerate}
+These exact values ($0.8415$, $0.5403$, and $0.8153$) illustrate how trigonometric arguments shift smoothly across embedding indices, providing each positional coordinate with an unambiguous, deterministic signature.
+
+\paragraph{5. Learned positional embeddings (GPT convention).}
+An alternative approach, adopted by architectures such as GPT-2 and GPT-3 \cite{radford2019, brown2020}, treats positional encodings as trainable parameter weights rather than fixed sinusoidal functions:
+\begin{equation}
+\label{eq:pos_embedding_layer}
+\mW_{\text{pos}} \in \R^{L_{\max} \times d}.
+\end{equation}
+Each integer coordinate $p \in \{0, 1, \dots, L_{\max}-1\}$ indexes a row vector $\vp_p = (\mW_{\text{pos}})_{p, :} \in \R^d$ optimized via gradient descent alongside token embeddings.
+
+\begin{table}[htbp]
+\centering
+\small
+\caption{Architectural comparison: sinusoidal positional encodings vs. learned positional embeddings.}
+\label{tab:pe_comparison}
+\begin{tabularx}{\textwidth}{lXX}
+\toprule
+\textbf{Property} & \textbf{Sinusoidal encodings \cite{vaswani2017}} & \textbf{Learned embeddings \cite{radford2019}} \\
+\midrule
+\textbf{Parameters} & $0$ trainable weights (fully deterministic) & $L_{\max} \times d$ trainable parameters \\
+\textbf{Extrapolation} & Can theoretically extrapolate to sequence lengths $> L_{\max}$ & Strictly confined to context length $L \le L_{\max}$ \\
+\textbf{Relative shift} & Exact orthogonal rotation $\mM_{i, k}$ provable analytically & Must be approximated empirically from data \\
+\textbf{Empirical similarity} & Pure smooth monotonic distance decay around diagonal & Smooth decay near diagonal with data-driven periodic peaks \\
+\textbf{Empirical performance} & Comparable translation BLEU in \cite{vaswani2017} & Standard in modern autoregressive decoders \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+As highlighted in the lecture, computing the cosine similarity matrix of learned GPT-2 embeddings reveals high values along the main diagonal, accompanied by periodic secondary peaks at larger distances. These secondary peaks reflect statistical regularities in the training corpus (such as paragraph transitions, section breaks, or dialogue conventions).
+
+\paragraph{6. Final clarification walkthrough: disambiguating opposite sentences.}
+To crystallize all of these principles into an indelible mental picture, let us trace how a mini 2-clock system disambiguates our contrasting sentences:
 \begin{center}
-\textbf{The input tensor $\mathbf{X}_{\text{in}}$ is still a collection of context-independent static lookups.}
+\textbf{Sentence 1}: \textit{``The dog bit the man.''} \quad vs. \quad \textbf{Sentence 2}: \textit{``The man bit the dog.''}
 \end{center}
-In $\mathbf{X}_{\text{in}}$, the vector representation for a word like \texttt{"bank"} or code keyword \texttt{"count"} is identical whether it appears in a financial document, a geography textbook, or an algorithmic loop counter. It contains zero dynamic information about the surrounding tokens in the sentence!
+Let $d = 4$ (consisting of $2$ clocks):
+\begin{itemize}
+    \item \textbf{Clock 1 (Fast Clock, $\omega_0 = 90^\circ/\text{step}$)}: Rotates $90^\circ$ clockwise per step.
+    \item \textbf{Clock 2 (Slow Clock, $\omega_1 = 30^\circ/\text{step}$)}: Rotates $30^\circ$ clockwise per step.
+\end{itemize}
 
-In Chapter~\ref{ch:rnn_sequence_modeling}, we saw that Recurrent Neural Networks (Elman RNNs, LSTMs, GRUs) attempted to build dynamic context sequentially by recurrently propagating state $\vh_t = f(\vh_{t-1}, \vx_t)$. However, sequential recurrence suffered from an insurmountable physical bottleneck: \textbf{the sequential execution wall}, requiring $\mathcal{O}(L)$ sequential steps that prevented parallel GPU tensor execution during training.
+Evaluating the positional vectors $\mathbf{PE}(pos) = [\sin(\omega_0 pos), \cos(\omega_0 pos), \sin(\omega_1 pos), \cos(\omega_1 pos)]$ yields:
+\begin{table}[htbp]
+\centering
+\small
+\caption{Exact numerical positional vectors for positions $0$ through $4$ under the 2-clock system.}
+\label{tab:clock_positions_table}
+\begin{tabular}{c c c c}
+\toprule
+\textbf{Position ($pos$)} & \textbf{Clock 1 ($\omega_0 = 90^\circ \cdot pos$)} & \textbf{Clock 2 ($\omega_1 = 30^\circ \cdot pos$)} & \textbf{Positional Vector $\vp_{pos}$} \\
+\midrule
+$0$ & $\theta = 0^\circ \implies [0.0, 1.0]$ & $\theta = 0^\circ \implies [0.0, 1.0]$ & $[0.0, 1.0, 0.0, 1.0]$ \\
+$1$ & $\theta = 90^\circ \implies [1.0, 0.0]$ & $\theta = 30^\circ \implies [0.5, 0.87]$ & $[1.0, 0.0, 0.5, 0.87]$ \\
+$2$ & $\theta = 180^\circ \implies [0.0, -1.0]$ & $\theta = 60^\circ \implies [0.87, 0.5]$ & $[0.0, -1.0, 0.87, 0.5]$ \\
+$3$ & $\theta = 270^\circ \implies [-1.0, 0.0]$ & $\theta = 90^\circ \implies [1.0, 0.0]$ & $[-1.0, 0.0, 1.0, 0.0]$ \\
+$4$ & $\theta = 360^\circ \implies [0.0, 1.0]$ & $\theta = 120^\circ \implies [0.87, -0.5]$ & $[0.0, 1.0, 0.87, -0.5]$ \\
+\bottomrule
+\end{tabular}
+\end{table}
 
-This impasse sets the stage for the single most consequential breakthrough in modern artificial intelligence: \emph{Can we design an architecture that allows every token in $\mathbf{X}_{\text{in}}$ to attend to every other token dynamically across the entire sequence in constant $\mathcal{O}(1)$ time, with full GPU sequence parallelization?}
+Now consider the additive inputs:
+\begin{itemize}
+    \item In \textbf{Sentence 1}:
+    $\vx_{\text{dog}} = \mathbf{E}_{\text{dog}} + \vp_1$, \quad
+    $\vx_{\text{bit}} = \mathbf{E}_{\text{bit}} + \vp_2$, \quad
+    $\vx_{\text{man}} = \mathbf{E}_{\text{man}} + \vp_4$.
+    \item In \textbf{Sentence 2}:
+    $\vx_{\text{man}} = \mathbf{E}_{\text{man}} + \vp_1$, \quad
+    $\vx_{\text{bit}} = \mathbf{E}_{\text{bit}} + \vp_2$, \quad
+    $\vx_{\text{dog}} = \mathbf{E}_{\text{dog}} + \vp_4$.
+\end{itemize}
 
-In Chapter~5 (\emph{The Transformer Architecture}), we answer this question by introducing the architecture that discarded recurrence entirely: the \textbf{Transformer} \cite{vaswani2017}, powered by Multi-Head Self-Attention.
+\paragraph{How attention identifies the subject.}
+In English syntax, the grammatical subject of the active verb ``bit'' resides $1$ step prior (relative offset $k = -1$).
+At position $pos = 2$, Clock 1 points South ($180^\circ$, vector $[0.0, -1.0]$).
+To identify the doer of the action, an attention head querying offset $k = -1$ rotates $90^\circ$ counterclockwise:
+\begin{equation}
+180^\circ - 90^\circ = 90^\circ \implies [1.0, 0.0].
+\end{equation}
+The attention query searches for the token whose Clock 1 points East ($[1.0, 0.0]$):
+\begin{itemize}
+    \item In \textbf{Sentence 1}, the token at position $1$ with East-pointing clock is \textbf{``dog''}. The attention mechanism routes information from ``dog'' to ``bit'', resolving the dog as the subject.
+    \item In \textbf{Sentence 2}, the token at position $1$ with East-pointing clock is \textbf{``man''}. The attention mechanism routes information from ``man'' to ``bit'', resolving the man as the subject.
+\end{itemize}
+The ambiguity is completely resolved: through sinusoidal clock rotations, the Transformer effortlessly deciphers who bit whom!
 
 \end{document}

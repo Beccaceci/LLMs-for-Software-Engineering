@@ -31,13 +31,13 @@ An Abstract Syntax Tree (AST) is a directed finite tree representation of the ab
 where $\mathcal{V}_N$ represents non-terminal syntactic constructs (e.g., \texttt{IfStatement}, \texttt{BinaryExpression}), $\mathcal{V}_T$ represents terminal tokens (identifiers, literals), $\mathcal{E}$ denotes directed child edges, and $r \in \mathcal{V}_N$ is the root compilation unit.
 \end{definition}
 
-\begin{examinsight}[Exam comparison: CFG vs DFG]
-In course examinations, a recurrent question requires students to differentiate between Control Flow Graphs (CFG) and Data Flow Graphs (DFG):
+\paragraph{Structural comparison: Control Flow Graphs (CFG) vs.~Data Flow Graphs (DFG).}
+We contrast how program representations differ between control and data flow structures:
 \begin{itemize}
     \item \textbf{Control Flow Graph (CFG)}: Nodes represent basic execution blocks; directed edges represent branch transitions (\texttt{if-else}, loops, returns). Shows the \emph{order} of execution.
     \item \textbf{Data Flow Graph (DFG)}: Directed edges trace the def-use chains of variables ($\text{var}_x \text{ defined at line } i \to \text{read at line } j$). Preserves semantic data dependencies invariant to code formatting and variable renaming.
 \end{itemize}
-\end{examinsight}
+
 
 \begin{deepdive}[CodeBERT and pre-trained models of code]
 In \citep{feng2020codebert}, CodeBERT was introduced as a bimodal pre-trained model combining natural language documentation with source code via masked language modeling and replaced token detection. Subsequent breakthroughs such as Codex \citep{chen2021codex} demonstrated that scaling causal decoders on hundreds of gigabytes of open-source code repositories produces emergent zero-shot code generation capabilities.

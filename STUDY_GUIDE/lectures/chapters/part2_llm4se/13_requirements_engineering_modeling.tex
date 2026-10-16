@@ -33,13 +33,13 @@ Given a temporal requirement \emph{"Whenever a transaction request is received, 
 where $\Box$ denotes "Always (Globally)" and $\Diamond$ denotes "Eventually (In the future)".
 \end{definition}
 
-\begin{examinsight}[Exam highlight: validating model-generated UML]
-When professors examine requirements modeling with LLMs, they emphasize that generated diagrams (in PlantUML or Mermaid) must satisfy structural consistency constraints:
+\paragraph{Validation of model-generated UML diagrams.}
+Model-generated architectural diagrams (in PlantUML or Mermaid) must satisfy structural consistency constraints:
 \begin{itemize}
     \item In Class Diagrams: Checking for circular inheritance, invalid multiplicities, and unmapped foreign keys.
     \item In Sequence Diagrams: Ensuring that every message invocation corresponds to an existing method signature in the target class.
 \end{itemize}
 An LLM can readily produce visually convincing diagrams that violate fundamental object-oriented encapsulation principles.
-\end{examinsight}
+
 
 \end{document}

@@ -340,8 +340,8 @@ where $f(\cdot)$ is applied elementwise. Figure~\ref{fig:dense_layer_architectur
 \label{fig:dense_layer_architecture}
 \end{figure}
 
-\begin{examinsight}[Parameter counting across dense layers]
-A standard oral and written examination question tests exact parameter counting across stacked dense layers. For an affine transformation mapping $\R^{d_{\text{in}}} \to \R^{d_{\text{out}}}$:
+\paragraph{Exact parameter counting across stacked dense layers.}
+For an affine transformation mapping $\R^{d_{\text{in}}} \to \R^{d_{\text{out}}}$:
 \begin{equation}
 \label{eq:param_count_formula}
 N_{\text{params}} = \underbrace{d_{\text{in}} \times d_{\text{out}}}_{\text{weight parameters}} + \underbrace{d_{\text{out}}}_{\text{bias parameters}} = d_{\text{out}}(d_{\text{in}} + 1).
@@ -352,8 +352,7 @@ N_{\text{params}} = \underbrace{d_{\text{in}} \times d_{\text{out}}}_{\text{weig
     \item Layer 2: $768 \times (3072 + 1) = 2{,}359{,}296 + 768 = 2{,}360{,}064$ parameters.
     \item Total Parameters: $2{,}362{,}368 + 2{,}360{,}064 = 4{,}722{,}432$ parameters.
 \end{enumerate}
-Neglecting bias terms during parameter inventory counts is a frequent source of point deductions.
-\end{examinsight}
+It is essential to account for the additive bias parameters ($d_{\text{out}}$) alongside the multiplicative weight matrix ($d_{\text{in}} \times d_{\text{out}}$) to obtain exact parameter counts.
 
 \subsection{The mathematical proof of linear stacking collapse}
 Now we return to our hypothesis: \emph{Can we solve XOR and non-linear problems simply by cascading multiple linear layers without activation functions?}
@@ -1275,7 +1274,7 @@ Throughout these formulations, feedforward networks operate under a fundamental 
 \label{eq:fcnn_static_cascade}
 \vy = \mathcal{F}(\vx; \Theta) = f_L(\mW_L \cdots f_1(\mW_1 \vx + \vb_1) \cdots + \vb_L).
 \end{equation}
-While this architecture is highly effective for tabular data and fixed-attribute classification, it immediately encounters a computational impasse when confronted with sequential data—such as human natural language, software source code tokens, execution traces, and temporal signals. Sequential data violates the core assumptions of feedforward processing in three fundamental ways:
+While this architecture is highly effective for tabular data and fixed-attribute classification, it immediately encounters a computational impasse when confronted with sequential data---such as human natural language, software source code tokens, execution traces, and temporal signals. Sequential data violates the core assumptions of feedforward processing in three fundamental ways:
 \begin{enumerate}
     \item \textbf{Rigid Input Dimensionality}: Natural language sentences and source code blocks have elastic, variable lengths $T$. An FCNN strictly expects an input of dimension $d_{\text{in}}$, forcing artificial truncation or massive zero-padding that wastes computational throughput and memory.
     \item \textbf{Zero Internal State and Temporal Memory}: Feedforward networks are memoryless. Each forward pass $\mathcal{F}(\vx)$ is independent and decoupled from prior inputs. They cannot maintain temporal context or resolve long-range grammatical and syntactic dependencies across multiple time steps.

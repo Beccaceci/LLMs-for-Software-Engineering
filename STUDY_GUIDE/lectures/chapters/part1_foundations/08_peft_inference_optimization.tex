@@ -28,14 +28,14 @@ For a pre-trained frozen weight matrix $\mW_0 \in \R^{d \times k}$, LoRA \citep{
 where $\mathbf{B} \in \R^{d \times r}$, $\mathbf{A} \in \R^{r \times k}$, with rank $r \ll \min(d, k)$ and scaling hyperparameter $\alpha$.
 \end{definition}
 
-\begin{examinsight}[Exam trap: LoRA matrix initialization]
-Professors regularly test the specific initialization protocol of LoRA matrices:
+\paragraph{LoRA matrix initialization protocol.}
+The specific initialization protocol of LoRA matrices ensures stable gradient updates:
 \begin{itemize}
     \item $\mathbf{A}$ is initialized using random Gaussian noise: $\mathbf{A}_{i,j} \sim \mathcal{N}(0, \sigma^2)$.
     \item $\mathbf{B}$ is initialized to \textbf{exact zeros}: $\mathbf{B} = \mathbf{0}$.
 \end{itemize}
 Consequently, at the start of fine-tuning, $\Delta \mW = \mathbf{B} \mathbf{A} = \mathbf{0}$. The model starts exactly from its pre-trained state without any destructive perturbations.
-\end{examinsight}
+
 
 \section{Inference bottlenecks and KV caching}
 During autoregressive generation, past tokens are re-evaluated at every new token step. Because attention keys and values for prior tokens do not change, they can be cached in GPU VRAM (the Key-Value or KV Cache).

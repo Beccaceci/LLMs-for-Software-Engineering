@@ -281,10 +281,12 @@ def main():
 
     if args.output_dir:
         out_dir = Path(args.output_dir)
+    elif Path("STUDY_GUIDE/TRANSCRIPTIONS/LECTURES").exists():
+        out_dir = Path("STUDY_GUIDE/TRANSCRIPTIONS/LECTURES")
     elif Path("TRANSCRIPTIONS/LECTURES").exists():
         out_dir = Path("TRANSCRIPTIONS/LECTURES")
     else:
-        out_dir = Path("LECTURE_TRANSCRIPTIONS")
+        out_dir = Path("STUDY_GUIDE/TRANSCRIPTIONS/LECTURES")
 
     with tempfile.TemporaryDirectory() as tmpdir:
         wav_path = Path(tmpdir) / "extracted_audio.wav"

@@ -29,8 +29,8 @@ Empirical studies reveal high prevalence of specific CWEs in LLM outputs:
 \end{itemize}
 \end{definition}
 
-\begin{examinsight}[Exam highlight: the slopsquatting supply chain attack]
-A cutting-edge exam question addresses the \textbf{Package Hallucination / Slopsquatting} vulnerability:
+\paragraph{Package hallucination and slopsquatting supply chain vulnerabilities.}
+The package hallucination (slopsquatting) vulnerability emerges through the following sequence:
 \begin{enumerate}
     \item An LLM generating code imports a non-existent package (e.g., \texttt{import flask\_security\_helper}).
     \item Developers, trusting the output, run \texttt{pip install flask\_security\_helper}.
@@ -38,7 +38,7 @@ A cutting-edge exam question addresses the \textbf{Package Hallucination / Slops
     \item Any developer or CI/CD pipeline executing the code automatically downloads and executes the attacker's payload.
 \end{enumerate}
 Defense requires strict package lockfile verification and internal repository proxy gating.
-\end{examinsight}
+
 
 \section{Intellectual property and licensing compliance}
 \begin{definition}{Copyleft license contamination}{copyleft_contamination}

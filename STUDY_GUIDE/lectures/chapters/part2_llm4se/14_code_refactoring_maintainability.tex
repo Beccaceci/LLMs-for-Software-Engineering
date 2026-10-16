@@ -36,14 +36,13 @@ The classic Maintainability Index combines Halstead Volume $V$, Cyclomatic Compl
 Values above $85$ denote high maintainability; values below $65$ signify severe maintenance risks.
 \end{definition}
 
-\begin{examinsight}[Exam focus: behavioral equivalence proofs]
-A standard exam question queries: \emph{"How can we guarantee that an LLM-refactored method has not altered program behavior?"}
+\paragraph{Behavioral equivalence verification in automated refactoring.}
 Unlike formal refactoring engines with AST rewriting rules, LLMs are stochastic and can silently modify operator precedence or variable state. To prove equivalence:
 \begin{enumerate}
     \item Run mutation-tested regression test suites before and after refactoring.
     \item Perform differential fuzzing on randomized inputs.
     \item When feasible, employ bounded model checking or SMT solvers (e.g., Z3) to verify that outputs coincide for all symbolic inputs.
 \end{enumerate}
-\end{examinsight}
+
 
 \end{document}

@@ -698,6 +698,24 @@ class TestTier2BoundaryAndCornerCases(unittest.TestCase):
                 f"Brace count mismatch in {tf.relative_to(STUDY_GUIDE_DIR)}: {open_count} '{{' vs {close_count} '}}'"
             )
 
+    def test_boundary_workspace_root_cleanliness(self):
+        """Boundary 1.6: Verify strict workspace hygiene and zero root directory pollution."""
+        forbidden_patterns = [
+            "*.tex", "*.pdf", "*.aux", "*.log", "*.bbl", "*.blg",
+            "*.fls", "*.fdb_latexmk", "*.toc", "texput.log"
+        ]
+        polluting_files = []
+        for pat in forbidden_patterns:
+            for p in PROJECT_ROOT.glob(pat):
+                if p.is_file():
+                    polluting_files.append(p.name)
+
+        self.assertEqual(
+            polluting_files, [],
+            f"Workspace root is polluted with study guide / build artifacts: {polluting_files}. "
+            "All study guide files must reside strictly inside STUDY_GUIDE/ subdirectories."
+        )
+
     # --------------------------------------------------------------------------
     # Boundary 2: LaTeX Environment Delimiter Boundaries
     # --------------------------------------------------------------------------

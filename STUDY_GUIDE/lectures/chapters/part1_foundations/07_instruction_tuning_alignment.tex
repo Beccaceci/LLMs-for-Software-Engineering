@@ -59,14 +59,12 @@ Substituting Equation~\eqref{eq:dpo_implicit_reward} directly into the Bradley--
 \end{equation}
 \end{theorem}
 
-\begin{examinsight}[Oral exam question: why does DPO cancel the partition function?]
-In oral examinations, students are often asked to explain the mathematical elegance of DPO.
-The critical insight is that $Z(x) = \sum_y \pi_{\text{ref}}(y \mid x) \exp(\frac{1}{\beta} r(x, y))$ depends \textbf{only on prompt $x$}, not on response $y$.
+\paragraph{Cancellation of the partition function in DPO.}
+The mathematical elegance of Direct Preference Optimization (DPO) lies in the fact that the partition function $Z(x) = \sum_y \pi_{\text{ref}}(y \mid x) \exp(\frac{1}{\beta} r(x, y))$ depends \textbf{only on prompt $x$}, not on response $y$.
 When subtracting the reward of the losing response from the winning response:
 \[
 r(x, y_w) - r(x, y_l) = \beta \log \frac{\pi_\theta(y_w \mid x)}{\pi_{\text{ref}}(y_w \mid x)} + \beta \log Z(x) - \left( \beta \log \frac{\pi_\theta(y_l \mid x)}{\pi_{\text{ref}}(y_l \mid x)} + \beta \log Z(x) \right),
 \]
 the intractable term $\beta \log Z(x)$ cancels completely! This allows direct optimization of the language model without training an auxiliary reward model or sampling during RL.
-\end{examinsight}
 
 \end{document}

@@ -1,0 +1,432 @@
+\documentclass[../../main.tex]{subfiles}
+
+\begin{document}
+
+% ==============================================================================
+% CHAPTER 07: LANGUAGE MODEL EVALUATION, METRICS, AND BENCHMARKS
+% ==============================================================================
+\chapter{Language model evaluation, metrics, and benchmarks}
+\label{ch:evaluation_metrics_benchmarks}
+
+The pre-training paradigm detailed in Chapter~\ref{ch:scaling_laws_pretraining} established that scaling parameter count, dataset volume, and training compute yields continuous, predictable reductions in next-token cross-entropy loss. By optimizing this autoregressive objective across trillions of tokens, modern foundation models acquire rich linguistic representations, syntactic abstractions, and emergent in-context learning capabilities. However, a fundamental discrepancy exists between pre-training optimization and practical deployment: minimizing the empirical cross-entropy loss over a corpus merely measures the statistical predictability of tokens under teacher forcing. It does not directly quantify whether an autoregressively generated sequence is coherent, factually truthful, stylistically appropriate, or capable of solving complex multi-step reasoning tasks.
+
+Evaluating natural language generation is fundamentally challenging because open-ended text does not conform to the closed-world assumptions of classical machine learning. In standard classification or regression tasks, the output space is bounded and discrete labels provide unambiguous ground truth. In contrast, generative language modeling is combinatorial: a single semantic concept, question prompt, or code specification can be articulated through an astronomical number of valid, syntactically diverse surface formulations. Conversely, a generated string may match reference vocabulary with high lexical overlap while completely inverting factual truth through the addition of a single negation token. Qualitative inspection---relying on human observers to informally assess whether sampled text appears coherent or degraded---is unscalable, subjective, and unable to establish statistically sound comparisons between competing architectures or training checkpoints.
+
+To establish rigorous engineering standards, the natural language processing community has developed an evaluation hierarchy that spans multiple levels of abstraction. At the lowest level lie intrinsic probabilistic metrics, such as cross-entropy and perplexity, which evaluate the model's internal likelihood assignments directly on held-out text without requiring generated outputs or human task labels. At the intermediate level lie reference-based lexical metrics, such as BLEU and ROUGE, which compare model-generated candidate sequences against human reference strings using $n$-gram overlap and length penalties. At higher levels of the hierarchy, evaluation shifts toward contextual embedding similarity (such as BERTScore), model-based evaluators, and standardized task benchmarks (ranging from core natural language understanding suites like GLUE to comprehensive multi-task and code-generation suites like MMLU and HumanEval).
+
+This chapter formalizes the principles of language model evaluation. We begin by examining the core mathematical properties required for rigorous evaluation metrics, focusing on the distinction between additive and multiplicative averaging, before conducting an exhaustive investigation of intrinsic uncertainty estimation via perplexity and surface-string reference matching via BLEU.
+
+\clearpage
+
+% ==============================================================================
+% SECTION 7.1: EVALUATION METRICS FOR LANGUAGE MODELS
+% ==============================================================================
+\section{Evaluation metrics for language models}
+\label{sec:evaluation_metrics}
+
+Evaluation metrics in natural language processing can be partitioned into two distinct paradigms: intrinsic likelihood metrics and extrinsic generation metrics. Intrinsic metrics evaluate the model's mathematical representation of language by computing the probability distribution it assigns to unseen test corpora under teacher forcing. They require no sample generation, no decoding algorithms, and no reference texts; they assess the predictive confidence of the probability model itself. Extrinsic metrics, by contrast, operate on the discrete sequences emitted during autoregressive inference, comparing the generated hypothesis against one or more human gold-standard references.
+
+\noindent\textbf{The geometric mean and multiplicative error penalization.}\newline
+Before formalizing specific metrics, we must establish the mathematical foundation of sequence-level score aggregation. When evaluating models across multiple tokens, sentences, or $n$-gram orders, individual scores must be aggregated into a single scalar summary. While the standard arithmetic mean is familiar, it possesses structural properties that render it unsuitable for probability spaces and multi-criteria quality evaluation.
+
+Let $\vx = (x_1, x_2, \dots, x_n) \in \R_{>0}^n$ denote a collection of $n$ positive evaluation values (such as token probabilities or $n$-gram precision scores). The arithmetic mean ($\AM$) and geometric mean ($\GM$) are defined as:
+\begin{align}
+\label{eq:arithmetic_mean_def}
+\AM(\vx) &= \frac{1}{n} \sum_{i=1}^n x_i, \\
+\label{eq:geometric_mean_def}
+\GM(\vx) &= \left( \prod_{i=1}^n x_i \right)^{\frac{1}{n}}.
+\end{align}
+
+The critical distinction between these two operators lies in how they penalize low values. The arithmetic mean exerts an \textit{additive effect}: a severely low score in one component can be easily masked by high scores in other components. For example, consider three evaluation scores $\vx = (0.1, 0.9, 0.9)$. The arithmetic mean yields:
+\begin{equation}
+\AM(0.1, 0.9, 0.9) = \frac{0.1 + 0.9 + 0.9}{3} = \frac{1.9}{3} \approx 0.6333,
+\end{equation}
+producing a deceptively favorable aggregate score despite catastrophic failure on the first criterion. In contrast, the geometric mean exerts a \textit{multiplicative effect}:
+\begin{equation}
+\GM(0.1, 0.9, 0.9) = (0.1 \times 0.9 \times 0.9)^{\frac{1}{3}} = (0.081)^{\frac{1}{3}} \approx 0.4327.
+\end{equation}
+Because the terms multiply, any degradation in an individual component disproportionately suppresses the entire product. Crucially, if any single term reaches zero ($x_i = 0$), the geometric mean collapses to zero:
+\begin{equation}
+\label{eq:geometric_mean_zero_collapse}
+\exists i \text{ such that } x_i = 0 \implies \GM(\vx) = 0.
+\end{equation}
+This property is indispensable in evaluation: a model must achieve reasonable competence across all evaluated dimensions to attain a high overall score. This behavior directly parallels the harmonic mean used in the $F_1$-score to balance precision and recall.
+
+\noindent\textbf{Numerical stability via the logarithmic formulation.}\newline
+In practical computation, evaluating long sequences or high-order $n$-grams involves multiplying dozens or hundreds of terms bounded in $(0, 1]$. In finite-precision floating-point arithmetic (IEEE 754 float32 or float64), direct repeated multiplication inevitably causes arithmetic underflow, rounding the running product to absolute zero.
+
+To guarantee numerical stability, the geometric mean is computed in the logarithmic domain. Utilizing the monotonic identity $\ln\left(\prod x_i\right) = \sum \ln x_i$, the $n$-th root is transformed into an arithmetic average of logarithms:
+\begin{equation}
+\label{eq:geometric_mean_log_trick}
+\GM(\vx) = \exp\left( \ln\left( \prod_{i=1}^n x_i \right)^{\frac{1}{n}} \right) = \exp\left( \frac{1}{n} \sum_{i=1}^n \ln x_i \right).
+\end{equation}
+As emphasized in lecture, the base of the logarithm must strictly match the base of the exponentiation operator. Standard scientific implementations employ the natural logarithm $\ln$ (base $e$) and natural exponential $\exp(\cdot)$ so that $\exp(\ln(z)) = z$ is an exact inverse mapping. If base-2 logarithms ($\log_2$) are adopted, the outer transformation must evaluate as $2^{\frac{1}{n} \sum \log_2 x_i}$.
+
+\subsection{Perplexity}
+\label{subsec:perplexity}
+
+The primary intrinsic metric for evaluating autoregressive language models is \textbf{perplexity} ($\PPL$). Rooted in Claude Shannon's mathematical theory of communication and information entropy \cite{shannon1948}, perplexity quantifies the degree of uncertainty a probabilistic model exhibits when predicting a sequence of tokens.
+
+\noindent\textbf{Conceptual intuition and the effective branching factor.}\newline
+Rather than assessing whether a model generates fluent answers, perplexity measures how surprised the model is when presented with human-written, grammatically correct text. If a model has acquired an accurate statistical representation of English, it will assign high probability to legitimate sentences from held-out corpora. Conversely, if the model is poorly trained or faces out-of-domain text, it will assign low probability to valid tokens, indicating substantial confusion.
+
+Perplexity provides an intuitive geometric interpretation as the \textbf{effective branching factor} of the language model. Suppose that at a specific step in a sentence, the model assigns probability $P(w_i \mid w_{<i})$ to the ground-truth token. The reciprocal:
+\begin{equation}
+\label{eq:equivalent_words_def}
+K_i = \frac{1}{P(w_i \mid w_{<i})}
+\end{equation}
+represents the number of equally probable alternative words among which the model was undecided. 
+
+Consider a thought experiment where the model's vocabulary contains 50,000 discrete tokens:
+\begin{itemize}
+    \item If the model assigns probability $P = 0.25$ to the correct token, $\frac{1}{0.25} = 4$. Even though the vocabulary contains 50,000 candidates, the model's uncertainty is equivalent to rolling a fair 4-sided die of equally likely tokens.
+    \item If the model assigns probability $P = 0.90$, $\frac{1}{0.90} \approx 1.11$. The model is near-certain of the true token, undecided between approximately 1.1 alternatives.
+    \item If the model assigns probability $P = 1.0$, $\frac{1}{1.0} = 1.0$. The model has zero uncertainty.
+    \item If the model assigns probability $P = 0.01$, $\frac{1}{0.01} = 100$. The model is as confused as choosing uniformly among 100 distinct words.
+\end{itemize}
+Across an entire sequence of $N$ words, perplexity represents the geometric average of these individual branching factors. A perplexity of 50 indicates that, on average across each position in the sentence, the model was as uncertain as choosing uniformly among 50 equally probable words. Lower perplexity reflects greater predictive confidence and superior alignment with the underlying data distribution.
+
+\noindent\textbf{Formal mathematical derivation and the negative log-likelihood.}\newline
+Let $W = (w_1, w_2, \dots, w_N)$ denote a sequence of $N$ tokens. By the probability chain rule, the joint probability assigned to sequence $W$ by an autoregressive language model parameterized by $\theta$ is:
+\begin{equation}
+\label{eq:joint_prob_chain_rule}
+P(W) = \prod_{i=1}^N P(w_i \mid w_1, \dots, w_{i-1}; \theta) = \prod_{i=1}^N P(w_i \mid w_{<i}).
+\end{equation}
+The perplexity of the model over the sequence $W$ is formally defined as the reciprocal of the geometric mean of the token conditional probabilities:
+\begin{equation}
+\label{eq:perplexity_def_geom}
+\PPL(W) = P(W)^{-\frac{1}{N}} = \left( \prod_{i=1}^N P(w_i \mid w_{<i}) \right)^{-\frac{1}{N}} = \left( \prod_{i=1}^N \frac{1}{P(w_i \mid w_{<i})} \right)^{\frac{1}{N}}.
+\end{equation}
+
+Applying the logarithmic transformation in Equation~\eqref{eq:geometric_mean_log_trick}, we rewrite perplexity in terms of the sum of token negative log-likelihoods ($\NLL$):
+\begin{align}
+\ln \PPL(W) &= -\frac{1}{N} \ln P(W) = -\frac{1}{N} \sum_{i=1}^N \ln P(w_i \mid w_{<i}), \\
+\label{eq:perplexity_nll_form}
+\PPL(W) &= \exp\left( -\frac{1}{N} \sum_{i=1}^N \ln P(w_i \mid w_{<i}) \right) = \exp\left( \frac{1}{N} \sum_{i=1}^N \NLL_i \right),
+\end{align}
+where $\NLL_i = -\ln P(w_i \mid w_{<i}) \ge 0$ is the negative log-likelihood of token $w_i$.
+
+Equation~\eqref{eq:perplexity_nll_form} reveals the direct mathematical link between perplexity and the pre-training cross-entropy loss $\Loss_{\text{CE}}$:
+\begin{equation}
+\label{eq:perplexity_cross_entropy_equiv}
+\Loss_{\text{CE}} = \frac{1}{N} \sum_{i=1}^N \NLL_i \implies \PPL(W) = e^{\Loss_{\text{CE}}}.
+\end{equation}
+Perplexity is simply the exponentiated cross-entropy loss.
+
+\textit{Mathematical justification for the geometric mean.} The selection of the geometric mean in Equation~\eqref{eq:perplexity_def_geom} is mathematically mandatory for three reasons:
+\begin{enumerate}
+    \item \textbf{Consistency with probability factorization}: In probability theory, the likelihood of a sequence is formed by the product of conditional probabilities, not their sum. Normalizing a product of $N$ terms by sequence length requires taking the $N$-th root, so that $\PPL(W)^N = \frac{1}{P(W)}$. Taking an arithmetic mean of probabilities ($\frac{1}{N}\sum P_i$) violates the product rule and lacks theoretical interpretation.
+    \item \textbf{Information-theoretic duality}: Taking the logarithm of the geometric mean yields the arithmetic mean of negative log-likelihoods (cross-entropy), establishing an exact duality with Shannon entropy. An arithmetic mean of probabilities cannot be converted into cross-entropy.
+    \item \textbf{Zero-frequency penalty}: If a model assigns zero probability to a single valid token ($P(w_k \mid w_{<k}) = 0$), the geometric mean product collapses to 0, which inverts to infinite perplexity: $\PPL(W) \to \infty$. This correctly identifies the model as broken, since it declared a real-world sentence impossible. An arithmetic mean would merely incur a negligible $\frac{1}{N}$ reduction.
+\end{enumerate}
+
+The theoretical lower bound of perplexity is $\PPL = 1.0$. This minimum occurs if and only if the model assigns probability $P(w_i \mid w_{<i}) = 1.0$ to every token in the sequence ($\NLL_i = 0 \implies e^0 = 1$), representing absolute, deterministic certainty. In practice, $\PPL = 1.0$ is observed only when a model severely overfits a training sequence.
+
+\noindent\textbf{Step-by-step worked examples: confident versus uncertain models.}\newline
+To illustrate the mechanics of perplexity, we walk through the exact numerical evaluations presented in the lecture. Consider a held-out test sentence delimited by boundary markers:
+\begin{equation*}
+W = \langle\text{bos}\rangle \, \text{The} \, \text{dog} \, \text{chased} \, \text{the} \, \text{cat} \, \langle\text{eos}\rangle.
+\end{equation*}
+The beginning-of-sequence token $\langle\text{bos}\rangle$ serves as initial conditioning prefix ($P=1.0$). The sequence contains $N = 6$ evaluated transitions ($w_1 = \text{The}, \dots, w_6 = \langle\text{eos}\rangle$).
+
+\textit{Case 1: Confident, well-trained model.}
+Suppose a model assigns high probability to each correct token, reflecting strong linguistic familiarity. The conditional probabilities, negative log-likelihoods, and equivalent branching numbers are listed in Table~\ref{tab:perplexity_confident_example}.
+
+\begin{table}[htbp]
+\centering
+\small
+\caption{Step-by-step perplexity computation for a confident model on $W = \langle\text{bos}\rangle \text{ The dog chased the cat } \langle\text{eos}\rangle$.}
+\label{tab:perplexity_confident_example}
+\begin{tabular}{llccc}
+\toprule
+$i$ & Token $w_i$ & Probability $P(w_i \mid w_{<i})$ & $\NLL_i = -\ln P(w_i \mid w_{<i})$ & Branching $K_i = \frac{1}{P_i}$ \\
+\midrule
+1 & The & $0.90$ & $-\ln(0.90) \approx 0.1054$ & $1.1111$ \\
+2 & dog & $0.85$ & $-\ln(0.85) \approx 0.1625$ & $1.1765$ \\
+3 & chased & $0.88$ & $-\ln(0.88) \approx 0.1278$ & $1.1364$ \\
+4 & the & $0.75$ & $-\ln(0.75) \approx 0.2877$ & $1.3333$ \\
+5 & cat & $0.95$ & $-\ln(0.95) \approx 0.0513$ & $1.0526$ \\
+6 & $\langle\text{eos}\rangle$ & $0.80$ & $-\ln(0.80) \approx 0.2231$ & $1.2500$ \\
+\midrule
+\multicolumn{2}{l}{\textbf{Sum / Mean}} & --- & $\sum \NLL_i = 0.9578 \implies \overline{\NLL} = 0.1596$ & $\prod K_i \approx 2.6074$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Evaluating the perplexity via the average negative log-likelihood:
+\begin{align}
+\PPL(W) &= \exp\left( \frac{1}{6} \sum_{i=1}^6 \NLL_i \right) \nonumber \\
+        &= \exp\left( \frac{0.1054 + 0.1625 + 0.1278 + 0.2877 + 0.0513 + 0.2231}{6} \right) \nonumber \\
+        &= e^{0.15963} \approx \mathbf{1.1731}.
+\end{align}
+Equivalently, taking the 6-th root of the product of equivalent words:
+\begin{equation}
+\PPL(W) = \left( 1.1111 \times 1.1765 \times 1.1364 \times 1.3333 \times 1.0526 \times 1.2500 \right)^{\frac{1}{6}} \approx (2.6074)^{\frac{1}{6}} \approx \mathbf{1.1731}.
+\end{equation}
+The model's perplexity is $1.1731$, indicating that on average, the model was undecided over approximately $1.17$ equivalent words per position. It possessed near-complete certainty throughout the sequence.
+
+\textit{Case 2: Uncertain, poorly trained model.}
+Now suppose an under-trained or out-of-domain model evaluates the identical sentence, assigning substantially lower probabilities to the correct tokens, as detailed in Table~\ref{tab:perplexity_uncertain_example}.
+
+\begin{table}[htbp]
+\centering
+\small
+\caption{Step-by-step perplexity computation for an uncertain model on $W = \langle\text{bos}\rangle \text{ The dog chased the cat } \langle\text{eos}\rangle$.}
+\label{tab:perplexity_uncertain_example}
+\begin{tabular}{llccc}
+\toprule
+$i$ & Token $w_i$ & Probability $P(w_i \mid w_{<i})$ & $\NLL_i = -\ln P(w_i \mid w_{<i})$ & Branching $K_i = \frac{1}{P_i}$ \\
+\midrule
+1 & The & $0.050$ & $-\ln(0.050) \approx 2.9957$ & $20$ \\
+2 & dog & $0.100$ & $-\ln(0.100) \approx 2.3026$ & $10$ \\
+3 & chased & $0.200$ & $-\ln(0.200) \approx 1.6094$ & $5$ \\
+4 & the & $0.010$ & $-\ln(0.010) \approx 4.6052$ & $100$ \\
+5 & cat & $0.005$ & $-\ln(0.005) \approx 5.2983$ & $200$ \\
+6 & $\langle\text{eos}\rangle$ & $0.001$ & $-\ln(0.001) \approx 6.9078$ & $1000$ \\
+\midrule
+\multicolumn{2}{l}{\textbf{Sum / Product}} & --- & $\sum \NLL_i = 23.7190 \implies \overline{\NLL} = 3.9532$ & $\prod K_i = 2 \times 10^{10}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Computing the geometric mean directly from the branching factors:
+\begin{align}
+\prod_{i=1}^6 K_i &= 20 \times 10 \times 5 \times 100 \times 200 \times 1000 = 2 \times 10^{10}, \\
+\PPL(W) &= \left( 2 \times 10^{10} \right)^{\frac{1}{6}} \approx \mathbf{52.10}.
+\end{align}
+Verifying via the average negative log-likelihood:
+\begin{equation}
+\PPL(W) = \exp\left( \frac{23.7190}{6} \right) = \exp(3.95317) \approx \mathbf{52.10}.
+\end{equation}
+Both formulations yield identical results: $\PPL = 52.10$. On average, the uncertain model was confused across approximately 52 equally likely candidate tokens at every position.
+
+\textit{Lecture insight: Perplexity as a historical and domain probe.} As highlighted by the professor, perplexity serves as a diagnostic probe into the temporal and thematic distribution of a model's pre-training data. If an older model trained on corpora prior to 2016 is evaluated on the prompt ``The President of the United States is [NAME]'', evaluating ``Barack Obama'' yields low perplexity, whereas evaluating ``Donald Trump'' or ``Joe Biden'' produces high perplexity. The elevated perplexity does not imply that the model is architecturally defective; rather, it indicates statistical surprise relative to the pre-training data distribution.
+
+\noindent\textbf{Advantages and fundamental limitations of perplexity.}\newline
+Perplexity possesses distinct methodological advantages that have cemented its status as standard reporting metric in pre-training literature:
+\begin{itemize}
+    \item \textbf{Unsupervised and task-agnostic}: Computing perplexity requires only raw, unannotated text. It eliminates the need for expensive human reference translations, task labels, or subjective grading rubrics.
+    \item \textbf{Zero inference compute overhead}: Because evaluation occurs under teacher forcing, perplexity is computed in a single forward pass over batches of tokens simultaneously with cross-entropy training loss, avoiding autoregressive generation.
+    \item \textbf{Continuous and sensitive}: Perplexity is a smooth, continuous scalar that detects subtle improvements in language modeling capability long before downstream task accuracies show measurable gains.
+\end{itemize}
+
+Despite these strengths, perplexity suffers from fundamental limitations that prevent it from serving as a universal measure of model quality:
+\begin{itemize}
+    \item \textbf{Vocabulary and tokenizer incomparability}: Perplexity is strictly incomparable across models that use different vocabularies or tokenization algorithms. Consider a byte-level tokenizer ($|\vocab| = 256$) versus a subword tokenizer ($|\vocab| = 100,000$). Because a byte-level model predicts tiny, predictable character fragments, its per-token perplexity will appear dramatically lower than the subword model, even though the subword model generates superior semantic text. Valid cross-model comparisons require normalizing perplexity by the number of words rather than subword tokens:
+    \begin{equation}
+    \label{eq:word_level_normalized_ppl}
+    \PPL_{\text{word}} = \exp\left( \frac{N_{\text{tokens}}}{N_{\text{words}}} \Loss_{\text{CE}} \right).
+    \end{equation}
+    \item \textbf{Disconnection from reasoning and factual truth}: A model can achieve outstanding (low) perplexity by mastering local grammatical syntax, common idioms, and surface transitions while remaining completely incapable of logical deduction, arithmetic calculation, or factual consistency. Perplexity rewards familiarity, not correctness.
+    \item \textbf{Vulnerability to data contamination}: If portions of the evaluation test set are inadvertently present in the multi-terabyte pre-training scrape, the model will memorize the sequences and exhibit near-zero perplexity, creating a false impression of general capability.
+\end{itemize}
+
+% ==============================================================================
+% SUBSECTION 7.1.2: BLEU
+% ==============================================================================
+\subsection{Bilingual Evaluation Understudy (BLEU)}
+\label{subsec:bleu}
+
+While perplexity evaluates the model's internal probability distribution over given text, practical deployment requires evaluating the actual text generated by the model during autonomous inference. In 2002, Papineni, Roukos, Ward, and Zhu~\cite{papineni2002bleu} introduced the \textbf{Bilingual Evaluation Understudy} ($\BLEU$) metric at IBM Research. Originally developed for machine translation, BLEU became the foundational reference-based evaluation metric across natural language processing.
+
+\noindent\textbf{Conceptual intuition and reference-based lexical matching.}\newline
+The fundamental premise of BLEU is that the closer a machine-generated candidate translation resembles a human gold-standard translation, the higher its quality. Evaluating open-ended text against human references requires navigating two competing linguistic dimensions:
+\begin{enumerate}
+    \item \textbf{Adequacy (Word Choice)}: Did the model translate the correct conceptual content? This is captured by measuring lexical overlap at the unigram level ($1$-grams).
+    \item \textbf{Fluency (Word Order)}: Did the model assemble the words in a natural, syntactically coherent sequence? This is captured by measuring contiguous overlap across higher-order $n$-grams ($2$-grams, $3$-grams, $4$-grams).
+\end{enumerate}
+
+BLEU is an extrinsic metric: it requires running the model autoregressively to generate a hypothesis string $G$ and comparing $G$ against one or more reference strings $R = \{R_1, \dots, R_m\}$. It is defined as a modified $n$-gram precision metric multiplied by an exponential brevity penalty.
+
+\noindent\textbf{Mathematical formulation and the brevity penalty.}\newline
+To compute BLEU, we first extract all contiguous $n$-grams of size $i \in \{1, 2, \dots, n\}$ from both the generated candidate sequence $G$ and the reference sequence $R$.
+
+\textit{Modified clipped $n$-gram precision.} A naive precision metric would simply count the fraction of candidate $n$-grams that appear in the reference:
+\begin{equation*}
+p_{\text{naive}} = \frac{\sum_{g \in G} \mathbb{I}(g \in R)}{|G|}.
+\end{equation*}
+However, naive precision can be exploited through pathological repetition. For example, if the reference is ``The cat sat on the mat'' and a defective model outputs the candidate ``the the the the the the'', every single generated unigram matches the reference word ``the''. Naive precision would reward this degenerative output with a perfect score: $p_{\text{naive}} = \frac{6}{6} = 1.0$.
+
+To eliminate this vulnerability, Papineni et al.~\cite{papineni2002bleu} introduced \textbf{clipped precision} ($p_i$). For each $i$-gram in the candidate sequence, the count is clipped so that it cannot exceed the maximum number of times that identical $i$-gram appears in any single reference sentence:
+\begin{equation}
+\label{eq:clipped_ngram_count}
+\Count_{\text{clip}}(g_i) = \min\left( \Count_G(g_i), \, \max_{R_j \in R} \Count_{R_j}(g_i) \right).
+\end{equation}
+The modified $i$-gram precision $p_i$ is then computed as the sum of clipped counts divided by the total number of candidate $i$-grams generated:
+\begin{equation}
+\label{eq:bleu_modified_precision}
+p_i = \frac{\sum_{g_i \in G} \Count_{\text{clip}}(g_i)}{\sum_{g_i \in G} \Count_G(g_i)}.
+\end{equation}
+In the pathological repetition example, the reference contains the unigram ``the'' twice ($\max \Count_R(\text{``the''}) = 2$). The clipped count for the candidate is $\min(6, 2) = 2$, reducing the unigram precision to $\frac{2}{6} = 0.3333$.
+
+\textit{Multi-order geometric mean aggregation.} To synthesize adequacy and fluency, BLEU computes the geometric mean of modified precisions across $n$-gram orders up to maximum order $n$ (typically $n=2$ or $n=4$):
+\begin{equation}
+\label{eq:bleu_precision_geom_mean}
+\text{Score}_{\text{prec}} = \exp\left( \sum_{i=1}^n w_i \ln p_i \right) = \left( \prod_{i=1}^n p_i \right)^{\frac{1}{n}},
+\end{equation}
+where uniform weights $w_i = \frac{1}{n}$ are standard. The geometric mean ensures that if a model fails completely at any $n$-gram order ($p_i = 0$), the entire score collapses to zero, enforcing that fluent text must exhibit both lexical accuracy and local phrase cohesion.
+
+\textit{The brevity penalty ($\BP$).} While clipped precision prevents repetitive over-generation, precision alone introduces an opposite failure mode: \textbf{under-generation}. 
+
+Suppose the reference sentence contains 20 words, and the candidate model generates only two words: ``The dog''. Both words appear in the reference, so $p_1 = \frac{2}{2} = 1.0$. The bigram ``The dog'' also appears in the reference, so $p_2 = \frac{1}{1} = 1.0$. Without length regulation, the truncated output would achieve a flawless score: $\BLEU = 1.0$, despite discarding 90\% of the intended content.
+
+Standard classification metrics resolve under-generation by computing recall. However, in machine translation and open-ended generation, defining recall is complicated because human translations exhibit natural length variance, and multiple reference translations often use different phrasing. Instead of explicit recall, BLEU introduces an exponential multiplicative \textbf{Brevity Penalty} ($\BP$).
+
+Let $g$ denote the length of the generated candidate sequence, and let $r$ denote the effective length of the reference sequence. The brevity penalty is defined as:
+\begin{equation}
+\label{eq:brevity_penalty_def}
+\BP = \begin{cases} 
+1.0 & \text{if } g > r, \\
+\exp\left( 1 - \frac{r}{g} \right) & \text{if } g \le r.
+\end{cases}
+\end{equation}
+
+Figure~\ref{fig:bleu_brevity_penalty_curve} illustrates the mathematical behavior of the brevity penalty as a function of the length ratio $\frac{g}{r}$.
+\begin{itemize}
+    \item When $g \ge r$, the candidate length equals or exceeds the reference length. In this regime, $\BP = 1.0$: no brevity penalty is applied. Overly long generations are naturally penalized by the denominator of the precision terms in Equation~\eqref{eq:bleu_modified_precision}.
+    \item When $g < r$, the exponent $1 - \frac{r}{g}$ is strictly negative, causing $\BP$ to decay exponentially below 1.0. As the candidate length approaches zero ($g \to 0$), the ratio $\frac{r}{g} \to \infty$, and $\BP \to 0$, aggressively driving the overall score to zero.
+\end{itemize}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    width=0.72\textwidth,
+    height=5.2cm,
+    font=\small\sffamily,
+    xmin=0.0, xmax=2.0,
+    ymin=0.0, ymax=1.1,
+    xlabel={Candidate to Reference Length Ratio ($g / r$)},
+    ylabel={Brevity Penalty ($\BP$)},
+    grid=major,
+    grid style={dashed, gray!30},
+    axis line style={line width=0.8pt, politoNavy},
+    tick style={line width=0.6pt, politoNavy},
+    samples=200,
+    legend pos=south east,
+    legend style={draw=politoNavy!50, rounded corners=2pt, font=\scriptsize\sffamily}
+]
+    % Brevity penalty curve: min(1, exp(1 - 1/x))
+    \addplot[domain=0.05:1.0, line width=1.8pt, crimsonRed] {exp(1 - 1/x)};
+    \addlegendentry{$\BP = \exp(1 - r/g) \quad (g \le r)$}
+    
+    \addplot[domain=1.0:2.0, line width=1.8pt, steelBlue] {1.0};
+    \addlegendentry{$\BP = 1.0 \quad (g > r)$}
+    
+    % Reference boundary line at g/r = 1.0
+    \draw[dashed, line width=1pt, politoNavy!70] (axis cs:1.0, 0) -- (axis cs:1.0, 1.0);
+    \node[anchor=north east, font=\scriptsize\bfseries\color{politoNavy}] at (axis cs:0.98, 0.95) {Reference Length ($g = r$)};
+    
+    % Annotated point at g/r = 0.5 (half length)
+    \node[circle, fill=crimsonRed, inner sep=1.8pt] at (axis cs:0.5, {exp(1 - 2)}) {};
+    \node[anchor=west, font=\scriptsize\sffamily\color{crimsonRed}] at (axis cs:0.53, 0.37) {$g = 0.5r \implies \BP \approx 0.37$};
+    
+    % Annotated point at g/r = 0.33
+    \node[circle, fill=crimsonRed, inner sep=1.8pt] at (axis cs:0.333, {exp(1 - 3)}) {};
+    \node[anchor=west, font=\scriptsize\sffamily\color{crimsonRed}] at (axis cs:0.36, 0.14) {$g = 0.33r \implies \BP \approx 0.14$};
+\end{axis}
+\end{tikzpicture}
+\caption{The BLEU Brevity Penalty ($\BP$) as a function of the generated-to-reference length ratio $g/r$. For $g \ge r$, $\BP = 1.0$ because over-generation is already penalized by precision denominators. For $g < r$, $\BP = \exp(1 - r/g)$ decays exponentially toward zero, severely penalizing short or truncated generations to prevent precision gaming.}
+\label{fig:bleu_brevity_penalty_curve}
+\end{figure}
+
+Synthesizing the brevity penalty and modified $n$-gram precisions yields the complete formulation of $\BLEU\text{-}n$:
+\begin{equation}
+\label{eq:bleu_full_formula}
+\BLEU\text{-}n = \BP \cdot \exp\left( \sum_{i=1}^n w_i \ln p_i \right) = \BP \cdot \left( \prod_{i=1}^n p_i \right)^{\frac{1}{n}}.
+\end{equation}
+
+\noindent\textbf{Step-by-step worked example: BLEU-2 calculation.}\newline
+We now execute the step-by-step computation of $\BLEU\text{-}2$ ($n=2$, uniform weights $w_1 = w_2 = 0.5$) on the worked example from the lecture slides.
+
+Let the reference and machine-generated candidate sequences be:
+\begin{align*}
+R &: \text{``The dog chased the cat''} \quad (r = 5 \text{ tokens}), \\
+G &: \text{``The dog ran after the cat''} \quad (g = 6 \text{ tokens}).
+\end{align*}
+
+\textit{Step 1: Unigram precision ($i = 1$).}
+Extract all unigrams from both sentences:
+\begin{align*}
+\text{Reference unigrams } R_1 &= \{\text{``The''}, \, \text{``dog''}, \, \text{``chased''}, \, \text{``the''}, \, \text{``cat''}\} \quad (|R_1| = 5), \\
+\text{Generated unigrams } G_1 &= \{\text{``The''}, \, \text{``dog''}, \, \text{``ran''}, \, \text{``after''}, \, \text{``the''}, \, \text{``cat''}\} \quad (|G_1| = 6).
+\end{align*}
+We count matching unigrams between $G$ and $R$:
+\begin{itemize}
+    \item ``The'': appears in $R$ ($\Count_{\text{clip}} = 1$)
+    \item ``dog'': appears in $R$ ($\Count_{\text{clip}} = 1$)
+    \item ``ran'': absent in $R$ ($\Count_{\text{clip}} = 0$)
+    \item ``after'': absent in $R$ ($\Count_{\text{clip}} = 0$)
+    \item ``the'': appears in $R$ ($\Count_{\text{clip}} = 1$)
+    \item ``cat'': appears in $R$ ($\Count_{\text{clip}} = 1$)
+\end{itemize}
+Total matching unigrams = 4. The total generated unigrams = 6. The modified unigram precision is:
+\begin{equation}
+p_1 = \frac{4}{6} \approx \mathbf{0.6667}.
+\end{equation}
+
+\textit{Step 2: Bigram precision ($i = 2$).}
+Extract all contiguous pairs of adjacent tokens (bigrams):
+\begin{align*}
+\text{Reference bigrams } R_2 &= \{\text{``The dog''}, \, \text{``dog chased''}, \, \text{``chased the''}, \, \text{``the cat''}\} \quad (|R_2| = 4), \\
+\text{Generated bigrams } G_2 &= \{\text{``The dog''}, \, \text{``dog ran''}, \, \text{``ran after''}, \, \text{``after the''}, \, \text{``the cat''}\} \quad (|G_2| = 5).
+\end{align*}
+We count matching bigrams:
+\begin{itemize}
+    \item ``The dog'': matches $R_2$ ($\Count_{\text{clip}} = 1$)
+    \item ``dog ran'': absent in $R_2$ ($\Count_{\text{clip}} = 0$)
+    \item ``ran after'': absent in $R_2$ ($\Count_{\text{clip}} = 0$)
+    \item ``after the'': absent in $R_2$ ($\Count_{\text{clip}} = 0$)
+    \item ``the cat'': matches $R_2$ ($\Count_{\text{clip}} = 1$)
+\end{itemize}
+Total matching bigrams = 2. The total generated bigrams = 5. The modified bigram precision is:
+\begin{equation}
+p_2 = \frac{2}{5} = \mathbf{0.4000}.
+\end{equation}
+
+\textit{Step 3: Geometric mean of precisions.}
+Combining $p_1$ and $p_2$ via the geometric mean:
+\begin{align}
+\GM &= \exp\left( \frac{1}{2}\left( \ln(0.6667) + \ln(0.4000) \right) \right) = \sqrt{p_1 \times p_2} \nonumber \\
+    &= \sqrt{\frac{4}{6} \times \frac{2}{5}} = \sqrt{\frac{8}{30}} = \sqrt{\frac{4}{15}} \approx \mathbf{0.5165}.
+\end{align}
+
+\textit{Step 4: Brevity penalty calculation.}
+We compare the candidate length $g = 6$ against the reference length $r = 5$:
+\begin{equation}
+g = 6 > r = 5 \implies \BP = 1.0.
+\end{equation}
+Because the candidate sequence is not shorter than the reference, no brevity penalty is incurred ($\BP = 1.0$).
+
+\textit{Step 5: Final BLEU-2 score.}
+Multiplying the brevity penalty by the precision geometric mean yields:
+\begin{equation}
+\BLEU\text{-}2 = \BP \times \GM = 1.0 \times 0.5165 = \mathbf{0.5165} \quad (\text{or } 51.65\%).
+\end{equation}
+
+\textit{Pedagogical analysis of the worked example.}
+This calculation exposes the defining characteristics and underlying limitations of $n$-gram lexical matching. The candidate phrase ``ran after'' is semantically equivalent to the reference verb ``chased''. A human evaluator would judge ``The dog ran after the cat'' as a completely correct, fluent, and faithful translation. However, because BLEU enforces exact surface string equality, the bigrams ``dog ran'', ``ran after'', and ``after the'' were scored as total errors ($0$ matches). Consequently, $p_2$ dropped from an expected near-perfect score to $0.4000$, driving the overall BLEU-2 score down to $0.5165$.
+
+\noindent\textbf{Advantages and fundamental limitations of BLEU.}\newline
+BLEU has served as the universal benchmark in machine translation and conditional generation for over two decades due to several compelling advantages:
+\begin{itemize}
+    \item \textbf{Automated and cost-effective}: BLEU replaces slow, expensive human judges with an instantaneous, deterministic algorithmic script that costs nothing to evaluate.
+    \item \textbf{Language-independent}: BLEU operates strictly on string matching over whitespace-separated tokens. It requires no morphological analyzers, syntactic dependency parsers, or semantic ontologies.
+    \item \textbf{Empirical human correlation}: Across large corpora containing thousands of sentences, aggregate BLEU scores correlate reasonably well with human assessments of translation quality, effectively discriminating between high-performing and defective models.
+    \item \textbf{Enforcement of phrasing structure}: By incorporating higher-order $n$-grams ($n \ge 2$), BLEU aggressively penalizes ``word salad'' outputs that contain relevant keywords in scrambled or ungrammatical orders.
+\end{itemize}
+
+Nonetheless, BLEU exhibits severe architectural limitations that have prompted the development of neural semantic evaluators:
+\begin{itemize}
+    \item \textbf{Total semantic blindness}: BLEU recognizes only exact surface character matches. It is completely blind to synonymy, paraphrasing, morphological inflection, and active-to-passive voice transformations. As demonstrated in our worked example, using ``ran after'' instead of ``chased'' severely degrades the score despite preserving identical semantics.
+    \item \textbf{Insensitivity to grammatical negation and factual correctness}: Surface overlap does not track truth value. If a reference states ``The system is secure'' and a model generates ``The system is not secure'', the candidate matches 4 out of 5 unigrams and achieves an excellent BLEU score, despite asserting the absolute opposite fact.
+    \item \textbf{Brittle reference dependency}: BLEU evaluates alignment with a specific reference phrasing. If the human reference uses rare vocabulary or unusual syntax, a model generating natural, idiomatic text will be penalized simply because its stylistic choices diverge from the specific reference annotator.
+    \item \textbf{Unsuitability for open-ended generation}: In tasks such as dialogue, creative writing, or long-form reasoning, there is no single ``correct'' reference string. Demanding exact $n$-gram overlap against a fixed reference penalizes valid divergent creativity.
+\end{itemize}
+
+\clearpage
+\thispagestyle{empty}
+\null
+\clearpage
+
+\end{document}

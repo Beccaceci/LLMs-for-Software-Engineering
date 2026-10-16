@@ -406,15 +406,14 @@ We trace the exact 5-step generation sequence recorded in the lecture slides, st
 
 Because the word \textit{``happily''} has zero outgoing transitions in Table~\ref{tab:transition_matrix}, the process reaches an absorbing terminal state and generation halts naturally.
 
-\begin{examinsight}[Classroom Q\&A: absorbing terminal states and infinite loops]
-During the lecture walkthrough, two crucial student questions were analyzed by the instructor:
+\paragraph{Analysis of absorbing terminal states and infinite loops.}
+During the sequence generation analysis, two fundamental edge cases emerge:
 \begin{enumerate}
-    \item \textbf{Question 1: What happens after words like ``happily'' or ``cheese''?} \\
+    \item \textbf{Absorbing terminal states after sentence-ending tokens}:
     In Table~\ref{tab:transition_matrix}, terminal sentence-ending words have a row count of zero ($C(\text{Happily}) = 0$), making the conditional probability division $0/0$ mathematically undefined. In standard production language modeling, this is formalized by appending an explicit end-of-sequence token $\langle /s \rangle$ (or $\text{[EOS]}$) to every training sentence, guaranteeing that every word possesses a non-zero outgoing transition to either another word or $\langle /s \rangle$.
-    \item \textbf{Question 2: Why did greedy decoding enter an infinite cyclic loop?} \\
+    \item \textbf{Infinite cyclic loops under greedy decoding}:
     Because bigram models condition exclusively on the single preceding token $w_{t-1}$, once the model transitions from \textit{``ate''} to \textit{``the''}, it retains zero memory that it already described the mouse eating cheese two steps earlier. If greedy decoding is used ($\argmax$), the transition path becomes fully deterministic and falls into a stationary limit cycle: \textit{``the $\to$ mouse $\to$ ate $\to$ the $\to$ mouse $\to$ \dots''}. Modern LLMs resolve this through long-context self-attention horizons, temperature-controlled stochastic sampling, and repetition penalties.
 \end{enumerate}
-\end{examinsight}
 
 
 \section{Fundamental limitations of statistical $n$-gram models: sparsity and zero-frequency collapse}
@@ -495,7 +494,7 @@ it gains zero statistical confidence regarding the identical sentence containing
 Because \textit{``cat''} and \textit{``feline''} are completely separate row indices in Table~\ref{tab:transition_matrix}, observations of one do not inform the other. There is no concept of semantic distance, synonymy, or conceptual overlap.
 
 \paragraph{The causal imperative.}
-While long-range memory amnesia and semantic blindness demand continuous neural architectures (introduced in Chapters~\ref{ch:deep_learning_foundations} and~\ref{ch:word_embeddings}), the immediate, fatal crisis in statistical language modeling is the **zero-frequency catastrophe** ($C=0 \implies P=0 \implies \PPL=\infty$). Before we can even evaluate an $n$-gram model, we must establish rigorous mathematical algorithms that steal probability mass from frequent events and reallocate it to unobserved events: this is the domain of **statistical smoothing**.
+While long-range memory amnesia and semantic blindness demand continuous neural architectures (introduced in Chapters~\ref{ch:deep_learning_foundations} and~\ref{ch:word_embeddings}), the immediate, fatal crisis in statistical language modeling is the \textbf{zero-frequency catastrophe} ($C=0 \implies P=0 \implies \PPL=\infty$). Before we can even evaluate an $n$-gram model, we must establish rigorous mathematical algorithms that steal probability mass from frequent events and reallocate it to unobserved events: this is the domain of \textbf{statistical smoothing}.
 
 
 \section{Statistical smoothing and discounting algorithms}
@@ -782,8 +781,10 @@ When a model evaluates a text corpus and achieves $\PPL = 42$, it indicates that
     \item State-of-the-art LLMs on natural language benchmarks typically achieve perplexities between $8$ and $15$.
 \end{itemize}
 
-\begin{examinsight}[Base-2 vs base-$e$ logarithmic conversions and worked exam example]
-A recurrent point of confusion in oral and written examinations at Politecnico di Torino is mixing base-2 information theory with base-$e$ deep learning frameworks:
+\subsection{Base-2 vs.~base-$e$ logarithmic conversions and perplexity computation}
+\label{subsec:log_base_conversions}
+
+A critical mathematical nuance arises when connecting information-theoretic formulations (which traditionally employ base-$2$ logarithms) with deep learning frameworks such as PyTorch (which exclusively compute natural base-$e$ cross-entropy loss):
 \begin{center}
 \begin{tabularx}{\linewidth}{l >{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}X}
 \toprule
@@ -797,8 +798,8 @@ Conversion Identity & \multicolumn{2}{c}{$\mathcal{H}_2 = \frac{\mathcal{L}_{\te
 \end{tabularx}
 \end{center}
 
-\paragraph{Worked exam calculation.}
-Suppose a PyTorch model trained on code completion reports an evaluation loss of $\mathcal{L}_{\text{CE}} = 2.7726$ nats.
+\paragraph{Worked numerical calculation.}
+Suppose a model trained on code completion reports an evaluation cross-entropy loss of $\mathcal{L}_{\text{CE}} = 2.7726$ nats:
 \begin{enumerate}
     \item \textbf{Direct Base-$e$ Perplexity}:
     \[
@@ -813,8 +814,7 @@ Suppose a PyTorch model trained on code completion reports an evaluation loss of
     \PPL = 2^{\mathcal{H}_2} = 2^{4.00} = 16.00.
     \]
 \end{enumerate}
-\emph{Common Exam Error}: If a student incorrectly evaluates $2^{\mathcal{L}_{\text{CE}}} = 2^{2.7726} \approx 6.83$, they underestimate the model's true branching factor by more than $57\%$. Always verify whether the logarithm used is base-$2$ or base-$e$ before computing perplexity.
-\end{examinsight}
+Notice that evaluating $2^{\mathcal{L}_{\text{CE}}} = 2^{2.7726} \approx 6.83$ would severely underestimate the true branching factor by more than $57\%$. One must always ensure consistent logarithmic bases when deriving perplexity from loss.
 
 \subsection{The glass ceiling of smoothed \texorpdfstring{$n$}{n}-gram models}
 While Kneser-Ney smoothing dramatically reduces test perplexity by eliminating zero-frequency collapses, smoothed $n$-gram models remain fundamentally handicapped:

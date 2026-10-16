@@ -49,6 +49,8 @@
 % Shorthand diagram colors
 \definecolor{pogreen}{RGB}{40, 160, 85}
 \definecolor{porange}{RGB}{220, 120, 35}
+\definecolor{amberGold}{RGB}{218, 165, 32}
+\definecolor{forestGreen}{RGB}{34, 139, 34}
 
 % Neutral Grays
 \definecolor{bodyDark}{RGB}{30, 30, 30}
@@ -56,6 +58,24 @@
 \definecolor{lightGrayLine}{RGB}{220, 225, 230}
 \definecolor{codeBg}{RGB}{248, 249, 251}
 \definecolor{codeFrame}{RGB}{225, 230, 238}
+\definecolor{cardBg}{RGB}{248, 249, 252}
+\definecolor{cardLine}{RGB}{220, 225, 235}
+
+% Canonical Transformer Architecture Colors (Vaswani et al. 2017)
+\definecolor{tfYellow}{RGB}{255, 242, 204}
+\definecolor{tfYellowBorder}{RGB}{214, 182, 86}
+\definecolor{tfOrange}{RGB}{255, 230, 204}
+\definecolor{tfOrangeBorder}{RGB}{215, 155, 0}
+\definecolor{tfBlue}{RGB}{218, 232, 252}
+\definecolor{tfBlueBorder}{RGB}{108, 142, 191}
+\definecolor{tfPurple}{RGB}{225, 213, 231}
+\definecolor{tfPurpleBorder}{RGB}{150, 115, 166}
+\definecolor{tfGreen}{RGB}{213, 232, 212}
+\definecolor{tfGreenBorder}{RGB}{130, 179, 102}
+\definecolor{tfPink}{RGB}{248, 206, 204}
+\definecolor{tfPinkBorder}{RGB}{184, 84, 80}
+\definecolor{tfGrayBg}{RGB}{248, 248, 248}
+\definecolor{tfGrayBorder}{RGB}{190, 190, 190}
 
 % ------------------------------------------------------------------------------
 % The 3 Specialized Callout Box Environments
@@ -318,7 +338,13 @@
 \let\oldL\L
 \DeclareRobustCommand{\L}{\ifmmode\mathcal{L}\else\oldL\fi}
 
-% Software Engineering Metrics
+% Evaluation & Software Engineering Metrics
+\newcommand{\AM}{\mathrm{AM}}
+\newcommand{\GM}{\mathrm{GM}}
+\newcommand{\BLEU}{\mathrm{BLEU}}
+\newcommand{\BP}{\mathrm{BP}}
+\newcommand{\NLL}{\mathrm{NLL}}
+\DeclareMathOperator{\Count}{Count}
 \newcommand{\PassAtK}[1]{\mathrm{Pass}@#1}
 \newcommand{\CodeBLEU}{\mathrm{CodeBLEU}}
 

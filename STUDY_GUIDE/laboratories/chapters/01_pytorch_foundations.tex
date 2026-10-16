@@ -896,7 +896,135 @@ The base \texttt{models.resnet18} has an output fully connected layer (\texttt{f
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=\textwidth]{figures/lab01/resnet_finetuning_cifar10.png}
+\resizebox{0.98\textwidth}{!}{%
+\begin{tikzpicture}[
+    >=Stealth,
+    font=\small\sffamily,
+    panellabel/.style={font=\bfseries\normalsize\sffamily, align=left},
+    block/.style={rectangle, rounded corners=4pt, draw=politoNavy, fill=skyBlue!35, thick, minimum height=1.15cm, minimum width=1.65cm, align=center, font=\scriptsize\bfseries},
+    gapnode/.style={rectangle, rounded corners=4pt, draw=deepdiveTeal, fill=deepdiveTealBg, thick, minimum height=1.15cm, minimum width=1.15cm, align=center, font=\scriptsize\bfseries, text=deepdiveTeal},
+    headnode/.style={rectangle, rounded corners=4pt, draw=crimsonRed, fill=examAmberBg, dashed, thick, minimum height=1.15cm, minimum width=2.5cm, align=center, font=\scriptsize\bfseries, text=crimsonRed},
+    newheadnode/.style={rectangle, rounded corners=4pt, draw=thmGreen, fill=thmGreenBg, thick, minimum height=1.15cm, minimum width=2.5cm, align=center, font=\scriptsize\bfseries, text=thmGreen},
+    lossnode/.style={rectangle, rounded corners=4pt, draw=crimsonRed, fill=examAmberBg, thick, minimum height=1.15cm, minimum width=2.2cm, align=center, font=\scriptsize\bfseries, text=crimsonRed},
+    arr/.style={->, thick, draw=politoNavy},
+    gradarr/.style={->, thick, dashed, draw=thmGreen}
+]
+
+    % =========================================================================
+    % PANEL 1: PRE-TRAINED SOURCE (ImageNet-1K)
+    % =========================================================================
+    \node[panellabel, text=politoNavy, anchor=west] at (-4.2, 5.0) {
+        \textbf{1. Pre-trained Source Architecture: ResNet-18 on ImageNet-1K}\\
+        \textmd{\footnotesize Pre-trained weights on $1.28\text{M}$ natural images across $1{,}000$ semantic categories (\texttt{weights='DEFAULT'})}
+    };
+
+    % ImageNet Input
+    \begin{scope}[xshift=-3.5cm, yshift=3.0cm, scale=0.6]
+        \filldraw[fill=skyBlue!40, draw=politoNavy, thick, opacity=0.9] (0, 1.2) -- (1.2, 1.9) -- (1.2, -0.5) -- (0, -1.2) -- cycle;
+        \filldraw[fill=thmGreenBg, draw=thmGreen, thick, opacity=0.9] (0.3, 1.35) -- (1.5, 2.05) -- (1.5, -0.35) -- (0.3, -1.05) -- cycle;
+        \filldraw[fill=crimsonRed!20, draw=crimsonRed, thick, opacity=0.9] (0.6, 1.5) -- (1.8, 2.2) -- (1.8, -0.2) -- (0.6, -0.9) -- cycle;
+        \node[font=\tiny\bfseries, text=politoNavy] at (0.2, 0.3) {B};
+        \node[font=\tiny\bfseries, text=thmGreen] at (0.8, 0.5) {G};
+        \node[font=\tiny\bfseries, text=crimsonRed] at (1.4, 0.7) {R};
+    \end{scope}
+    \node[font=\scriptsize\bfseries, text=politoNavy, align=center] at (-3.0, 1.8) {ImageNet Input\\[1pt]\tiny\texttt{[3 $\times$ 224 $\times$ 224]}};
+
+    % Backbone dashed container
+    \draw[draw=steelBlue!60, dashed, rounded corners=6pt, fill=skyBlue!10] 
+        (-2.0, 2.1) rectangle (8.4, 4.0);
+    \node[font=\tiny\bfseries, text=steelBlue, anchor=west] at (-1.8, 3.8) {Transferred Visual Backbone: 18 layers, $11.17\text{M}$ pre-learned weights (\texttt{torchvision.models.resnet18})};
+
+    % Conv1 + Pool
+    \node[block] (conv1) at (-1.0, 2.9) {Conv1 + Pool\\[2pt]{\tiny\textmd{$7\times 7$, st.~2}}\\[1pt]{\tiny\textmd{64 ch, $112\times 112$}}};
+    \node[block] (lay1) at (1.0, 2.9) {Layer 1\\[2pt]{\tiny\textmd{2 ResBlocks}}\\[1pt]{\tiny\textmd{64 ch, $56\times 56$}}};
+    \node[block] (lay2) at (3.0, 2.9) {Layer 2\\[2pt]{\tiny\textmd{2 ResBlocks}}\\[1pt]{\tiny\textmd{128 ch, $28\times 28$}}};
+    \node[block] (lay3) at (5.0, 2.9) {Layer 3\\[2pt]{\tiny\textmd{2 ResBlocks}}\\[1pt]{\tiny\textmd{256 ch, $14\times 14$}}};
+    \node[block] (lay4) at (7.0, 2.9) {Layer 4\\[2pt]{\tiny\textmd{2 ResBlocks}}\\[1pt]{\tiny\textmd{512 ch, $7\times 7$}}};
+    \node[gapnode] (gap1) at (8.9, 2.9) {GAP\\[2pt]{\tiny\textmd{Spatial}}\\[1pt]{\tiny\textmd{$\vz \in \R^{512}$}}};
+
+    \draw[arr] (-2.2, 2.9) -- (conv1);
+    \draw[arr] (conv1) -- (lay1);
+    \draw[arr] (lay1) -- (lay2);
+    \draw[arr] (lay2) -- (lay3);
+    \draw[arr] (lay3) -- (lay4);
+    \draw[arr] (lay4) -- (gap1);
+
+    % Scissors / Discard marker
+    \node[circle, draw=crimsonRed, fill=white, inner sep=1.5pt, text=crimsonRed, font=\footnotesize\bfseries] (scissors) at (10.0, 2.9) {\faCut};
+    \draw[arr, dashed, crimsonRed] (gap1) -- (scissors);
+
+    % Original ImageNet Head (discarded)
+    \node[headnode] (orighead) at (12.1, 2.9) {Original Head \texttt{fc}\\[2pt]\tiny $\mW \in \R^{1000 \times 512},\; \vb \in \R^{1000}$\\[1pt]{\tiny\textmd{\textbf{1,000 ImageNet Classes}}}};
+    \draw[arr, dashed, crimsonRed] (scissors) -- (orighead);
+    \node[draw=crimsonRed!60, fill=crimsonRed!8, rounded corners=2pt, font=\tiny\bfseries, text=crimsonRed, anchor=north] at (12.1, 2.1) {\faTimes\ DISCARDED (\texttt{in\_features = 512})};
+
+    % =========================================================================
+    % HEAD SURGERY ARROW (Connecting Original Head to New Head)
+    % =========================================================================
+    \node[draw=examAmberLine, fill=examAmberBg, rounded corners=4pt, font=\tiny, align=center, inner sep=4pt] (surgbox) at (12.1, 0.4) {
+        \textbf{Classification Head Surgery:}\\[1pt]
+        \texttt{pretrained\_model.fc = nn.Linear(512, 10)}\\[1pt]
+        Replaces 1,000 ImageNet outputs with 10 CIFAR-10 logits
+    };
+    \draw[->, very thick, examAmberLine] (orighead.south) -- (surgbox.north);
+    \draw[->, very thick, examAmberLine] (surgbox.south) -- (12.1, -1.2);
+
+    % =========================================================================
+    % PANEL 2: DOWNSTREAM FINE-TUNING (CIFAR-10)
+    % =========================================================================
+    \node[panellabel, text=thmGreen, anchor=west] at (-4.2, 0.2) {
+        \textbf{2. Downstream Fine-Tuning Pipeline: Adaptation to CIFAR-10}\\
+        \textmd{\footnotesize Reusing pre-learned visual representations and training the adapted model end-to-end}
+    };
+
+    % CIFAR-10 Input
+    \begin{scope}[xshift=-3.5cm, yshift=-1.9cm, scale=0.6]
+        \filldraw[fill=skyBlue!40, draw=politoNavy, thick, opacity=0.9] (0, 1.2) -- (1.2, 1.9) -- (1.2, -0.5) -- (0, -1.2) -- cycle;
+        \filldraw[fill=thmGreenBg, draw=thmGreen, thick, opacity=0.9] (0.3, 1.35) -- (1.5, 2.05) -- (1.5, -0.35) -- (0.3, -1.05) -- cycle;
+        \filldraw[fill=crimsonRed!20, draw=crimsonRed, thick, opacity=0.9] (0.6, 1.5) -- (1.8, 2.2) -- (1.8, -0.2) -- (0.6, -0.9) -- cycle;
+        \node[font=\tiny\bfseries, text=politoNavy] at (0.2, 0.3) {B};
+        \node[font=\tiny\bfseries, text=thmGreen] at (0.8, 0.5) {G};
+        \node[font=\tiny\bfseries, text=crimsonRed] at (1.4, 0.7) {R};
+    \end{scope}
+    \node[font=\scriptsize\bfseries, text=politoNavy, align=center] at (-3.0, -3.1) {CIFAR-10 Input\\[1pt]\tiny\texttt{[3 $\times$ 32 $\times$ 32]}\\[1pt]\tiny 10 classes};
+
+    % Pretrained Transferred Backbone Box
+    \node[rectangle, rounded corners=6pt, draw=steelBlue, fill=white, line width=1.1pt, minimum width=8.8cm, minimum height=1.3cm, align=center] 
+        (transbb) at (3.2, -1.9) {
+        \textbf{Pretrained ResNet-18 Feature Extractor (Transferred Backbone)}\\[2pt]
+        \footnotesize Hierarchical Feature Hierarchy: Gabor edge filters $\longrightarrow$ texture \& corner motifs $\longrightarrow$ high-level object semantics\\[2pt]
+        \tiny 18 Convolutional / Residual Layers \;\;$\vert$\;\; Warm-Start Initialized \;\;$\vert$\;\; Active Device: \texttt{.to(device)}
+    };
+    \draw[arr] (-2.2, -1.9) -- (transbb.west);
+
+    % GAP for downstream
+    \node[gapnode] (gap2) at (8.9, -1.9) {GAP\\[2pt]{\tiny\textmd{Spatial}}\\[1pt]{\tiny\textmd{$\vz \in \R^{512}$}}};
+    \draw[arr] (transbb.east) -- (gap2);
+
+    % New Head fc
+    \node[newheadnode] (newhead) at (12.1, -1.9) {New Head \texttt{fc}\\[2pt]\tiny $\mW \in \R^{10 \times 512},\; \vb \in \R^{10}$\\[1pt]{\tiny\textmd{\textbf{10 CIFAR Classes}}}\\[1pt]\tiny\color{bodyGray}(airplane, auto, bird, \dots, truck)};
+    \draw[arr] (gap2) -- (newhead);
+
+    % Loss node
+    \node[lossnode] (lossbox) at (15.1, -1.9) {Cross-Entropy\\Loss $\Loss_{\text{CE}}$\\[2pt]\tiny $-\log\left(\frac{e^{\hat{y}_y}}{\sum_j e^{\hat{y}_j}}\right)$};
+    \draw[arr] (newhead) -- node[above=1pt, font=\tiny\bfseries, text=steelBlue] {Logits $\hat{\vy}$} (lossbox);
+
+    % Target
+    \node[rectangle, rounded corners=3pt, draw=bodyGray, fill=gray!10, font=\tiny\bfseries, align=center] (targetbox) at (15.1, -0.6) {Ground Truth Target\\$y \in \{0, \dots, 9\}$};
+    \draw[arr, dashed, bodyGray] (targetbox) -- node[right, font=\tiny] {One-Hot} (lossbox);
+
+    % Backpropagation arrows
+    \draw[gradarr] (lossbox.south) -- (15.1, -2.9) -- node[below, font=\tiny\bfseries, text=thmGreen] {\texttt{loss.backward()}} (12.1, -2.9) -- (newhead.south);
+    \draw[gradarr] (12.1, -2.9) -- node[below=2pt, font=\tiny\bfseries, text=thmGreen] {End-to-End Fine-Tuning: \texttt{optim.SGD(pretrained\_model.parameters(), lr=0.01, momentum=0.9)}} (3.2, -2.9) -- (transbb.south);
+
+    % Bottom summary badge
+    \node[rectangle, rounded corners=5pt, draw=politoNavy, fill=skyBlue!20, thick, inner sep=5pt, font=\scriptsize, align=center] at (5.5, -3.8) {
+        \textbf{Transfer Learning Empirical Advantage (CIFAR-10)}: SimpleNN (Trained from Scratch): $\approx 47.5\%$ accuracy ($5$ epochs) $\Longrightarrow$ \textbf{Pre-trained ResNet-18 (Fine-Tuned): $> 82.4\%$} accuracy ($5$ epochs)\\
+        \textbf{Key Principle}: Reusing rich low-level convolutional feature hierarchies pre-learned on $1.28\text{M}$ ImageNet images eliminates cold-start sample complexity.
+    };
+
+\end{tikzpicture}%
+}
 \caption{Architectural topology of transfer learning and fine-tuning with ResNet-18 on CIFAR-10 (Section~1.7.2). (Top) The source ResNet-18 model pre-trained on ImageNet-1K ($1.28\text{M}$ images, $1{,}000$ categories) features $18$ residual convolutional layers and an original $1{,}000$-class classification head. (Middle) Classification head surgery replaces \texttt{pretrained\_model.fc} with a new linear projection $\mW \in \R^{10 \times 512},\; \vb \in \R^{10}$. (Bottom) End-to-end downstream fine-tuning on CIFAR-10 ($[3 \times 32 \times 32]$), propagating gradients through both the new head and the pre-trained feature extractor, boosting classification accuracy from $47.5\%$ (MLP from scratch) to $> 82.4\%$ in just $5$ epochs.}
 \label{fig:lab01_resnet_finetuning}
 \end{figure}
