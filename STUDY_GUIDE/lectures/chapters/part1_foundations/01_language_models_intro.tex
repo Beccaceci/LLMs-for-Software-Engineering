@@ -4,6 +4,11 @@
 \chapter{Introduction to language models}
 \label{ch:intro_lms}
 
+Human language and software engineering source code represent discrete symbolic systems governed by intricate, multi-level structures spanning phonology, syntax, semantics, and pragmatics. For decades, computational linguistics attempted to capture these phenomena through hand-crafted rule bases and formal context-free grammars. However, natural language is inherently ambiguous, productive, and elastic: speakers continuously coin new idioms, tolerate grammatical ellipses, and convey complex connotations that elude rigid deterministic parsers.
+
+To build computational systems capable of understanding, completing, and generating coherent text, modern computer science reframes language processing from deterministic rule parsing into a discrete stochastic process. By treating words and subwords as discrete random variables, we formulate language modeling as the task of quantifying the joint probability distribution over arbitrary token sequences. Through the unconditional factorization of the chain rule of probability, this joint estimation problem collapses into sequential next-token conditional prediction. This deceptively simple objective—predicting the identity of the next token given preceding context—constitutes the foundational golden thread uniting the earliest twentieth-century statistical Markov models with modern multi-billion-parameter foundation models. In this chapter, we establish the mathematical foundations of probabilistic language modeling, formalize the trade-offs of classical $n$-gram representations, analyze the pathological breakdown of discrete frequency counting, derive statistical smoothing algorithms, and establish information-theoretic metrics for sequence evaluation.
+
+\clearpage
 \section{The sequence prediction problem and probabilistic language modeling}
 \label{sec:prob_lm}
 
@@ -66,12 +71,8 @@ This formulation aligns directly with the classic psychological \emph{cloze test
 \end{center}
 Every modern autoregressive language model, including GPT-4 and Claude, relies fundamentally on this conditional next-token formulation.
 
-\begin{intuition}[The core thesis: next-word prediction as full language modeling]
-In the opening lecture of the Politecnico di Torino course, the fundamental essence of modern language modeling was crystallized:
-\begin{quote}
-\emph{``If we can predict the next word, then we have estimated this conditional probability. And then we can plug this into the chain rule, and estimate the probability of any arbitrary sentence. This is what a language model does: nothing more, nothing less. If you understand this idea, you understand the core mechanism driving the entire course, from 1980s Markov chains to modern trillion-parameter LLMs.''}
-\end{quote}
-\end{intuition}
+\noindent\textbf{Next-word prediction as generative modeling.}\newline
+This observation reveals a profound equivalence in statistical NLP: estimating the local conditional probability $\Prob(w_t \mid w_{<t})$ across a vocabulary is mathematically sufficient to compute the global probability $\Prob(W)$ of any arbitrary document via Equation~\eqref{eq:chain_rule_exact}. Conversely, generating novel text reduces to iteratively sampling from this local conditional distribution and appending each sampled token to the conditioning history. Thus, mastering conditional next-token prediction equates to mastering generative language modeling in its entirety.
 
 \begin{figure}[htbp]
 \centering
@@ -117,10 +118,10 @@ In the opening lecture of the Politecnico di Torino course, the fundamental esse
 \label{fig:prob_tree}
 \end{figure}
 
-\begin{intuition}[The branching probability tree]
-Sequence generation can be visualized geometrically as walking down a directed decision tree (Figure~\ref{fig:prob_tree}). At the root node $\langle s \rangle$, the model confronts the entire vocabulary $\vocab$. Choosing a token $w_1$ traverses an edge with probability $\Prob(w_1)$ and lands at a new conditioning state. From this state, another set of branches opens, weighted by $\Prob(w_2 \mid w_1)$. The joint probability of an entire sentence is simply the product of edge weights along that unique trajectory. Generating text consists of sampling a path from the root to a designated terminal token $\langle /s \rangle$.
-\end{intuition}
+\noindent\textbf{Path traversal across the probability tree.}\newline
+Sequence generation can be understood geometrically as walking down a directed decision tree (Figure~\ref{fig:prob_tree}). At the root node $\langle s \rangle$, the model confronts the entire vocabulary $\vocab$. Choosing a token $w_1$ traverses an edge with probability $\Prob(w_1)$ and lands at a new conditioning state. From this state, another set of branches opens, weighted by $\Prob(w_2 \mid w_1)$. The joint probability of an entire sentence is simply the product of edge weights along that unique trajectory, and text generation corresponds to sampling a valid path from the root to a designated terminal token $\langle /s \rangle$.
 
+\clearpage
 \section{Markov assumptions and $n$-gram language models}
 \label{sec:markov_ngram}
 
@@ -208,6 +209,7 @@ where $C(\cdot)$ denotes the raw frequency of that exact sequence in the trainin
 Normalizing each row by the unigram count of the conditioning prefix ensures that $\sum_{w \in \vocab} \Prob_{\text{MLE}}(w \mid w_{t-1}) = 1$.
 
 
+\clearpage
 \section{Transition count matrix construction walkthrough}
 \label{sec:count_matrix}
 
@@ -322,6 +324,7 @@ Applying Equation~\eqref{eq:mle_bigram} yields the complete $7 \times 7$ transit
 \end{figure}
 
 
+\clearpage
 \section{Autoregressive estimation and generation}
 \label{sec:estimation_generation}
 
@@ -358,7 +361,7 @@ Despite the sequence \textit{``the cat chased the cheese''} never occurring as a
 \subsection{5-step autoregressive generation trace}
 Now consider using the bigram model for open-ended text generation. Autoregressive sampling begins with a seed prefix, samples the next token from the resulting conditional probability distribution, appends the sampled token to the history, and repeats.
 
-We trace the exact 5-step generation sequence recorded in the lecture slides, starting from the seed token \textit{``the''}:
+We trace a concrete 5-step generation sequence starting from the seed token \textit{``the''}:
 
 \begin{enumerate}[label=\textbf{Step \arabic*:}, leftmargin=2.0cm]
     \item \textbf{Condition on prefix:} $\text{history} = (\text{``the''})$.
@@ -390,7 +393,7 @@ We trace the exact 5-step generation sequence recorded in the lecture slides, st
         \item Active row in transition matrix: $\text{Row ``The''}$.
         \item Candidate distribution: $\Prob(\text{cat}\mid\text{the}) = 0.25$, $\Prob(\text{cheese}\mid\text{the}) = 0.25$, $\Prob(\text{mouse}\mid\text{the}) = 0.50$.
         \item Random sample: \textbf{``mouse''}.
-        \item \emph{Slide Note}: \textcolor{examAmber}{\textbf{:(}} (A repetitive structural loop has emerged because the model cannot remember that it already emitted ``mouse'' two words ago).
+        \item \textit{Pathological state}: A repetitive structural loop emerges because the first-order Markov model cannot retain the memory that it already emitted ``mouse'' two steps earlier.
         \item Generated prefix: \textit{``the mouse ate the mouse''}.
     \end{itemize}
 
@@ -399,7 +402,7 @@ We trace the exact 5-step generation sequence recorded in the lecture slides, st
         \item Active row in transition matrix: $\text{Row ``Mouse''}$.
         \item Candidate distribution: $\Prob(\text{ate}\mid\text{mouse}) = 0.50$, $\Prob(\text{happily}\mid\text{mouse}) = 0.50$.
         \item Random sample: \textbf{``happily''}.
-        \item \emph{Slide Note}: \textcolor{examAmber}{\textbf{\faSurprise\ (shocked face)}} (A syntactically valid but bizarre, cannibalistic sentence is generated).
+        \item \textit{Pathological state}: While syntactically licensed by local transitions, an unnatural semantic tautology is generated due to the absence of long-range semantic grounding.
         \item Generated sequence: \textbf{\textit{``The mouse ate the mouse happily''}}.
     \end{itemize}
 \end{enumerate}
@@ -416,6 +419,7 @@ During the sequence generation analysis, two fundamental edge cases emerge:
 \end{enumerate}
 
 
+\clearpage
 \section{Fundamental limitations of statistical $n$-gram models: sparsity and zero-frequency collapse}
 \label{sec:ngram_limitations}
 
@@ -497,6 +501,7 @@ Because \textit{``cat''} and \textit{``feline''} are completely separate row ind
 While long-range memory amnesia and semantic blindness demand continuous neural architectures (introduced in Chapters~\ref{ch:deep_learning_foundations} and~\ref{ch:word_embeddings}), the immediate, fatal crisis in statistical language modeling is the \textbf{zero-frequency catastrophe} ($C=0 \implies P=0 \implies \PPL=\infty$). Before we can even evaluate an $n$-gram model, we must establish rigorous mathematical algorithms that steal probability mass from frequent events and reallocate it to unobserved events: this is the domain of \textbf{statistical smoothing}.
 
 
+\clearpage
 \section{Statistical smoothing and discounting algorithms}
 \label{sec:smoothing}
 
@@ -666,6 +671,7 @@ Interpolated Kneser-Ney consistently outperforms all other statistical smoothing
 Now that we have established competing smoothing algorithms (Laplace, Good-Turing, Katz, Kneser-Ney), each reallocating probability mass under different mathematical assumptions, we face a crucial practical question: \emph{How do we quantitatively benchmark and compare these models on held-out evaluation text without running costly downstream applications?} This brings us directly to formal evaluation metrics.
 
 
+\clearpage
 \section{Evaluation metrics: cross-entropy and perplexity}
 \label{sec:eval_metrics}
 
@@ -826,6 +832,7 @@ While Kneser-Ney smoothing dramatically reduces test perplexity by eliminating z
 These structural limits motivated researchers to explore new paradigms that replace discrete counting tables with continuous, parameterized functions.
 
 
+\clearpage
 \section{Historical evolution of language models}
 \label{sec:history_lms}
 
@@ -953,7 +960,7 @@ In this framework, the conditional probability of token $w_t$ given context $w_1
 
 Throughout the 1990s, as speech recognition and machine translation systems scaled, researchers recognized that flat $n$-gram tables could not condition on long histories without exponential parameter explosion. 
 
-To overcome this limitation in the course progression, \emph{decision-tree language models} were introduced in \cite{potamianos1998} (as examined on Slide 19 of the course lecture deck). Rather than conditioning probability on a rigid, exact sequence of $n-1$ tokens, a binary decision tree asks a sequence of syntactic and lexical questions about the historical context $\mathcal{H} = (w_{t-1}, w_{t-2}, \dots)$.
+To overcome this limitation, \emph{decision-tree language models} were introduced in \cite{potamianos1998}. Rather than conditioning probability on a rigid, exact sequence of $n-1$ tokens, a binary decision tree asks a sequence of syntactic and lexical questions about the historical context $\mathcal{H} = (w_{t-1}, w_{t-2}, \dots)$.
 
 \begin{figure}[htbp]
 \centering
@@ -989,7 +996,7 @@ As illustrated in Figure~\ref{fig:decision_tree_lm}, context histories that shar
 \subsection{2000--2003: The neural probabilistic language model}
 \label{subsec:milestone_bengio_nplm}
 
-In the landmark 2003 paper \textit{``A Neural Probabilistic Language Model''} \cite{bengio2003}, natural language processing was revolutionized by introducing continuous distributed representations to defeat the curse of dimensionality (as highlighted on Slide 20 of the course lectures).
+In the landmark 2003 paper \textit{``A Neural Probabilistic Language Model''} \cite{bengio2003}, natural language processing was revolutionized by introducing continuous distributed representations to defeat the curse of dimensionality.
 
 \begin{figure}[htbp]
 \centering
@@ -1074,14 +1081,14 @@ The neural probabilistic formulation in \cite{bengio2003} replaced discrete coun
 \subsection{2018--2019: Generative pre-training and GPT-2}
 \label{subsec:milestone_gpt2}
 
-While continuous representations were established in \cite{bengio2003}, models throughout the 2000s and 2010s remained restricted in scale and context length. In 2018--2019, the GPT-2 architecture was introduced in \cite{radford2019} (\textit{``Language Models are Unsupervised Multitask Learners''}, examined on Slide 21 of the course slides).
+While continuous representations were established in \cite{bengio2003}, models throughout the 2000s and 2010s remained restricted in scale and context length. In 2018--2019, the GPT-2 architecture was introduced in \cite{radford2019} (\textit{``Language Models are Unsupervised Multitask Learners''}).
 
 GPT-2 demonstrated that massive, autoregressive decoder-only models trained on hundreds of gigabytes of uncurated internet text (WebText) could perform diverse natural language and software tasks without task-specific supervised training. By predicting next tokens over context windows of $1{,}024$ tokens, the model exhibited emergent zero-shot transfer across reading comprehension, machine translation, and Python code generation.
 
 \subsection{2020--2022: Megatron-Turing NLG 530B and compute-optimal scaling}
 \label{subsec:milestone_scaling}
 
-Following GPT-2 and GPT-3, the deep learning industry initiated an aggressive scaling arms race, culminating in monolithic models such as the Megatron-Turing NLG 530B (Slide 22). However, early scaling heuristics \cite{kaplan2020} recommended scaling model parameters faster than training data. Consequently, models like Megatron-Turing NLG 530B and GPT-3 (175B parameters trained on 300B tokens) were severely \textbf{undertrained} relative to their parameter capacity.
+Following GPT-2 and GPT-3, the deep learning industry initiated an aggressive scaling arms race, culminating in monolithic models such as the Megatron-Turing NLG 530B \cite{smith2022mtnlg}. However, early scaling heuristics \cite{kaplan2020} recommended scaling model parameters faster than training data. Consequently, models like Megatron-Turing NLG 530B and GPT-3 (175B parameters trained on 300B tokens) were severely \textbf{undertrained} relative to their parameter capacity.
 
 In 2022, the landmark study \textit{``Training Compute-Optimal Large Language Models''} \cite{hoffmann2022} established the \textbf{Chinchilla} scaling laws:
 \begin{equation}
@@ -1108,5 +1115,10 @@ Instead of counting co-occurrences in text, we parameterize language predictors 
 This transition requires establishing the mathematical and computational foundations of deep learning: How does an artificial neuron compute? Why is stacking linear layers without non-linear activations mathematically futile? What allows multi-layer perceptrons to approximate arbitrary complex functions? And how does backpropagation automatically compute gradients across computational graphs?
 
 We address each of these foundational questions in Chapter~\ref{ch:deep_learning_foundations}: \emph{Deep Learning Foundations for NLP}.
+
+\clearpage
+\thispagestyle{empty}
+\null
+\clearpage
 
 \end{document}

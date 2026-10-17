@@ -5,6 +5,13 @@
 \chapter{Distributed word representations and Word2Vec}
 \label{ch:word_embeddings}
 
+In Chapter~\ref{ch:intro_lms}, we examined statistical language modeling through $n$-gram Markov chains and smoothed frequency distributions, demonstrating how purely discrete combinatorics collapses beneath the curse of dimensionality. In Chapter~\ref{ch:deep_learning_foundations}, we established the mathematical machinery of continuous deep neural networks, proving how non-linear activations prevent rank collapse and how multivariable gradient descent optimizes parameters across continuous manifolds. Furthermore, in Chapter~\ref{ch:rnn_sequence_modeling}, we explored temporal dynamics and gating mechanisms over time-varying hidden states.
+
+Yet, a fundamental representation barrier governs every neural approach to natural language and source code: while human communication is articulated through discrete symbolic tokens, deep neural networks are continuous differentiable matrix operators that can neither compute distances nor evaluate gradients on raw string literals. Treating words as atomic indices via one-hot standard basis vectors incurs extreme sparsity, geometric orthogonality, and zero parameter sharing during backpropagation.
+
+This chapter constructs the theoretical and mathematical bridge from discrete symbols to dense continuous metric spaces. Grounded in Harris and Firth's distributional hypothesis, we formulate self-supervised objective functions that organize latent spaces through context prediction. We dissect the Word2Vec suite---analyzing Continuous Bag-of-Words (CBOW) and Continuous Skip-Gram---and solve the full softmax computational bottleneck via Hierarchical Softmax binary trees and Noise Contrastive Negative Sampling (SGNS). We then address the out-of-vocabulary barrier and morphological blindness through FastText subword character $n$-gram compositions, analyze the emergent geometric symmetries of semantic clustering and linear vector analogies, and formalize modern subword tokenization and positional encoding pipelines that underpin contemporary foundation models.
+
+\clearpage
 \section{The representation problem: why continuous embeddings are mandatory}
 \label{sec:representation_problem}
 
@@ -37,6 +44,7 @@ In typical natural language and software engineering applications, vocabulary si
 
 To understand why dense continuous representations are indispensable, we must first examine the standard categorical baseline: local one-hot encoding. While intuitive and trivial to construct, one-hot vectors suffer from severe geometric and computational pathologies that fundamentally incapacitate neural learning.
 
+\clearpage
 \section{The baseline approach: local one-hot encodings and why they fail}
 \label{sec:onehot_baseline}
 
@@ -46,7 +54,7 @@ The most straightforward, historical baseline for converting discrete categorica
 \ve_i = [\underbrace{0, \dots, 0}_{i-1\text{ zeros}}, 1, \underbrace{0, \dots, 0}_{V-i\text{ zeros}}]^\top \in \{0, 1\}^V, \quad \text{where } (\ve_i)_k = \delta_{ik} = \begin{cases} 1 & \text{if } k = i, \\ 0 & \text{if } k \neq i. \end{cases}
 \end{equation}
 
-For example, consider a toy vocabulary of $V=5$ tokens from the course lecture slides:
+For example, consider a canonical toy vocabulary of $V=5$ tokens:
 \begin{equation}
 \label{eq:toy_vocab}
 \vocab = \{\text{\texttt{"dog"}}, \, \text{\texttt{"cat"}}, \, \text{\texttt{"fish"}}, \, \text{\texttt{"pen"}}, \, \text{\texttt{"pencil"}}\}.
@@ -69,7 +77,7 @@ In the foundational guide \emph{Build a Large Language Model from Scratch} \cite
 \begin{theorem}{Embedding lookup equivalence}{embedding_lookup_equiv}
 Let $\vocab$ be a vocabulary of size $V$, and let token $w_i \in \vocab$ be encoded as the standard basis vector $\ve_i \in \{0, 1\}^V$.
 
-\noindent\textbf{Case 1: Column-Vector Orientation (Lecture Slide Convention).}  
+\noindent\textbf{Case 1: Column-Vector Orientation (Standard Basis Representation).}  
 Let $\mW_{\text{in}} \in \R^{d \times V}$ be the embedding matrix whose $k$-th column corresponds to the $d$-dimensional embedding vector $\vw_k = (\mW_{\text{in}})_{:, k} \in \R^d$:
 \begin{equation}
 \label{eq:win_column_blocks}
@@ -280,6 +288,7 @@ This lexical fragmentation completely prevents code-intelligence models from tra
 
 Because local one-hot encodings confine words to isolated, orthogonal coordinate axes where semantic similarity is geometrically undefinable, we require a fundamentally different representational paradigm. This paradigm shift rests on distributing linguistic meaning across continuous latent dimensions---guided by the foundational Distributional Hypothesis.
 
+\clearpage
 \section{Distributed representations and the distributional hypothesis}
 \label{sec:distributed_representations}
 
@@ -316,6 +325,7 @@ Therefore, statistical co-occurrence within local contextual windows serves as a
 
 While the Distributional Hypothesis asserts that context defines meaning, it does not specify an optimization algorithm. To translate linguistic co-occurrence into optimized vector coordinates, we must frame a self-supervised prediction task and establish an end-to-end differentiable training loop.
 
+\clearpage
 \section{The embedding training loop and semantic geometry evolution}
 \label{sec:embedding_training_loop}
 
@@ -324,12 +334,12 @@ To convert the distributional hypothesis into concrete numerical representations
 \subsection{The 7-step self-supervised optimization cycle}
 \label{subsec:seven_step_loop}
 
-Given a raw, unannotated corpus of $T$ running words $\mathcal{C} = (w_1, w_2, \dots, w_T)$, we slide a context window of half-width $C$ across the text. At each step $t$, the model solves a fill-in-the-blank prediction task: estimating the probability distribution over the vocabulary for a missing token given its surrounding context:
+Given a raw, unannotated corpus of $T$ running words $\mathcal{C} = (w_1, w_2, \dots, w_T)$, we shift a sliding context window of half-width $C$ across the text. At each step $t$, the model solves a fill-in-the-blank prediction task: estimating the probability distribution over the vocabulary for a missing token given its surrounding context:
 \begin{equation}
 \label{eq:cloze_task}
 \Prob(w_t = w \mid w_{t-C}, \dots, w_{t-1}, w_{t+1}, \dots, w_{t+C}).
 \end{equation}
-As presented in the course lecture slides, this prediction task is executed through an iterative \textbf{7-step optimization cycle}:
+This self-supervised prediction task is executed through an iterative \textbf{7-step optimization cycle}:
 
 \begin{enumerate}
     \item \textbf{Initialize Parameter Matrices}: Allocate two weight matrices with small random values: the input embedding matrix $\mW_{\text{in}} \in \R^{d \times V}$ and the output embedding matrix $\mW_{\text{out}} \in \R^{d \times V}$.
@@ -566,12 +576,13 @@ Consequently, the theoretical expected initial cross-entropy loss is strictly:
 \end{equation}
 For a vocabulary of $V = 50{,}000$, the initial loss must be $\Loss_{\text{init}} = \ln(50{,}000) \approx 10.82$. If $\mW_{\text{in}}$ or $\mW_{\text{out}}$ are initialized with excessively large variance, logits $z_w = \vu_w^\top \vh$ take extreme values; the softmax distribution becomes peaky and confident on arbitrary words, causing the initial loss to spike drastically ($\Loss \gg 20$). The optimizer must then spend thousands of iterations flattening these unearned confidences---producing a pathological ``hockey-stick'' loss curve. Proper variance scaling ($\mathcal{N}(0, 0.01^2)$ or $\mathcal{N}(0, 1/d)$) ensures stable, well-conditioned gradient flow from step zero.
 
-With the general self-supervised training cycle established, we must concretize the network architecture. The first foundational architecture investigated in the course is the Continuous Bag-of-Words (CBOW) model, which aggregates surrounding context words to predict an omitted target center word.
+With the general self-supervised training cycle established, we must concretize the network architecture. The first foundational architecture is the Continuous Bag-of-Words (CBOW) model, which aggregates surrounding context words to predict an omitted target center word.
 
+\clearpage
 \section{Word2Vec continuous bag-of-words (CBOW)}
 \label{sec:cbow_architecture}
 
-In 2013, \textbf{Word2Vec} was introduced in \cite{mikolov2013efficient,mikolov2013distributed} (covered on Slides 9--12 of the course lecture deck) as a suite of log-linear models designed to scale distributed representation learning to web-scale corpora containing billions of tokens.
+In 2013, \textbf{Word2Vec} was introduced by Mikolov et al.~\cite{mikolov2013efficient,mikolov2013distributed} as a suite of log-linear models designed to scale distributed representation learning to web-scale corpora containing billions of tokens.
 
 The first of these architectures is the \textbf{Continuous Bag-of-Words (CBOW)} model. In CBOW, the objective is to predict the omitted center target token $w_t$ given the symmetric surrounding context window:
 \begin{equation}
@@ -691,10 +702,11 @@ A neural language model learning distributed embeddings had been introduced a de
 
 Although CBOW trains rapidly by averaging context representations, this very averaging creates a representational bottleneck: it washes out rare vocabulary tokens and discards syntactic word order. To learn high-fidelity representations for infrequent words, inverting the predictive formulation yields the Continuous Skip-Gram architecture.
 
+\clearpage
 \section{Word2Vec continuous skip-gram and the softmax bottleneck}
 \label{sec:skipgram_architecture}
 
-To preserve the distinct gradient signal of rare words, the \textbf{Continuous Skip-Gram} architecture was introduced in \cite{mikolov2013efficient} (examined on Slide 11 of the course slides). Instead of aggregating context words to predict a single center token, Skip-Gram \textbf{inverts the predictive direction}: given a single center target word $w_t$, the model independently predicts each surrounding context word within window radius $C$.
+To preserve the distinct gradient signal of rare words, the \textbf{Continuous Skip-Gram} architecture was introduced in \cite{mikolov2013efficient}. Instead of aggregating context words to predict a single center token, Skip-Gram \textbf{inverts the predictive direction}: given a single center target word $w_t$, the model independently predicts each surrounding context word within window radius $C$.
 
 \begin{figure}[htbp]
 \centering
@@ -789,6 +801,7 @@ This $\mathcal{O}(V \cdot d)$ complexity renders standard multinomial softmax co
 
 While Continuous Skip-Gram excels at capturing nuanced semantic relationships and rare tokens, its standard formulation crashes into a severe computational barrier: normalizing over the full vocabulary requires an $\mathcal{O}(V \cdot d)$ denominator calculation for every single token prediction. To scale to realistic vocabularies, we must circumvent this partition function bottleneck.
 
+\clearpage
 \section{Scaling softmax: hierarchical softmax and negative sampling}
 \label{sec:scaling_softmax}
 
@@ -1006,6 +1019,7 @@ where $f(X_{ij}) = \min(1, (X_{ij}/x_{\max})^\alpha)$ is a sub-linear weighting 
 
 Skip-Gram Negative Sampling and GloVe resolve the computational bottleneck, making large-scale distributed representation learning feasible. However, Word2Vec operates under an implicit architectural assumption: that the word is the minimal, indivisible atomic unit of language. In real-world deployment, this assumption creates severe structural vulnerabilities.
 
+\clearpage
 \section{Limitations of Word2Vec and the out-of-vocabulary (OOV) barrier}
 \label{sec:word2vec_limitations}
 
@@ -1065,10 +1079,11 @@ A static Word2Vec model maps \texttt{"Rust"} to a compromise vector that conflat
 
 While contextual ambiguity requires sequence models that dynamically modulate representations based on full sentence context, the Out-of-Vocabulary barrier and morphological blindness can be solved at the token representation level. By abandoning the word as an atomic unit and descending into subword character $n$-grams, FastText establishes a morphologically aware embedding paradigm.
 
+\clearpage
 \section{FastText: subword character \texorpdfstring{$n$}{n}-gram embeddings}
 \label{sec:fasttext_subwords}
 
-To conquer the OOV barrier and enable morphological parameter sharing, \textbf{FastText} was introduced in \cite{bojanowski2017} (and covered on Slides 13--14 of the course lecture deck).
+To conquer the OOV barrier and enable morphological parameter sharing, \textbf{FastText} was introduced by Bojanowski et al.~\cite{bojanowski2017}.
 
 \subsection{Character \texorpdfstring{$n$}{n}-gram decomposition and boundary markers}
 \label{subsec:character_ngrams}
@@ -1086,8 +1101,8 @@ Rather than treating a word as an atomic token, FastText represents each word as
     \item \textbf{Subword Extraction}: All character $n$-grams of length $n \in [n_{\min}, n_{\max}]$ (typically $n \in [3, 6]$) are extracted, along with the special sequence containing the entire word itself $\tilde{w}$.
 \end{enumerate}
 
-\paragraph{Course Slide Example: $\langle\text{\texttt{where}}\rangle$.}
-Following Slide 13 of the course lecture deck, consider the word \texttt{"where"} with character trigrams ($n = 3$):
+\paragraph{Worked Example: Subword Decomposition of $\langle\text{\texttt{where}}\rangle$.}
+Consider the word \texttt{"where"} decomposed into character trigrams ($n = 3$):
 \begin{equation}
 \label{eq:fasttext_subwords}
 \text{\texttt{"<where>"}} \implies \mathcal{G}_{\text{\texttt{where}}} = \Big\{ \text{\texttt{"<wh"}}, \; \text{\texttt{"whe"}}, \; \text{\texttt{"her"}}, \; \text{\texttt{"ere"}}, \; \text{\texttt{"re>"}}, \; \text{\texttt{"<where>"}} \Big\}.
@@ -1154,6 +1169,7 @@ FastText operates continuous character $n$-gram summations at the embedding laye
 
 By decomposing words into character $n$-grams, FastText conquers the Out-of-Vocabulary barrier and enables morphological parameter sharing. With our embedding models fully trained, we can now step back and examine the remarkable mathematical geometry that spontaneously emerges within these dense vector spaces.
 
+\clearpage
 \section{Emergent vector space geometry: clustering, metrics and relational analogies}
 \label{sec:vector_geometry_metrics}
 
@@ -1164,7 +1180,7 @@ When Word2Vec and FastText models are trained over large text corpora, the resul
 
 In high-dimensional embedding space ($d = 300$), words with similar functional roles organize into distinct, tightly bound clusters.
 
-Following Slide 14 of the course lecture deck, projecting 300-dimensional FastText vectors into two dimensions via Principal Component Analysis (PCA) reveals distinct semantic clusters:
+Projecting 300-dimensional FastText vectors into two dimensions via Principal Component Analysis (PCA) reveals distinct semantic clusters:
 \begin{itemize}
     \item \textbf{Household Items}: \texttt{"table"}, \texttt{"chair"}, \texttt{"desk"}, \texttt{"sofa"}.
     \item \textbf{Mammals}: \texttt{"dog"}, \texttt{"cat"}, \texttt{"tiger"}, \texttt{"elephant"}.
@@ -1181,8 +1197,8 @@ The most celebrated emergent property of continuous word embeddings is that sema
 \vv_{w_2} - \vv_{w_1} \approx \vec{d}_{\text{relation}}.
 \end{equation}
 
-\paragraph{Country-to-Capital Analogy (Course Slide 15).}
-In the course lecture deck (Slide 15), subtracting the vector for \texttt{"Berlin"} from \texttt{"Germany"} produces a directional displacement vector $\vec{d}_{\text{capital\_of}}$:
+\paragraph{Country-to-Capital Analogy.}
+For instance, subtracting the vector for \texttt{"Berlin"} from \texttt{"Germany"} produces a directional displacement vector $\vec{d}_{\text{capital\_of}}$:
 \begin{equation}
 \label{eq:rel_germany_berlin}
 \vv_{\text{Germany}} - \vv_{\text{Berlin}} \approx \vec{d}_{\text{capital\_of}}.
@@ -1302,6 +1318,7 @@ such that all pairwise Euclidean distances are preserved within a distortion fac
 \end{theorem}
 For a vocabulary of $N = 100{,}000$ tokens and distortion tolerance $\epsilon = 0.2$, $\log(10^5) / 0.04 \approx 287$, precisely justifying why $d = 300$ serves as the golden standard for dense static word vectors.
 
+\clearpage
 \section{Modern subword tokenization and input pipelines for foundation models}
 \label{sec:modern_tokenization_pipeline}
 
@@ -1819,7 +1836,7 @@ where the identity $\mP^\top \mP = \mathbf{I}$ collapses the internal permutatio
 \paragraph{The unordered multiset collapse.}
 Theorem~\ref{thm:attention_permutation_invariance} establishes that if we permute the input tokens, the output vectors undergo the exact same permutation with \emph{identical values}. The attention mechanism treats the input sequence as an \textbf{unordered multiset} (a ``bag of vectors'') with zero intrinsic knowledge of temporal order!
 
-To understand the catastrophic consequence of this property, consider the two contrasting sentences analyzed in the course lecture:
+To understand the catastrophic consequence of this property, consider two contrasting sentence pairs:
 \begin{center}
 \textbf{Sentence 1}: \textit{``I ate an apple''} \quad $\Longrightarrow$ \quad $\{\mathbf{e}_{\text{I}}, \mathbf{e}_{\text{ate}}, \mathbf{e}_{\text{an}}, \mathbf{e}_{\text{apple}}\}$ \\
 \textbf{Sentence 2}: \textit{``An apple, I ate''} \quad $\Longrightarrow$ \quad $\{\mathbf{e}_{\text{an}}, \mathbf{e}_{\text{apple}}, \mathbf{e}_{\text{I}}, \mathbf{e}_{\text{ate}}\}$
@@ -1839,17 +1856,17 @@ Before arriving at the modern formulation, it is vital to understand why naive i
     \item \textbf{Coordinate Concatenation ($[\vw_t; \vp_t]$)}: Concatenating positional coordinates expands embedding dimensionality to $d + d_{\text{pos}}$, increasing parameter counts across all subsequent projection matrices ($\mW_Q, \mW_K, \mW_V, \mW_O$) and preventing seamless parameter sharing.
 \end{enumerate}
 
-\paragraph{2. The geometric clock intuition (the ``Clock Way of Thought'').}
+\paragraph{The geometric clock intuition (the ``Clock Way of Thought'').}
 How can we construct an encoding that remains strictly bounded within $[-1, 1]$, assigns a unique signature to every position, and preserves consistent geometric notions of distance?
 
-\begin{intuition}[From binary counting to continuous multi-scale clocks]
-Consider how a digital computer represents numbers using bounded bits $\{0, 1\}$. In a 3-bit binary counter:
+\noindent\textit{From binary counting to continuous multi-scale clocks}.\newline
+To build geometric intuition, consider how a digital computer represents numbers using bounded bits $\{0, 1\}$. In a 3-bit binary counter:
 \begin{itemize}
     \item The lowest bit (Bit 0) alternates every single step: $0, 1, 0, 1, 0, 1 \dots$ (high-frequency wave).
     \item The middle bit (Bit 1) alternates every two steps: $0, 0, 1, 1, 0, 0 \dots$ (medium-frequency wave).
     \item The highest bit (Bit 2) alternates every four steps: $0, 0, 0, 0, 1, 1 \dots$ (low-frequency wave).
 \end{itemize}
-Every integer receives an unambiguous signature, even though individual bits are bounded in $\{0, 1\}$. However, discrete step functions are non-differentiable. \textbf{Sinusoidal positional encoding is the smooth, continuous, differentiable generalization of binary counting!}
+Every integer receives an unambiguous signature, even though individual bits are bounded in $\{0, 1\}$. However, discrete step functions are non-differentiable. Sinusoidal positional encoding operates as the smooth, continuous, differentiable generalization of binary counting.
 
 Rather than binary square waves, we assign continuous trigonometric waves oscillating at geometrically decreasing frequencies across embedding channels:
 \begin{itemize}
@@ -1857,7 +1874,6 @@ Rather than binary square waves, we assign continuous trigonometric waves oscill
     \item \textbf{Medium Clocks (Minutes Hand)}: Oscillate at intermediate frequencies, capturing phrase and clause boundaries.
     \item \textbf{Slow Clocks (Hours Hand)}: Oscillate extremely slowly across high dimension indices, capturing document-level flow and paragraphs.
 \end{itemize}
-\end{intuition}
 
 \paragraph{The clock hand problem: why sine alone fails.}
 Why can we not simply use sine waves with varying frequencies?
@@ -2005,7 +2021,7 @@ Sinusoidal positional encodings satisfy three pivotal theoretical properties:
         \item When $p_1 = p_2$, $\cos(0) = 1$ (maximum correlation along the diagonal).
         \item As $|p_1 - p_2|$ increases, the similarity smoothly decays.
     \end{itemize}
-    In the course lecture, the professor demonstrated this property empirically by computing the complete pairwise cosine similarity matrix across $500$ positions:
+    Computing the complete pairwise cosine similarity matrix across $500$ positions demonstrates this property empirically:
     \begin{itemize}
         \item The 2D Gram matrix exhibits a bright, luminous main diagonal ($\cos = 1$).
         \item A horizontal slice along row $pos = 100$ reveals a sharp symmetric peak at index $100$, followed by a smooth, monotonic decay as distance $|pos - 100|$ expands.
@@ -2013,7 +2029,7 @@ Sinusoidal positional encodings satisfy three pivotal theoretical properties:
 \end{enumerate}
 
 \paragraph{Concrete numerical calculation of sinusoidal coordinates.}
-To illustrate this formulation concretely, consider the numerical configuration presented in the course lecture: sequence position $pos = 1$ (the second token, under $0$-indexed coordinates) within a standard latent embedding space of dimension $d = 768$:
+To illustrate this formulation concretely, consider a canonical numerical configuration: sequence position $pos = 1$ (the second token, under $0$-indexed coordinates) within a standard latent embedding space of dimension $d = 768$:
 \begin{enumerate}
     \item \textbf{Lowest channel pair ($i = 0$, high-frequency regime)}:
     \begin{align}
@@ -2028,7 +2044,7 @@ To illustrate this formulation concretely, consider the numerical configuration 
 \end{enumerate}
 These exact values ($0.8415$, $0.5403$, and $0.8153$) illustrate how trigonometric arguments shift smoothly across embedding indices, providing each positional coordinate with an unambiguous, deterministic signature.
 
-\paragraph{5. Learned positional embeddings (GPT convention).}
+\paragraph{Learned positional embeddings (GPT convention).}
 An alternative approach, adopted by architectures such as GPT-2 and GPT-3 \cite{radford2019, brown2020}, treats positional encodings as trainable parameter weights rather than fixed sinusoidal functions:
 \begin{equation}
 \label{eq:pos_embedding_layer}
@@ -2054,9 +2070,9 @@ Each integer coordinate $p \in \{0, 1, \dots, L_{\max}-1\}$ indexes a row vector
 \end{tabularx}
 \end{table}
 
-As highlighted in the lecture, computing the cosine similarity matrix of learned GPT-2 embeddings reveals high values along the main diagonal, accompanied by periodic secondary peaks at larger distances. These secondary peaks reflect statistical regularities in the training corpus (such as paragraph transitions, section breaks, or dialogue conventions).
+Computing the cosine similarity matrix of learned GPT-2 embeddings reveals high values along the main diagonal, accompanied by periodic secondary peaks at larger distances. These secondary peaks reflect statistical regularities in the training corpus (such as paragraph transitions, section breaks, or dialogue conventions).
 
-\paragraph{6. Final clarification walkthrough: disambiguating opposite sentences.}
+\paragraph{Final clarification walkthrough: disambiguating opposite sentences.}
 To crystallize all of these principles into an indelible mental picture, let us trace how a mini 2-clock system disambiguates our contrasting sentences:
 \begin{center}
 \textbf{Sentence 1}: \textit{``The dog bit the man.''} \quad vs. \quad \textbf{Sentence 2}: \textit{``The man bit the dog.''}
@@ -2111,5 +2127,10 @@ The attention query searches for the token whose Clock 1 points East ($[1.0, 0.0
     \item In \textbf{Sentence 2}, the token at position $1$ with East-pointing clock is \textbf{``man''}. The attention mechanism routes information from ``man'' to ``bit'', resolving the man as the subject.
 \end{itemize}
 The ambiguity is completely resolved: through sinusoidal clock rotations, the Transformer effortlessly deciphers who bit whom!
+
+\clearpage
+\thispagestyle{empty}
+\null
+\clearpage
 
 \end{document}

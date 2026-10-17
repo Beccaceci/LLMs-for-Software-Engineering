@@ -4,6 +4,13 @@
 \chapter{Deep learning foundations for NLP}
 \label{ch:deep_learning_foundations}
 
+In Chapter~\ref{ch:intro_lms}, we formalized language modeling through the exact decomposition of the chain rule of probability. Yet, our empirical analysis exposed the severe, insurmountable glass ceiling of discrete counting models: table-based frequency estimators suffer from exponential parameter explosion ($V^n$), context horizon amnesia ($n-1$), and total semantic blindness across distinct vocabulary symbols. Because discrete strings cannot be differentiated and isolated token IDs share zero statistical strength, classical frequency tables cannot scale to the combinatorial complexity of human language or software engineering source code.
+
+To transcend the discrete counting paradigm, modern computational linguistics and artificial intelligence reframe language processing through the lens of \emph{connectionism} and differentiable programming. Instead of tabulating occurrences in discrete bins, we parameterize language predictors as continuous mathematical functions mapping inputs onto high-dimensional metric spaces $\R^d$. In this continuous formulation, semantic similarity corresponds to geometric proximity, syntactic constraints correspond to smooth decision manifolds, and model parameters are learned automatically by propagating error gradients through computational graphs via multivariable calculus.
+
+This chapter establishes the rigorous mathematical and architectural foundations of deep learning required to build modern foundation models. Beginning with the biological inspiration and mathematical formulation of the artificial perceptron, we prove why single layers fail on non-linear tasks (such as XOR) and why multi-layer linear stacking without activations collapses into a single trivial matrix. We then analyze the functional geometry of non-linear activations ($\sigma, \tanh, \relu, \gelu$), formalize the Universal Approximation Theorem through localized wavelet bump constructions, derive the convexity of maximum likelihood loss landscapes versus Mean Squared Error, and unpack the exact mechanics of reverse-mode automatic differentiation across directed acyclic graphs.
+
+\clearpage
 \section{From biological neurons to the artificial perceptron}
 \label{sec:perceptron}
 
@@ -11,7 +18,7 @@ Having established the probabilistic formulation of language modeling and the co
 
 The foundational building block of modern deep learning is the \emph{perceptron}, originally inspired by biological neurons in the human nervous system. A biological neuron receives electrochemical signals from upstream cells through branching \emph{dendrites}, integrates these incoming potentials in its central cell body (\emph{soma}), and, when the accumulated electrical voltage exceeds a physiological threshold (the action potential), fires a spike through its \emph{axon} to downstream synapses.
 
-In computational neural networks, this biological mechanism was first formalized in 1943 \cite{mcculloch1943} as a threshold logic unit and subsequently refined in 1958 \cite{rosenblatt1958} into the trainable \emph{Perceptron} (examined on Slide 7 of the course deep learning foundations).
+In computational neural networks, this biological mechanism was first formalized in 1943 \cite{mcculloch1943} as a threshold logic unit and subsequently refined in 1958 \cite{rosenblatt1958} into the trainable \emph{Perceptron}.
 
 \begin{definition}{The artificial perceptron}{perceptron}
 Let $\vx = [x_1, x_2, \dots, x_n]^\top \in \R^n$ represent an input feature vector, and let $\vw = [w_1, w_2, \dots, w_n]^\top \in \R^n$ represent the corresponding parameter weights, with scalar bias $w_0 = b \in \R$. The artificial perceptron computes:
@@ -268,6 +275,7 @@ As visualized in Figure~\ref{fig:xor_inseparability}, no straight line can separ
 How can we overcome this linear inseparability barrier? An immediate intuitive engineering hypothesis presents itself: \emph{If one linear perceptron can draw one line, can we solve non-linear problems simply by cascading multiple linear perceptrons into a multi-layer network?} We test this hypothesis next.
 
 
+\clearpage
 \section{Stacking linear layers and the proof of linear stacking collapse}
 \label{sec:linear_stacking_collapse}
 
@@ -493,14 +501,28 @@ Each bump $B_k(x)$ requires exactly two hidden sigmoid neurons. Consequently, a 
 \end{figure}
 
 \subsection{Why deep networks if shallow networks are universal approximators?}
-If a single hidden layer can approximate any function, why does modern deep learning exclusively use deep architectures with dozens or hundreds of stacked layers (e.g., 96 layers in GPT-3)?
+If a single hidden layer can approximate any continuous function, why does modern deep learning exclusively build deep architectures with dozens or hundreds of stacked layers (e.g., 96 layers in GPT-3)?
+
+Three foundational theoretical and geometric arguments answer this fundamental question:
 \begin{enumerate}
-    \item \textbf{Non-Constructive Existence}: The theorem guarantees that parameters exist, but provides no gradient-based algorithm to discover them and establishes no finite bound on the width $M$.
-    \item \textbf{Exponential Parameter Inefficiency}: Approximating highly compositional functions in $n$ dimensions with a single hidden layer requires a width $M$ that scales exponentially with input dimensionality ($M \sim \mathcal{O}(2^n)$).
-    \item \textbf{Hierarchical Compositionality}: Deep networks factorize functions into hierarchical abstractions: early layers learn low-level primitives (subwords, syntax), intermediate layers learn grammatical structure, and deep layers capture long-range semantic discourse. Deep networks achieve equal approximation power with exponentially fewer parameters than shallow networks.
+    \item \textbf{Non-Constructive Existence vs. Optimization}: The Cybenko and Hornik theorems guarantee that a set of parameters exists within some arbitrary $\epsilon$-ball, but offer no gradient-based algorithm to discover them. In practice, gradient descent over shallow networks with massive width easily becomes trapped in degenerate saddle points or overfits catastrophic boundary noise.
+    \item \textbf{Exponential Parameter Inefficiency and the Curse of Dimensionality}: Approximating highly oscillatory or compositional functions in $d_{\text{in}}$ dimensions with a single hidden layer requires a width $M$ that scales exponentially with input dimensionality ($M \sim \mathcal{O}(2^{d_{\text{in}}})$), rendering shallow networks computationally intractable for real-world NLP vocabularies and context windows.
+    \item \textbf{Exponential Linear Region Counting with Depth}: Simon Prince \cite{prince2023udl} and Montúfar et al. \cite{montufar2014number} mathematically formalized the expressive advantage of depth through \emph{linear region counting}. A shallow network with 1 hidden layer containing $K$ rectified linear units partitions input space $\R^{d_{\text{in}}}$ into at most:
+    \begin{equation}
+    \label{eq:shallow_linear_regions}
+    \mathcal{N}_{\text{shallow}} \le \sum_{j=0}^{d_{\text{in}}} \binom{K}{j} = \mathcal{O}(K^{d_{\text{in}}})
+    \end{equation}
+    linear regions. In contrast, cascading $D$ layers of width $K$ allows subsequent layers to compute piecewise linear functions of piecewise linear functions, effectively folding the input domain repeatedly. The maximal number of linear regions generated by a deep ReLU network grows exponentially with depth $D$:
+    \begin{equation}
+    \label{eq:deep_linear_regions}
+    \mathcal{N}_{\text{deep}} = \mathcal{O}\left( \left(\frac{K}{d_{\text{in}}}\right)^{(D-1)d_{\text{in}}} K^{d_{\text{in}}} \right) \sim \mathcal{O}(K^D).
+    \end{equation}
+    A deep network of depth $D$ can thus produce an astronomical number of linear regions $\mathcal{O}(K^D)$ using only $\mathcal{O}(D \cdot K^2)$ total parameters. To match this expressive capacity, a shallow 1-layer network would require an exponential number of neurons $M \sim K^D$, necessitating astronomical parameter storage and memory bandwidth.
 \end{enumerate}
 
+Deep architectures are therefore fundamentally more efficient: they factorize high-dimensional manifolds into hierarchical abstractions, extracting local lexical tokens at early layers, compositional syntactic trees at intermediate layers, and long-range semantic discourse at deep layers.
 
+\clearpage
 \section{Taxonomy of neural activation functions}
 \label{sec:activations_taxonomy}
 
@@ -727,6 +749,7 @@ Identity & $\R$ & $\R$ & $1.00$ ($\forall z$) & Regression output head; unbounde
 \end{table}
 
 
+\clearpage
 \section{Architectural task formulations and software engineering case studies}
 \label{sec:task_formulations_se}
 
@@ -825,6 +848,7 @@ Figure~\ref{fig:se_tasks_diagrams}(c) illustrates continuous line fitting throug
 \end{figure}
 
 
+\clearpage
 \section{Loss function formulations and optimization landscapes}
 \label{sec:output_loss_opt}
 
@@ -957,7 +981,26 @@ The fundamental architectural flaws of MSE for classification are immediately ap
     \frac{\partial \Loss_{\text{BCE}}}{\partial z} = \hat{y} - y = 0 - 1 = -1.0.
     \]
     The sigmoid derivative in the numerator cancels perfectly with the denominator in the derivative of the logarithm! The gradient is strictly linear with respect to the error $(y - \hat{y})$ and provides maximum learning signal precisely when the model is most wrong.
-    \item \textbf{Non-Convexity}: While MSE with linear regression is strictly convex, combining MSE with non-linear sigmoid activations creates a non-convex loss surface with numerous local plateaus. In contrast, BCE is strictly convex with respect to logit $z$.
+    \item \textbf{Loss Surface Geometry and Convexity in Logit Space}: As formalized by Goodfellow et al. \cite{goodfellow2016}, the fundamental geometric pathology of combining MSE with sigmoidal classification units is the destruction of convexity. 
+    
+    To see this analytically, evaluate the second derivative of the loss with respect to pre-activation logit $z$. For MSE with $\hat{y} = \sigma(z)$:
+    \begin{align}
+    \frac{\partial^2 \Loss_{\text{MSE}}}{\partial z^2} &= \frac{\partial}{\partial z} \left[ - (y - \sigma(z)) \sigma'(z) \right] \nonumber \\
+    &= (\sigma'(z))^2 - (y - \sigma(z)) \sigma''(z).
+    \end{align}
+    Recalling that $\sigma''(z) = \sigma'(z)(1 - 2\sigma(z))$, we have:
+    \begin{equation}
+    \label{eq:mse_second_derivative}
+    \frac{\partial^2 \Loss_{\text{MSE}}}{\partial z^2} = \sigma'(z) \left[ \sigma'(z) - (y - \sigma(z))(1 - 2\sigma(z)) \right].
+    \end{equation}
+    When the prediction is severely wrong (e.g., $y = 1$ and $z \ll 0$ so $\sigma(z) \to 0$), the term $(y - \sigma(z))(1 - 2\sigma(z)) \approx (1)(1) = 1$, which strictly dominates $\sigma'(z) \approx 0$. Consequently, the bracketed quantity becomes negative, causing the second derivative to flip sign or vanish. This sign reversal breaks positive semi-definiteness, creating vast non-convex plateaus, inflection points, and saddle regions where gradient descent stalls indefinitely.
+
+    In stark contrast, for Binary Cross-Entropy, the first derivative is $\frac{\partial \Loss_{\text{BCE}}}{\partial z} = \sigma(z) - y$. Differentiating again with respect to $z$:
+    \begin{equation}
+    \label{eq:bce_second_derivative}
+    \frac{\partial^2 \Loss_{\text{BCE}}}{\partial z^2} = \frac{\partial}{\partial z} (\sigma(z) - y) = \sigma'(z) = \sigma(z)(1 - \sigma(z)) > 0 \quad \forall z \in \R.
+    \end{equation}
+    Because $\sigma(z) \in (0, 1)$ for all finite $z \in \R$, the second derivative is strictly positive everywhere. The BCE loss surface is therefore \textbf{strictly convex} with respect to the logit $z$. In logit space, there are no local plateaus, no saddle points, and any stationary point is guaranteed to be the unique global minimum.
 \end{itemize}
 
 \subsection{Maximum likelihood estimation derivation of cross-entropy}
@@ -1007,6 +1050,7 @@ In deep neural architectures, vanilla Gradient Descent struggles with:
 \end{itemize}
 
 
+\clearpage
 \section{Computational graphs and exact adjoint backpropagation}
 \label{sec:backprop_computational_graph}
 
@@ -1020,18 +1064,18 @@ A computational graph $\mathcal{G} = (\mathcal{V}, \mathcal{E})$ is a directed a
 \end{itemize}
 \end{definition}
 
-\subsection{Exact backpropagation walkthrough from slide 24}
-We reproduce and derive the exact pedagogical computational graph and adjoint trace from Slide 24 of the course materials.
+\subsection{Exact scalar adjoint backpropagation on a computational DAG}
+To build foundational intuition for how reverse-mode automatic differentiation operates on directed acyclic graphs, consider a canonical scalar computational model.
 
 \paragraph{Problem setup.}
 Consider a model with two scalar parameters $\theta_1, \theta_2 \in \R$ evaluated on training pair $(x, y) \in \R^2$:
 \begin{align}
-\text{Model Prediction:} \quad &\hat{y} = \theta_1 \theta_2 x, \label{eq:slide24_model} \\
-\text{Objective Loss:} \quad &\Loss = (\theta_1 \theta_2 x - y)^2. \label{eq:slide24_loss}
+\text{Model Prediction:} \quad &\hat{y} = \theta_1 \theta_2 x, \label{eq:adjoint_scalar_model} \\
+\text{Objective Loss:} \quad &\Loss = (\theta_1 \theta_2 x - y)^2. \label{eq:adjoint_scalar_loss}
 \end{align}
 
 \paragraph{Forward decomposition.}
-The graph decomposes Equation~\eqref{eq:slide24_loss} into four primitive operations:
+The graph decomposes Equation~\eqref{eq:adjoint_scalar_loss} into four primitive operations:
 \begin{align}
 a &= \theta_1 \theta_2 \quad (\text{parameter interaction product}), \label{eq:fwd_a} \\
 b &= a x = \theta_1 \theta_2 x \quad (\text{prediction } \hat{y}), \label{eq:fwd_b} \\
@@ -1049,7 +1093,7 @@ Backpropagation computes the derivative of scalar loss $\Loss$ with respect to e
 \text{Step 5: } \frac{\partial \Loss}{\partial \theta_2} &= \frac{\partial \Loss}{\partial a} \frac{\partial a}{\partial \theta_2} = (2cx) \cdot \frac{\partial (\theta_1 \theta_2)}{\partial \theta_2} = 2cx \cdot \theta_1 = 2(\theta_1 \theta_2 x - y) x \theta_1. \label{eq:bwd_theta2}
 \end{align}
 
-Figure~\ref{fig:slide24_computational_graph} illustrates this complete forward and backward adjoint execution.
+Figure~\ref{fig:adjoint_scalar_graph} illustrates this complete forward and backward adjoint execution.
 
 \begin{figure}[htbp]
 \centering
@@ -1106,16 +1150,16 @@ Figure~\ref{fig:slide24_computational_graph} illustrates this complete forward a
 
 \end{tikzpicture}%
 }
-\caption{Directed Acyclic Computational Graph (DAG) for model $\hat{y} = \theta_1 \theta_2 x$ with quadratic loss $\Loss = (\theta_1 \theta_2 x - y)^2$ (reproduced from Slide 24). Solid black arrows trace forward execution; dashed red arrows trace reverse-mode adjoint backpropagation via the chain rule \cite{rumelhart1986}.}
-\label{fig:slide24_computational_graph}
+\caption{Directed Acyclic Computational Graph (DAG) for model $\hat{y} = \theta_1 \theta_2 x$ with quadratic loss $\Loss = (\theta_1 \theta_2 x - y)^2$. Solid black arrows trace forward execution; dashed red arrows trace reverse-mode adjoint backpropagation via the chain rule \cite{rumelhart1986}.}
+\label{fig:adjoint_scalar_graph}
 \end{figure}
 
-\begin{intuition}[3Blue1Brown's geometric view of backpropagation]
-Grant Sanderson (3Blue1Brown) articulates backpropagation not as abstract calculus algebra, but as a systematic tracking of sensitivity \emph{nudges}. Imagine wiggling parameter $\theta_1$ by an infinitesimal perturbation $\epsilon$. That nudge ripples through the product node to scale $a$ by $\epsilon \theta_2$. The change in $a$ wiggles $b$ by $\epsilon \theta_2 x$, which directly shifts error $c$ and finally scales loss $\Loss$ by $2c \epsilon \theta_2 x$. Backpropagation simply reads these connected multiplicative sensitivity tracks in reverse, gathering the composite derivative at each fork in the graph.
-\end{intuition}
+\noindent\textbf{Geometric perturbation perspective.}\newline
+\textit{Grant Sanderson (3Blue1Brown) articulates backpropagation not as abstract calculus algebra, but as a systematic tracking of sensitivity nudges.} Imagine wiggling parameter $\theta_1$ by an infinitesimal perturbation $\epsilon$. That nudge ripples through the product node to scale $a$ by $\epsilon \theta_2$. The change in $a$ wiggles $b$ by $\epsilon \theta_2 x$, which directly shifts error $c$ and finally scales loss $\Loss$ by $2c \epsilon \theta_2 x$. Backpropagation simply reads these connected multiplicative sensitivity tracks in reverse, gathering the composite derivative at each fork in the graph.
 
-\begin{deepdive}[Building autograd from scratch: Andrej Karpathy's Micrograd]
-Andrej Karpathy's open-source library \emph{Micrograd} implements reverse-mode automatic differentiation in fewer than 100 lines of pure Python, demonstrating the exact computational graph mechanics shown in Figure~\ref{fig:slide24_computational_graph}.
+\medskip
+\noindent\textbf{Mechanics of reverse-mode autodiff engines: Micrograd.}\newline
+\textit{Andrej Karpathy's open-source library Micrograd implements reverse-mode automatic differentiation in fewer than 100 lines of pure Python}, demonstrating the exact computational graph mechanics shown in Figure~\ref{fig:adjoint_scalar_graph}.
 
 Each scalar variable is wrapped inside a \texttt{Value} class containing:
 \begin{itemize}
@@ -1136,7 +1180,39 @@ def __mul__(self, other):
     return out
 \end{lstlisting}
 When calling \texttt{loss.backward()}, the engine performs a \textbf{topological sort} on the DAG to establish reverse dependency ordering, sets \texttt{loss.grad = 1.0}, and executes \texttt{node.\_backward()} across all parent nodes in reverse topological order.
-\end{deepdive}
+
+\subsection{Reverse-mode automatic differentiation: Vector-Jacobian products (VJPs)}
+\label{subsec:vjp_theory}
+As formalized by Bishop \& Bishop \cite{bishop2024deep}, the theoretical foundation of backpropagation rests on the duality between \emph{forward-mode} and \emph{reverse-mode} automatic differentiation.
+
+Consider a multi-stage computational sequence where an intermediate vector $\vu \in \R^{D_u}$ maps to $\vv \in \R^{D_v}$ via differentiable mapping $\vv = \mathbf{g}(\vu)$, eventually yielding a scalar training loss $\Loss \in \R$. The sensitivity of the mapping is captured by its Jacobian matrix:
+\begin{equation}
+\label{eq:jacobian_def}
+\mathbf{J}_{\mathbf{g}} = \frac{\partial \vv}{\partial \vu} \in \R^{D_v \times D_u}, \quad (\mathbf{J}_{\mathbf{g}})_{jk} = \frac{\partial v_j}{\partial u_k}.
+\end{equation}
+
+\paragraph{Forward-mode automatic differentiation (Jacobian-Vector Products).}
+Forward mode propagates directional perturbation vectors $\vr_u \in \R^{D_u}$ from inputs toward outputs by evaluating \emph{Jacobian-Vector Products} (JVPs):
+\begin{equation}
+\vr_v = \mathbf{J}_{\mathbf{g}} \vr_u \in \R^{D_v}.
+\end{equation}
+To calculate the complete gradient of loss $\Loss$ with respect to a parameter vector of dimension $P$ (where $P = D_{\text{in}}$), forward-mode must seed directional vectors along each coordinate basis $\ve_1, \dots, \ve_P$ sequentially. Computing the full gradient vector requires $P$ separate forward sweeps, yielding a computational complexity of:
+\begin{equation}
+\text{Cost}_{\text{forward-mode}}(\nabla_\theta \Loss) = \mathcal{O}(P \times \text{Cost}(\text{forward pass})).
+\end{equation}
+In modern foundation models where parameter count reaches billions ($P \sim 10^9 - 10^{11}$), forward-mode differentiation is entirely infeasible.
+
+\paragraph{Reverse-mode automatic differentiation (Vector-Jacobian Products).}
+Reverse mode (backpropagation) inverts the direction of differentiation. Beginning at the final scalar loss $\Loss \in \R$ with initial adjoint seed $\bar{\Loss} = \frac{\partial \Loss}{\partial \Loss} = 1.0$, the algorithm propagates adjoint row vectors $\bar{\vv} = \left(\frac{\partial \Loss}{\partial \vv}\right)^\top \in \R^{1 \times D_v}$ backward through the DAG by evaluating \emph{Vector-Jacobian Products} (VJPs):
+\begin{equation}
+\label{eq:vjp_equation}
+\bar{\vu} = \bar{\vv} \mathbf{J}_{\mathbf{g}} = \left(\frac{\partial \Loss}{\partial \vv}\right)^\top \frac{\partial \vv}{\partial \vu} \in \R^{1 \times D_u}.
+\end{equation}
+Because the objective $\Loss$ is a single scalar ($D_{\text{out}} = 1$), a \textbf{single reverse traversal} of the computational graph simultaneously evaluates the exact partial derivatives with respect to all $P$ parameters. The computational cost of reverse-mode autodiff scales independently of parameter count $P$:
+\begin{equation}
+\text{Cost}_{\text{reverse-mode}}(\nabla_\theta \Loss) \le \omega \cdot \text{Cost}(\text{forward pass}), \quad \omega \in [2, 5].
+\end{equation}
+Crucially, production deep learning runtimes never materialize the full dense Jacobian matrix $\mathbf{J}_{\mathbf{g}}$ in GPU memory (which would require $\mathcal{O}(D_u D_v)$ memory). Instead, each primitive node provides an analytic VJP operator that computes the vector-matrix product directly. For linear projections, this operator computes the matrix-vector products $\mW \bm{\delta}$ and outer products $\vx \bm{\delta}^\top$ derived below.
 
 \subsection{Vectorized matrix adjoint backpropagation for dense layers}
 \label{subsec:vectorized_backprop}
@@ -1258,6 +1334,7 @@ Defining batch adjoint matrix $\bm{\Delta} = \frac{\partial \Loss}{\partial \mZ}
 These matrix equations form the computational workhorse executed across billions of parameters in modern GPU training clusters.
 
 
+\clearpage
 \section{The sequential computation impasse: bridge to recurrent neural networks}
 \label{sec:bridge_to_ch03}
 
@@ -1285,5 +1362,10 @@ While this architecture is highly effective for tabular data and fixed-attribute
 To process variable-length sequences, maintain evolving context over time, and achieve translational invariance across sequence positions, deep learning requires a computational paradigm with internal recurrence and temporal weight sharing.
 
 This architectural necessity leads directly to Chapter~\ref{ch:rnn_sequence_modeling}: \emph{Recurrent Neural Networks and Sequence Modeling}.
+
+\clearpage
+\thispagestyle{empty}
+\null
+\clearpage
 
 \end{document}
