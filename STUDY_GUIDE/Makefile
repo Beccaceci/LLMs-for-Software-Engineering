@@ -12,7 +12,7 @@ lectures:
 	cd lectures && $(TEX_ENGINE) $(MAIN).tex
 
 labs:
-	cd laboratories && $(TEX_ENGINE) $(LABS).tex
+	cd ../LABS/study_guide && $(TEX_ENGINE) $(LABS).tex
 
 # Standalone single lecture chapter build: make chapter CH=part1_foundations/01_language_models_intro
 chapter:
@@ -22,21 +22,22 @@ chapter:
 # Standalone single laboratory build: make lab LAB=01_pytorch_foundations
 lab:
 	@if [ -z "$(LAB)" ]; then echo "Error: Please specify LAB=lab_name (e.g. LAB=01_pytorch_foundations)"; exit 1; fi
-	cd laboratories/chapters && latexmk -pdf -interaction=nonstopmode $$(basename $(LAB)).tex
+	cd ../LABS/study_guide/chapters && latexmk -pdf -interaction=nonstopmode $$(basename $(LAB)).tex
 
 clean:
 	rm -f *.aux *.log *.toc *.out *.bbl *.blg *.fls *.fdb_latexmk *.synctex.gz *.bcf *.run.xml *.lof *.lot
 	cd lectures && latexmk -c && rm -f *.aux *.log *.toc *.out *.bbl *.blg *.fls *.fdb_latexmk *.synctex.gz *.bcf *.run.xml *.lof *.lot
-	cd laboratories && latexmk -c && rm -f *.aux *.log *.toc *.out *.bbl *.blg *.fls *.fdb_latexmk *.synctex.gz *.bcf *.run.xml *.lof *.lot
+	if [ -d ../LABS/study_guide ]; then cd ../LABS/study_guide && latexmk -c && rm -f *.aux *.log *.toc *.out *.bbl *.blg *.fls *.fdb_latexmk *.synctex.gz *.bcf *.run.xml *.lof *.lot; fi
 	find lectures/chapters -name "*.aux" -o -name "*.log" -o -name "*.fls" -o -name "*.fdb_latexmk" -o -name "*.out" -o -name "*.toc" -delete
 	find lectures/frontmatter -name "*.aux" -o -name "*.log" -o -name "*.fls" -o -name "*.fdb_latexmk" -o -name "*.out" -delete
-	find laboratories/chapters -name "*.aux" -o -name "*.log" -o -name "*.fls" -o -name "*.fdb_latexmk" -o -name "*.out" -o -name "*.toc" -delete
-	find laboratories/frontmatter -name "*.aux" -o -name "*.log" -o -name "*.fls" -o -name "*.fdb_latexmk" -o -name "*.out" -delete
+	if [ -d ../LABS/study_guide ]; then find ../LABS/study_guide/chapters -name "*.aux" -o -name "*.log" -o -name "*.fls" -o -name "*.fdb_latexmk" -o -name "*.out" -o -name "*.toc" -delete; fi
+	if [ -d ../LABS/study_guide ]; then find ../LABS/study_guide/frontmatter -name "*.aux" -o -name "*.log" -o -name "*.fls" -o -name "*.fdb_latexmk" -o -name "*.out" -delete; fi
 
 distclean: clean
-	rm -f lectures/$(MAIN).pdf laboratories/$(LABS).pdf
+	rm -f lectures/$(MAIN).pdf
+	if [ -d ../LABS/study_guide ]; then rm -f ../LABS/study_guide/$(LABS).pdf; fi
 	find lectures/chapters -name "*.pdf" -delete
-	find laboratories/chapters -name "*.pdf" -delete
+	if [ -d ../LABS/study_guide ]; then find ../LABS/study_guide/chapters -name "*.pdf" -delete; fi
 
 help:
 	@echo "Politecnico di Torino - LLM4SE Study Guide Build System"

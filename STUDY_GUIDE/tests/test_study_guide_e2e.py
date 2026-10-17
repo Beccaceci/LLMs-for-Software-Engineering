@@ -35,7 +35,15 @@ STUDY_GUIDE_DIR = (PROJECT_ROOT / "STUDY_GUIDE") if (PROJECT_ROOT / "STUDY_GUIDE
     (PROJECT_ROOT / "study_guide") if (PROJECT_ROOT / "study_guide").exists() else PROJECT_ROOT
 )
 LECTURES_DIR = (STUDY_GUIDE_DIR / "lectures") if (STUDY_GUIDE_DIR / "lectures").exists() else STUDY_GUIDE_DIR
-LABS_DIR = (STUDY_GUIDE_DIR / "laboratories") if (STUDY_GUIDE_DIR / "laboratories").exists() else STUDY_GUIDE_DIR
+LABS_DIR = (
+    (PROJECT_ROOT / "LABS" / "study_guide")
+    if (PROJECT_ROOT / "LABS" / "study_guide").exists()
+    else (
+        (STUDY_GUIDE_DIR / "laboratories")
+        if (STUDY_GUIDE_DIR / "laboratories").exists()
+        else STUDY_GUIDE_DIR
+    )
+)
 SHARED_DIR = (STUDY_GUIDE_DIR / "shared") if (STUDY_GUIDE_DIR / "shared").exists() else STUDY_GUIDE_DIR
 
 MAIN_TEX = (LECTURES_DIR / "main.tex") if (LECTURES_DIR / "main.tex").exists() else (MAIN_TEX)
