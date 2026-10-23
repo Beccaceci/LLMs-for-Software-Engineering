@@ -345,7 +345,120 @@
 \newcommand{\BP}{\mathrm{BP}}
 \newcommand{\NLL}{\mathrm{NLL}}
 \DeclareMathOperator{\Count}{Count}
+\DeclareMathOperator{\LCS}{LCS}
+\newcommand{\Pen}{\mathrm{Pen}}
+\newcommand{\EM}{\mathrm{EM}}
+\newcommand{\MRR}{\mathrm{MRR}}
+\newcommand{\NDCG}{\mathrm{NDCG}}
+\newcommand{\TP}{\mathrm{TP}}
+\newcommand{\TN}{\mathrm{TN}}
+\newcommand{\FP}{\mathrm{FP}}
+\newcommand{\FN}{\mathrm{FN}}
+\newcommand{\CoT}{\mathrm{CoT}}
+\newcommand{\QA}{\mathrm{QA}}
+\newcommand{\NLI}{\mathrm{NLI}}
 \newcommand{\PassAtK}[1]{\mathrm{Pass}@#1}
 \newcommand{\CodeBLEU}{\mathrm{CodeBLEU}}
+
+% ------------------------------------------------------------------------------
+% macOS Dark Terminal & Solution Code Listings
+% ------------------------------------------------------------------------------
+\providecolor{termbg}{RGB}{15, 23, 36}
+\providecolor{termframe}{RGB}{24, 34, 52}
+\providecolor{termtitlebar}{RGB}{20, 30, 46}
+\providecolor{termred}{RGB}{239, 68, 68}
+\providecolor{termyellow}{RGB}{245, 158, 11}
+\providecolor{termgreen}{RGB}{34, 197, 94}
+\providecolor{termtext}{RGB}{241, 245, 249}
+\providecolor{primaryBlue}{RGB}{11, 60, 93}
+\providecolor{mintGreen}{RGB}{46, 125, 50}
+\providecolor{mintGreenBg}{RGB}{232, 245, 233}
+
+\lstdefinestyle{pythonstyle}{
+    language=Python,
+    basicstyle=\ttfamily\footnotesize\color{bodyDark},
+    keywordstyle=\bfseries\color{primaryBlue},
+    stringstyle=\color{mintGreen},
+    commentstyle=\itshape\color{gray},
+    numberstyle=\tiny\color{gray},
+    numbers=left,
+    numbersep=8pt,
+    stepnumber=1,
+    tabsize=4,
+    showspaces=false,
+    showstringspaces=false,
+    breaklines=true,
+    breakatwhitespace=true,
+    columns=flexible,
+    keepspaces=true
+}
+
+\lstdefinestyle{mactermstyle}{
+    basicstyle=\fontsize{8.2pt}{11pt}\ttfamily\color{termtext},
+    breaklines=true,
+    breakatwhitespace=false,
+    keepspaces=true,
+    columns=fullflexible,
+    frame=none,
+    showstringspaces=false
+}
+
+\ifcsmacro{solutioncode}{}{%
+\newtcblisting[auto counter, number within=chapter]{solutioncode}[2][]{
+    enhanced,
+    breakable,
+    colback=codeBg,
+    colframe=steelBlue,
+    arc=4pt,
+    boxrule=1pt,
+    left=6pt,
+    right=6pt,
+    top=6pt,
+    bottom=6pt,
+    title=\textsf{\textbf{\small Listing \thetcbcounter: #2}},
+    coltitle=white,
+    attach boxed title to top left={yshift=-2mm, xshift=4mm},
+    boxed title style={colback=steelBlue, arc=3pt, boxrule=0pt},
+    listing only,
+    listing engine=listings,
+    listing options={style=pythonstyle},
+    #1
+}
+}
+
+\ifcsmacro{macterminal}{}{%
+\newtcblisting{macterminal}[2][]{
+    enhanced,
+    breakable,
+    colback=termbg,
+    colframe=termframe,
+    colupper=termtext,
+    collower=termtext,
+    arc=3mm,
+    boxrule=0.8pt,
+    top=2.5mm,
+    bottom=2.5mm,
+    left=3.5mm,
+    right=3.5mm,
+    colbacktitle=termtitlebar,
+    coltitle=termtext,
+    titlerule=0pt,
+    title={%
+        \tikz[baseline=-0.6ex]{
+            \fill[termred] (0,0) circle (2.8pt);
+            \fill[termyellow] (8.5pt,0) circle (2.8pt);
+            \fill[termgreen] (17pt,0) circle (2.8pt);
+        }\hspace{8pt}\textbf{\sffamily\small\color{termtext}#2}%
+    },
+    overlay middle and last={},
+    middle=2.5mm,
+    listing only,
+    listing style=mactermstyle,
+    before skip=3mm,
+    after skip=3mm,
+    #1
+}
+\AddToHook{env/macterminal/after}{\color{black}}
+}
 
 \endinput
