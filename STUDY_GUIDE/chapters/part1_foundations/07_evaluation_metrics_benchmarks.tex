@@ -8,11 +8,11 @@
 \chapter{Language model evaluation, metrics, and benchmarks}
 \label{ch:evaluation_metrics_benchmarks}
 
-The pre-training paradigm detailed in Chapter~\ref{ch:scaling_laws_pretraining} established that scaling parameter count, dataset volume, and training compute yields continuous, predictable reductions in next-token cross-entropy loss. By optimizing this autoregressive objective across trillions of tokens, modern foundation models acquire rich linguistic representations, syntactic abstractions, and emergent in-context learning capabilities. However, a fundamental discrepancy exists between pre-training optimization and practical deployment: minimizing the empirical cross-entropy loss over a corpus merely measures the statistical predictability of tokens under teacher forcing. It does not directly quantify whether an autoregressively generated sequence is coherent, factually truthful, stylistically appropriate, or capable of solving complex multi-step reasoning tasks.
+Chapter~\ref{ch:scaling_laws_pretraining} described how model size, training data, and compute affect next-token cross-entropy. This objective measures token prediction under teacher forcing, where the model conditions on the reference prefix. It does not directly measure whether generated text is coherent, factually accurate, appropriate to its context, or useful for a reasoning task. Evaluation therefore requires measures that reflect the intended use of the model.
 
-Evaluating natural language generation is fundamentally challenging because open-ended text does not conform to the closed-world assumptions of classical machine learning. In standard classification or regression tasks, the output space is bounded and discrete labels provide unambiguous ground truth. In contrast, generative language modeling is combinatorial: a single semantic concept, question prompt, or code specification can be articulated through an astronomical number of valid, syntactically diverse surface formulations. Conversely, a generated string may match reference vocabulary with high lexical overlap while completely inverting factual truth through the addition of a single negation token. Qualitative inspection---relying on human observers to informally assess whether sampled text appears coherent or degraded---is unscalable, subjective, and unable to establish statistically sound comparisons between competing architectures or training checkpoints.
+Natural-language generation is difficult to evaluate because a meaning can be expressed by many valid strings. Classification and regression often use a bounded output space with a defined target, whereas a language or code prompt may admit many correct responses. A candidate can share most of its words with a reference while reversing its meaning by adding a negation. Human review can assess qualities that automatic measures miss, but it is costly and may vary across reviewers, so it does not by itself provide a scalable basis for comparing models or checkpoints.
 
-To establish rigorous engineering standards, the natural language processing community has developed an evaluation hierarchy that spans multiple levels of abstraction. At the lowest level lie intrinsic probabilistic metrics, such as cross-entropy and perplexity, which evaluate the model's internal likelihood assignments directly on held-out text without requiring generated outputs or human task labels. At the intermediate level lie reference-based lexical metrics, such as BLEU and ROUGE, which compare model-generated candidate sequences against human reference strings using $n$-gram overlap and length penalties. At higher levels of the hierarchy, evaluation shifts toward contextual embedding similarity (such as BERTScore), model-based evaluators, and standardized task benchmarks (ranging from core natural language understanding suites like GLUE to comprehensive multi-task and code-generation suites like MMLU and HumanEval).
+Evaluation methods address different properties. Intrinsic measures such as cross-entropy and perplexity assess likelihood assignments on held-out text. Reference-based metrics such as BLEU and ROUGE compare generated candidates with reference strings using $n$-gram overlap and length penalties. Contextual measures such as BERTScore, model-based evaluators, and task benchmarks such as GLUE, MMLU, and HumanEval provide evidence about semantic similarity or performance on specified tasks.
 
 This chapter formalizes the principles of language model evaluation. We begin by examining the core mathematical properties required for rigorous evaluation metrics, focusing on the distinction between additive and multiplicative averaging, before conducting an exhaustive investigation of intrinsic uncertainty estimation via perplexity and surface-string reference matching via BLEU.
 
@@ -26,7 +26,7 @@ This chapter formalizes the principles of language model evaluation. We begin by
 
 Evaluation metrics in natural language processing can be partitioned into two distinct paradigms: intrinsic likelihood metrics and extrinsic generation metrics. Intrinsic metrics evaluate the model's mathematical representation of language by computing the probability distribution it assigns to unseen test corpora under teacher forcing. They require no sample generation, no decoding algorithms, and no reference texts; they assess the predictive confidence of the probability model itself. Extrinsic metrics, by contrast, operate on the discrete sequences emitted during autoregressive inference, comparing the generated hypothesis against one or more human gold-standard references.
 
-\noindent\textbf{The geometric mean and multiplicative error penalization.}\newline
+\subsubsection{The geometric mean and multiplicative error penalization}
 Before formalizing specific metrics, we must establish the mathematical foundation of sequence-level score aggregation. When evaluating models across multiple tokens, sentences, or $n$-gram orders, individual scores must be aggregated into a single scalar summary. While the standard arithmetic mean is familiar, it possesses structural properties that render it unsuitable for probability spaces and multi-criteria quality evaluation.
 
 Let $\vx = (x_1, x_2, \dots, x_n) \in \R_{>0}^n$ denote a collection of $n$ positive evaluation values (such as token probabilities or $n$-gram precision scores). The arithmetic mean ($\AM$) and geometric mean ($\GM$) are defined as:
@@ -41,7 +41,7 @@ The critical distinction between these two operators lies in how they penalize l
 \begin{equation}
 \AM(0.1, 0.9, 0.9) = \frac{0.1 + 0.9 + 0.9}{3} = \frac{1.9}{3} \approx 0.6333,
 \end{equation}
-producing a deceptively favorable aggregate score despite catastrophic failure on the first criterion. In contrast, the geometric mean exerts a \textit{multiplicative effect}:
+producing a deceptively favorable aggregate score despite substantial failure on the first criterion. In contrast, the geometric mean exerts a \textit{multiplicative effect}:
 \begin{equation}
 \GM(0.1, 0.9, 0.9) = (0.1 \times 0.9 \times 0.9)^{\frac{1}{3}} = (0.081)^{\frac{1}{3}} \approx 0.4327.
 \end{equation}
@@ -52,7 +52,7 @@ Because the terms multiply, any degradation in an individual component dispropor
 \end{equation}
 This property is indispensable in evaluation: a model must achieve reasonable competence across all evaluated dimensions to attain a high overall score. This behavior directly parallels the harmonic mean used in the $F_1$-score to balance precision and recall.
 
-\noindent\textbf{Numerical stability via the logarithmic formulation.}\newline
+\subsubsection{Numerical stability via logarithmic formulation}
 In practical computation, evaluating long sequences or high-order $n$-grams involves multiplying dozens or hundreds of terms bounded in $(0, 1]$. In finite-precision floating-point arithmetic (IEEE 754 float32 or float64), direct repeated multiplication inevitably causes arithmetic underflow, rounding the running product to absolute zero.
 
 To guarantee numerical stability, the geometric mean is computed in the logarithmic domain. Utilizing the monotonic identity $\ln\left(\prod x_i\right) = \sum \ln x_i$, the $n$-th root is transformed into an arithmetic average of logarithms:
@@ -67,7 +67,7 @@ As emphasized in lecture, the base of the logarithm must strictly match the base
 
 The primary intrinsic metric for evaluating autoregressive language models is \textbf{perplexity} ($\PPL$). Rooted in Claude Shannon's mathematical theory of communication and information entropy \cite{shannon1948}, perplexity quantifies the degree of uncertainty a probabilistic model exhibits when predicting a sequence of tokens.
 
-\noindent\textbf{Conceptual intuition and the effective branching factor.}\newline
+\subsubsection{Conceptual intuition and the effective branching factor}
 Rather than assessing whether a model generates fluent answers, perplexity measures how surprised the model is when presented with human-written, grammatically correct text. If a model has acquired an accurate statistical representation of English, it will assign high probability to legitimate sentences from held-out corpora. Conversely, if the model is poorly trained or faces out-of-domain text, it will assign low probability to valid tokens, indicating substantial confusion.
 
 Perplexity provides an intuitive geometric interpretation as the \textbf{effective branching factor} of the language model. Suppose that at a specific step in a sentence, the model assigns probability $P(w_i \mid w_{<i})$ to the ground-truth token. The reciprocal:
@@ -86,7 +86,7 @@ Consider a thought experiment where the model's vocabulary contains 50,000 discr
 \end{itemize}
 Across an entire sequence of $N$ words, perplexity represents the geometric average of these individual branching factors. A perplexity of 50 indicates that, on average across each position in the sentence, the model was as uncertain as choosing uniformly among 50 equally probable words. Lower perplexity reflects greater predictive confidence and superior alignment with the underlying data distribution.
 
-\noindent\textbf{Formal mathematical derivation and the negative log-likelihood.}\newline
+\subsubsection{Formal mathematical derivation and negative log-likelihood}
 Let $W = (w_1, w_2, \dots, w_N)$ denote a sequence of $N$ tokens. By the probability chain rule, the joint probability assigned to sequence $W$ by an autoregressive language model parameterized by $\theta$ is:
 \begin{equation}
 \label{eq:joint_prob_chain_rule}
@@ -111,7 +111,51 @@ Equation~\eqref{eq:perplexity_nll_form} reveals the direct mathematical link bet
 \label{eq:perplexity_cross_entropy_equiv}
 \Loss_{\text{CE}} = \frac{1}{N} \sum_{i=1}^N \NLL_i \implies \PPL(W) = e^{\Loss_{\text{CE}}}.
 \end{equation}
-Perplexity is simply the exponentiated cross-entropy loss.
+Perplexity is simply the exponentiated cross-entropy loss. Figure~\ref{fig:perplexity_loss_curve} illustrates the exponential growth of perplexity as average cross-entropy loss increases, underscoring the disproportionately severe penalty imposed on uncertain predictions.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    width=0.72\textwidth,
+    height=5.2cm,
+    font=\small\sffamily,
+    xmin=0.0, xmax=4.2,
+    ymin=0.0, ymax=60.0,
+    xlabel={Average Cross-Entropy Loss ($\Loss_{\text{CE}}$)},
+    ylabel={Perplexity ($\PPL = e^{\Loss_{\text{CE}}}$)},
+    grid=major,
+    grid style={dashed, gray!30},
+    axis line style={line width=0.8pt, politoNavy},
+    tick style={line width=0.6pt, politoNavy},
+    samples=200,
+    legend pos=north west,
+    legend style={draw=politoNavy!50, rounded corners=2pt, font=\scriptsize\sffamily}
+]
+    % Perplexity curve: exp(x)
+    \addplot[domain=0.0:4.05, line width=1.8pt, politoNavy] {exp(x)};
+    \addlegendentry{$\PPL = \exp(\Loss_{\text{CE}})$}
+    
+    % Theoretical minimum at L_CE = 0 -> PPL = 1.0
+    \node[circle, fill=forestGreen, inner sep=1.8pt] at (axis cs:0.0, 1.0) {};
+    \node[anchor=west, font=\scriptsize\sffamily\color{forestGreen}] at (axis cs:0.1, 2.5) {$\Loss_{\text{CE}} = 0 \implies \PPL = 1.0$ (Certainty)};
+    
+    % Confident model point (from worked example: L_CE = 0.16, PPL = 1.17)
+    \node[circle, fill=steelBlue, inner sep=1.8pt] at (axis cs:0.1596, 1.1731) {};
+    \node[anchor=south west, font=\scriptsize\sffamily\color{steelBlue}] at (axis cs:0.2, 5.0) {Confident Model: $\Loss_{\text{CE}} = 0.16 \implies \PPL \approx 1.17$};
+    
+    % Uncertain model point (from worked example: L_CE = 3.95, PPL = 52.1)
+    \node[circle, fill=crimsonRed, inner sep=1.8pt] at (axis cs:3.9532, 52.10) {};
+    \node[anchor=east, font=\scriptsize\sffamily\color{crimsonRed}] at (axis cs:3.85, 52.10) {Uncertain Model: $\Loss_{\text{CE}} = 3.95 \implies \PPL \approx 52.10$};
+    
+    % Asymptote / dashed drop lines
+    \draw[dotted, line width=0.8pt, gray!60] (axis cs:3.9532, 0) -- (axis cs:3.9532, 52.10);
+    \draw[dotted, line width=0.8pt, gray!60] (axis cs:0, 52.10) -- (axis cs:3.9532, 52.10);
+\end{axis}
+\end{tikzpicture}
+\caption{Perplexity ($\PPL$) as an exponential function of the average cross-entropy loss $\Loss_{\text{CE}}$. The metric attains its theoretical minimum at $\PPL = 1.0$ when $\Loss_{\text{CE}} = 0$. Due to the exponential mapping $\PPL = e^{\Loss_{\text{CE}}}$, modest increments in cross-entropy loss trigger dramatic escalations in perplexity, effectively penalizing poor probability assignments.}
+\label{fig:perplexity_loss_curve}
+\end{figure}
 
 \textit{Mathematical justification for the geometric mean.} The selection of the geometric mean in Equation~\eqref{eq:perplexity_def_geom} is mathematically mandatory for three reasons:
 \begin{enumerate}
@@ -122,7 +166,7 @@ Perplexity is simply the exponentiated cross-entropy loss.
 
 The theoretical lower bound of perplexity is $\PPL = 1.0$. This minimum occurs if and only if the model assigns probability $P(w_i \mid w_{<i}) = 1.0$ to every token in the sequence ($\NLL_i = 0 \implies e^0 = 1$), representing absolute, deterministic certainty. In practice, $\PPL = 1.0$ is observed only when a model severely overfits a training sequence.
 
-\noindent\textbf{Step-by-step worked examples: confident versus uncertain models.}\newline
+\subsubsection{Worked examples: confident versus uncertain models}
 To illustrate the mechanics of perplexity, we walk through the exact numerical evaluations presented in the lecture. Consider a held-out test sentence delimited by boundary markers:
 \begin{equation*}
 W = \langle\text{bos}\rangle \, \text{The} \, \text{dog} \, \text{chased} \, \text{the} \, \text{cat} \, \langle\text{eos}\rangle.
@@ -200,9 +244,9 @@ Verifying via the average negative log-likelihood:
 \end{equation}
 Both formulations yield identical results: $\PPL = 52.10$. On average, the uncertain model was confused across approximately 52 equally likely candidate tokens at every position.
 
-\textit{Lecture insight: Perplexity as a historical and domain probe.} As highlighted by the professor, perplexity serves as a diagnostic probe into the temporal and thematic distribution of a model's pre-training data. If an older model trained on corpora prior to 2016 is evaluated on the prompt ``The President of the United States is [NAME]'', evaluating ``Barack Obama'' yields low perplexity, whereas evaluating ``Donald Trump'' or ``Joe Biden'' produces high perplexity. The elevated perplexity does not imply that the model is architecturally defective; rather, it indicates statistical surprise relative to the pre-training data distribution.
+As highlighted by the professor, perplexity serves as a diagnostic probe into the temporal and thematic distribution of a model's pre-training data. If an older model trained on corpora prior to 2016 is evaluated on the prompt ``The President of the United States is [NAME]'', evaluating ``Barack Obama'' yields low perplexity, whereas evaluating ``Donald Trump'' or ``Joe Biden'' produces high perplexity. The elevated perplexity does not imply that the model is architecturally defective; rather, it indicates statistical surprise relative to the pre-training data distribution.
 
-\noindent\textbf{Advantages and fundamental limitations of perplexity.}\newline
+\subsubsection{Advantages and fundamental limitations of perplexity}
 Perplexity possesses distinct methodological advantages that have cemented its status as standard reporting metric in pre-training literature:
 \begin{itemize}
     \item \textbf{Unsupervised and task-agnostic}: Computing perplexity requires only raw, unannotated text. It eliminates the need for expensive human reference translations, task labels, or subjective grading rubrics.
@@ -218,7 +262,6 @@ Despite these strengths, perplexity suffers from fundamental limitations that pr
     \PPL_{\text{word}} = \exp\left( \frac{N_{\text{tokens}}}{N_{\text{words}}} \Loss_{\text{CE}} \right).
     \end{equation}
     \item \textbf{Disconnection from reasoning and factual truth}: A model can achieve outstanding (low) perplexity by mastering local grammatical syntax, common idioms, and surface transitions while remaining completely incapable of logical deduction, arithmetic calculation, or factual consistency. Perplexity rewards familiarity, not correctness.
-    \item \textbf{Vulnerability to data contamination}: If portions of the evaluation test set are inadvertently present in the multi-terabyte pre-training scrape, the model will memorize the sequences and exhibit near-zero perplexity, creating a false impression of general capability.
 \end{itemize}
 
 % ==============================================================================
@@ -229,7 +272,7 @@ Despite these strengths, perplexity suffers from fundamental limitations that pr
 
 While perplexity evaluates the model's internal probability distribution over given text, practical deployment requires evaluating the actual text generated by the model during autonomous inference. In 2002, Papineni, Roukos, Ward, and Zhu~\cite{papineni2002bleu} introduced the \textbf{Bilingual Evaluation Understudy} ($\BLEU$) metric at IBM Research. Originally developed for machine translation, BLEU became the foundational reference-based evaluation metric across natural language processing.
 
-\noindent\textbf{Conceptual intuition and reference-based lexical matching.}\newline
+\subsubsection{Conceptual intuition and reference-based lexical matching}
 The fundamental premise of BLEU is that the closer a machine-generated candidate translation resembles a human gold-standard translation, the higher its quality. Evaluating open-ended text against human references requires navigating two competing linguistic dimensions:
 \begin{enumerate}
     \item \textbf{Adequacy (Word Choice)}: Did the model translate the correct conceptual content? This is captured by measuring lexical overlap at the unigram level ($1$-grams).
@@ -238,7 +281,7 @@ The fundamental premise of BLEU is that the closer a machine-generated candidate
 
 BLEU is an extrinsic metric: it requires running the model autoregressively to generate a hypothesis string $G$ and comparing $G$ against one or more reference strings $R = \{R_1, \dots, R_m\}$. It is defined as a modified $n$-gram precision metric multiplied by an exponential brevity penalty.
 
-\noindent\textbf{Mathematical formulation and the brevity penalty.}\newline
+\subsubsection{Mathematical formulation and brevity penalty}
 To compute BLEU, we first extract all contiguous $n$-grams of size $i \in \{1, 2, \dots, n\}$ from both the generated candidate sequence $G$ and the reference sequence $R$.
 
 \textit{Modified clipped $n$-gram precision.} A naive precision metric would simply count the fraction of candidate $n$-grams that appear in the reference:
@@ -259,14 +302,7 @@ p_i = \frac{\sum_{g_i \in G} \Count_{\text{clip}}(g_i)}{\sum_{g_i \in G} \Count_
 \end{equation}
 In the pathological repetition example, the reference contains the unigram ``the'' twice ($\max \Count_R(\text{``the''}) = 2$). The clipped count for the candidate is $\min(6, 2) = 2$, reducing the unigram precision to $\frac{2}{6} = 0.3333$.
 
-\textit{Multi-order geometric mean aggregation.} To synthesize adequacy and fluency, BLEU computes the geometric mean of modified precisions across $n$-gram orders up to maximum order $n$ (typically $n=2$ or $n=4$):
-\begin{equation}
-\label{eq:bleu_precision_geom_mean}
-\text{Score}_{\text{prec}} = \exp\left( \sum_{i=1}^n w_i \ln p_i \right) = \left( \prod_{i=1}^n p_i \right)^{\frac{1}{n}},
-\end{equation}
-where uniform weights $w_i = \frac{1}{n}$ are standard. The geometric mean ensures that if a model fails completely at any $n$-gram order ($p_i = 0$), the entire score collapses to zero, enforcing that fluent text must exhibit both lexical accuracy and local phrase cohesion.
-
-\textit{The brevity penalty ($\BP$).} While clipped precision prevents repetitive over-generation, precision alone introduces an opposite failure mode: \textbf{under-generation}. 
+\textit{Multi-order precision and the brevity penalty.} While clipped precision prevents repetitive over-generation, precision alone introduces an opposite failure mode: \textbf{under-generation}. 
 
 Suppose the reference sentence contains 20 words, and the candidate model generates only two words: ``The dog''. Both words appear in the reference, so $p_1 = \frac{2}{2} = 1.0$. The bigram ``The dog'' also appears in the reference, so $p_2 = \frac{1}{1} = 1.0$. Without length regulation, the truncated output would achieve a flawless score: $\BLEU = 1.0$, despite discarding 90\% of the intended content.
 
@@ -330,13 +366,38 @@ Figure~\ref{fig:bleu_brevity_penalty_curve} illustrates the mathematical behavio
 \label{fig:bleu_brevity_penalty_curve}
 \end{figure}
 
-Synthesizing the brevity penalty and modified $n$-gram precisions yields the complete formulation of $\BLEU\text{-}n$:
+\subsubsection{Formal mathematical derivation of the BLEU metric}
+With the individual components defined, we now formally derive the composite $\BLEU$ formula from first principles, following the exact mathematical trajectory used for perplexity.
+
+Let $\{p_1, p_2, \dots, p_n\}$ denote the modified clipped precisions up to order $n$, with corresponding non-negative weights $w_i \ge 0$ satisfying $\sum_{i=1}^n w_i = 1$. The collective precision across all $n$-gram orders is combined using a weighted geometric mean:
+\begin{equation}
+\label{eq:bleu_geom_mean_raw}
+\GM(p_1, \dots, p_n) = \prod_{i=1}^n p_i^{w_i}.
+\end{equation}
+Under standard uniform weighting across the $n$ orders, $w_i = \frac{1}{n}$, simplifying the product to:
+\begin{equation}
+\GM(p_1, \dots, p_n) = \left( \prod_{i=1}^n p_i \right)^{\frac{1}{n}}.
+\end{equation}
+In computational implementations, multiplying small probabilities or fractional precisions directly induces numerical underflow. To guarantee numerical stability, we map the geometric mean into the log-domain:
+\begin{align}
+\ln \GM(p_1, \dots, p_n) &= \ln\left( \prod_{i=1}^n p_i^{w_i} \right) \nonumber \\
+                          &= \sum_{i=1}^n \ln\left( p_i^{w_i} \right) \nonumber \\
+                          &= \sum_{i=1}^n w_i \ln p_i.
+\end{align}
+Exponentiating both sides restores the original geometric scale:
+\begin{equation}
+\label{eq:bleu_exp_log_sum}
+\GM(p_1, \dots, p_n) = \exp\left( \sum_{i=1}^n w_i \ln p_i \right).
+\end{equation}
+Notice the mathematical parallel with perplexity: just as perplexity maps the arithmetic mean of negative log-likelihoods back to probability space via $\exp(-\frac{1}{N}\sum \ln P_i)$, BLEU maps the weighted arithmetic mean of log-precisions back to precision space via $\exp(\sum w_i \ln p_i)$.
+
+Finally, coupling this precision term multiplicatively with the brevity penalty $\BP$ yields the complete, definitive formulation of $\BLEU\text{-}n$:
 \begin{equation}
 \label{eq:bleu_full_formula}
-\BLEU\text{-}n = \BP \cdot \exp\left( \sum_{i=1}^n w_i \ln p_i \right) = \BP \cdot \left( \prod_{i=1}^n p_i \right)^{\frac{1}{n}}.
+\BLEU\text{-}n = \BP \cdot \GM(p_1, \dots, p_n) = \BP \cdot \exp\left( \sum_{i=1}^n w_i \ln p_i \right) = \BP \cdot \left( \prod_{i=1}^n p_i \right)^{\frac{1}{n}}.
 \end{equation}
 
-\noindent\textbf{Step-by-step worked example: BLEU-2 calculation.}\newline
+\subsubsection{Worked example: BLEU-2 calculation}
 We now execute the step-by-step computation of $\BLEU\text{-}2$ ($n=2$, uniform weights $w_1 = w_2 = 0.5$) on the worked example from the lecture slides.
 
 Let the reference and machine-generated candidate sequences be:
@@ -404,10 +465,9 @@ Multiplying the brevity penalty by the precision geometric mean yields:
 \BLEU\text{-}2 = \BP \times \GM = 1.0 \times 0.5165 = \mathbf{0.5165} \quad (\text{or } 51.65\%).
 \end{equation}
 
-\textit{Pedagogical analysis of the worked example.}
 This calculation exposes the defining characteristics and underlying limitations of $n$-gram lexical matching. The candidate phrase ``ran after'' is semantically equivalent to the reference verb ``chased''. A human evaluator would judge ``The dog ran after the cat'' as a completely correct, fluent, and faithful translation. However, because BLEU enforces exact surface string equality, the bigrams ``dog ran'', ``ran after'', and ``after the'' were scored as total errors ($0$ matches). Consequently, $p_2$ dropped from an expected near-perfect score to $0.4000$, driving the overall BLEU-2 score down to $0.5165$.
 
-\noindent\textbf{Advantages and fundamental limitations of BLEU.}\newline
+\subsubsection{Advantages and foundational limitations of BLEU}
 BLEU has served as the universal benchmark in machine translation and conditional generation for over two decades due to several compelling advantages:
 \begin{itemize}
     \item \textbf{Automated and cost-effective}: BLEU replaces slow, expensive human judges with an instantaneous, deterministic algorithmic script that costs nothing to evaluate.
@@ -416,12 +476,12 @@ BLEU has served as the universal benchmark in machine translation and conditiona
     \item \textbf{Enforcement of phrasing structure}: By incorporating higher-order $n$-grams ($n \ge 2$), BLEU aggressively penalizes ``word salad'' outputs that contain relevant keywords in scrambled or ungrammatical orders.
 \end{itemize}
 
-Nonetheless, BLEU exhibits severe architectural limitations that have prompted the development of neural semantic evaluators:
+Despite these operational strengths, BLEU exhibits a single, overarching foundational limitation: \textbf{it relies exclusively on exact surface word matching}. Every recorded failure mode and empirical deficiency of BLEU is simply a direct branch of this core constraint:
 \begin{itemize}
-    \item \textbf{Total semantic blindness}: BLEU recognizes only exact surface character matches. It is completely blind to synonymy, paraphrasing, morphological inflection, and active-to-passive voice transformations. As demonstrated in our worked example, using ``ran after'' instead of ``chased'' severely degrades the score despite preserving identical semantics.
-    \item \textbf{Insensitivity to grammatical negation and factual correctness}: Surface overlap does not track truth value. If a reference states ``The system is secure'' and a model generates ``The system is not secure'', the candidate matches 4 out of 5 unigrams and achieves an excellent BLEU score, despite asserting the absolute opposite fact.
-    \item \textbf{Brittle reference dependency}: BLEU evaluates alignment with a specific reference phrasing. If the human reference uses rare vocabulary or unusual syntax, a model generating natural, idiomatic text will be penalized simply because its stylistic choices diverge from the specific reference annotator.
-    \item \textbf{Unsuitability for open-ended generation}: In tasks such as dialogue, creative writing, or long-form reasoning, there is no single ``correct'' reference string. Demanding exact $n$-gram overlap against a fixed reference penalizes valid divergent creativity.
+    \item \textbf{Synonymy and paraphrasing blindness}: Because BLEU matches character sequences rather than semantics, semantically identical phrases receive zero credit. As demonstrated in our worked example, replacing the reference verb ``chased'' with ``ran after'' destroys bigram precision despite preserving perfect semantic fidelity. Similarly, active-to-passive voice transformations and morphological inflections are penalized as complete errors.
+    \item \textbf{Negation and factual insensitivity}: Surface character counting does not evaluate truth value. Inserting a single negation operator (e.g., generating ``The system is not secure'' when the reference is ``The system is secure'') preserves nearly all unigrams and bigrams, earning a stellar BLEU score while stating the exact opposite of the truth.
+    \item \textbf{Brittle reference dependency}: The metric rewards adherence to the specific lexical choices of the human reference annotator. If the reference author employed uncommon vocabulary or idiosyncratic phrasing, a model generating natural, fluent, and correct prose is penalized simply because its surface tokens diverge from the human author.
+    \item \textbf{Divergence in open-ended generation}: In tasks where generation is divergent and creative (such as dialogue, essay writing, or storytelling), there exists no unique reference sentence. Demanding exact $n$-gram alignment against a single reference penalizes valid linguistic creativity.
 \end{itemize}
 
 
@@ -435,7 +495,7 @@ While BLEU was conceived for machine translation---where generating spurious wor
 
 To address this challenge, Lin~\cite{lin2004rouge} introduced \textbf{ROUGE} (\textit{Recall-Oriented Understudy for Gisting Evaluation}). In contrast to BLEU's precision-centric design, ROUGE evaluates generative performance primarily through \textbf{recall}, measuring the fraction of reference $n$-grams and structural subsequences successfully captured in the machine-generated hypothesis.
 
-\noindent\textbf{ROUGE-$N$: $N$-gram recall.}\newline
+\subsubsection{ROUGE-$N$: $N$-gram recall}
 Let $R = \{r_1, r_2, \dots, r_m\}$ denote a set of reference summaries, and let $G$ denote the model-generated candidate summary. For a chosen $n$-gram length $n \ge 1$, $\text{ROUGE-}N$ computes the ratio of matched $n$-grams over the total $n$-grams appearing in the reference texts:
 \begin{equation}
 \label{eq:rouge_n_def}
@@ -447,7 +507,7 @@ where $\Count_{\text{match}}(g_n)$ represents the maximum number of times the ca
     \item \textbf{ROUGE-2 ($n=2$)}: Measures bigram recall, testing whether vocabulary is assembled with local syntactic cohesion and pairwise grammatical fluency.
 \end{itemize}
 
-\noindent\textbf{ROUGE-L: Longest common subsequence.}\newline
+\subsubsection{ROUGE-L: Longest common subsequence}
 A limitation of fixed $n$-gram matching is that it requires choosing an arbitrary context window $n$. To capture flexible, sentence-level syntactic structure without imposing fixed $n$-gram boundaries, Lin~\cite{lin2004rouge} introduced \textbf{ROUGE-L}, based on the \textbf{Longest Common Subsequence} ($\LCS$).
 
 Given two sequences $X = (x_1, \dots, x_m)$ and $Y = (y_1, \dots, y_n)$, a sequence $Z = (z_1, \dots, z_k)$ is a common subsequence if $Z$ can be derived by deleting zero or more elements from both $X$ and $Y$ without altering the relative ordering of the remaining tokens. Unlike $n$-grams, the tokens in an $\LCS$ do not need to be contiguous.
@@ -465,17 +525,11 @@ where $\beta$ controls the relative weighting between precision and recall. In s
 
 \textit{Structural advantage of ROUGE-L.} Because $\LCS$ requires tokens to appear in the same relative order, ROUGE-L naturally penalizes scrambled sentences without requiring predefined $n$-gram orders. If a candidate retains the subject-verb-object progression of the reference with intermediate modifiers deleted, $\LCS$ assigns a high score, reflecting accurate gist extraction.
 
-\noindent\textbf{ROUGE-W: Weighted longest common subsequence.}\newline
+\subsubsection{ROUGE-W: Weighted longest common subsequence}
 A structural blind spot of standard $\LCS$ is that it treats all common subsequences equally, regardless of whether their matching tokens are contiguous or widely separated across the text. For example, given the reference $R = (w_1, w_2, w_3, w_4, w_5)$, candidate $G_1 = (w_1, w_2, w_3, y_a, y_b)$ and candidate $G_2 = (w_1, y_a, w_2, y_b, w_3)$ both yield $\LCS = 3$. However, $G_1$ possesses continuous phrasing, whereas $G_2$ is severely fragmented. \textbf{ROUGE-W} assigns higher weight to contiguous matching subsequences by applying a polynomial weight function $f(k) = k^2$ to consecutive matches.
 
-\begin{examinsight}[BLEU versus ROUGE Selection Criteria]
-In formal examination questions, students are frequently asked to select the appropriate metric for specific natural language tasks:
-\begin{itemize}
-    \item \textbf{Machine Translation $\implies$ BLEU}: Translation demands high precision; extra or fabricated words distort meaning, and fluency is measured through higher-order $n$-gram precision.
-    \item \textbf{Text Summarization $\implies$ ROUGE}: Summarization demands high recall; the goal is to condense a long document into its essential facts without omitting key information.
-    \item \textbf{Common Weakness}: Both BLEU and ROUGE are surface lexical matchers. Neither metric accounts for semantic synonyms, paraphrases, or negation inversion.
-\end{itemize}
-\end{examinsight}
+\subsubsection{Task-aligned metric selection: Precision vs. recall}
+The structural divergence between BLEU and ROUGE underscores a fundamental principle of generative evaluation: metric design must mirror the primary failure mode of the downstream task. In \textbf{machine translation}, the cardinal sin is introducing spurious, fabricated, or ungrounded words that distort the original semantic meaning of the source sentence; precision is paramount, and fluent syntax is strictly monitored by higher-order $n$-gram precision, making BLEU the natural operational choice. Conversely, in \textbf{text summarization}, the primary failure mode is information omission---generating a grammatically flawless snippet that fails to mention the main event, characters, or conclusions renders the summary useless; recall is paramount, making ROUGE the appropriate instrument. Nevertheless, both metrics remain fundamentally bound to surface lexical matching, remaining equally blind to semantic synonymy, paraphrasing, and negation inversion.
 
 % ==============================================================================
 % SUBSECTION 7.1.4: METEOR
@@ -485,7 +539,7 @@ In formal examination questions, students are frequently asked to select the app
 
 To overcome the rigid surface-matching constraints of BLEU and ROUGE, Banerjee and Lavie~\cite{banerjee2005meteor} developed \textbf{METEOR} (\textit{Metric for Evaluation of Translation with Explicit ORdering}). METEOR introduces two fundamental innovations: \textbf{multi-stage linguistic matching} (incorporating morphological stemming and semantic synonymy) and an \textbf{explicit fragmentation penalty} to measure structural coherence.
 
-\noindent\textbf{The four-stage linguistic alignment cascade.}\newline
+\subsubsection{The four-stage linguistic alignment cascade}
 METEOR aligns candidate tokens against reference tokens by constructing a generalized bipartite matching where each token matches at most one token in the other sequence. The alignment is resolved through four successive linguistic modules:
 \begin{enumerate}
     \item \textbf{Exact match}: Pairs identical surface character strings (e.g., \textit{chased} $\leftrightarrow$ \textit{chased}).
@@ -494,7 +548,7 @@ METEOR aligns candidate tokens against reference tokens by constructing a genera
     \item \textbf{Paraphrase match}: Matches multi-word phrase equivalents identified through statistical phrase tables.
 \end{enumerate}
 
-\noindent\textbf{Harmonic score and fragmentation penalty.}\newline
+\subsubsection{Harmonic score and fragmentation penalty}
 Once the alignment is finalized, unigram precision ($P$) and unigram recall ($R$) are computed over the aligned matches. METEOR combines them via a parameterized harmonic mean $F_{\text{mean}}$ that explicitly prioritizes recall:
 \begin{equation}
 \label{eq:meteor_fmean}
@@ -513,7 +567,7 @@ The final METEOR score is computed as:
 \end{equation}
 When syntax is preserved ($\text{ch} = 1$), the penalty $\Pen \approx 0$ and $\text{METEOR} \approx F_{\text{mean}}$. When syntax is scrambled, $\Pen \to 0.5$, cutting the score in half.
 
-\noindent\textbf{Advantages and limitations of METEOR.}\newline
+\subsubsection{Advantages and limitations of METEOR}
 By incorporating stemming and synonymy, METEOR achieves substantially higher correlation with human judgments than BLEU on sentence-level translation benchmarks. However, it incurs significant trade-offs:
 \begin{itemize}
     \item \textbf{Resource dependency}: It requires curated external resources (Porter stemmers, WordNet synsets, paraphrase tables), making it difficult to port to low-resource languages.
@@ -530,7 +584,7 @@ Despite the additions of stemming and WordNet lookups in METEOR, all string-matc
 
 In 2020, Zhang, Kishore, Wu, Weinberger, and Artzi~\cite{zhang2020bertscore} introduced \textbf{BERTScore}, transitioning evaluation from discrete character matching into continuous contextual vector spaces. Rather than matching strings, BERTScore evaluates generated text by computing pairwise cosine similarities between deep contextual embeddings generated by models such as BERT~\cite{devlin2019}, RoBERTa, or DeBERTa.
 
-\noindent\textbf{Mathematical formulation and greedy bipartite matching.}\newline
+\subsubsection{Mathematical formulation and greedy bipartite matching}
 Let $R = (x_1, x_2, \dots, x_k)$ denote a reference sequence of $k$ tokens, and let $G = (y_1, y_2, \dots, y_m)$ denote a candidate generated sequence of $m$ tokens. Both sequences are processed through a pre-trained contextual transformer, producing sequences of contextual vectors:
 \begin{align}
 \vx_i &= \text{ContextualEncoder}(R)_i \in \R^d, \quad \text{for } i \in \{1, \dots, k\}, \\
@@ -561,7 +615,7 @@ Instead of solving an expensive global assignment problem, BERTScore performs \t
     \end{equation}
 \end{itemize}
 
-\noindent\textbf{Step-by-step worked numerical calculation from lecture.}\newline
+\subsubsection{Worked numerical calculation from lecture}
 To illustrate how BERTScore resolves the semantic failure modes of BLEU, we reproduce the exact numerical evaluation delivered by Prof.~Giobergia during lecture.
 
 Consider the identical reference and candidate pair analyzed in Section~\ref{subsec:bleu}:
@@ -569,7 +623,7 @@ Consider the identical reference and candidate pair analyzed in Section~\ref{sub
 R &: \text{``the dog chased the cat''} \quad (|R| = 5 \text{ tokens}), \\
 G &: \text{``the dog ran after the cat''} \quad (|G| = 6 \text{ tokens}).
 \end{align*}
-Under BLEU-2, this pair suffered a catastrophic drop to $0.5165$ because ``ran after'' did not match ``chased'' at the surface level. Table~\ref{tab:bertscore_matrix_lecture} displays the complete $6 \times 5$ pairwise cosine similarity matrix $\mathbf{S}$ computed from contextual BERT embeddings.
+Under BLEU-2, this pair suffered a substantial drop to $0.5165$ because ``ran after'' did not match ``chased'' at the surface level. Table~\ref{tab:bertscore_matrix_lecture} displays the complete $6 \times 5$ pairwise cosine similarity matrix $\mathbf{S}$ computed from contextual BERT embeddings.
 
 \begin{table}[htbp]
 \centering
@@ -628,7 +682,7 @@ R_{\text{BERT}} = \frac{4.9167}{5} \approx \mathbf{0.98334}.
 F_{\text{BERT}} = 2 \cdot \frac{0.96725 \times 0.98334}{0.96725 + 0.98334} = \frac{1.90220}{1.95059} \approx \mathbf{0.97519}.
 \end{equation}
 
-\noindent\textbf{Critical pedagogical analysis: Strengths and the ``BERT says so'' bottleneck.}\newline
+\subsubsection{Strengths and opaque semantic embedding bottlenecks}
 Comparing BLEU-2 ($51.65\%$) against BERTScore ($97.52\%$) demonstrates the expressive power of contextual representations:
 \begin{itemize}
     \item \textbf{Paraphrase and synonym recognition}: The verbal predicate ``ran after'' matches ``chased'' with high similarity ($\cos \approx 0.9351$ and $0.8868$). The model is not penalized for natural vocabulary variation.
@@ -650,7 +704,7 @@ However, as emphasized by Prof.~Giobergia, BERTScore introduces serious methodol
 
 In tasks where the target output space is strictly bounded, continuous overlap scores are neither necessary nor desirable. When evaluating closed-domain question answering, factual entity retrieval, or programmatic code execution, a prediction is either entirely correct or unusable.
 
-\noindent\textbf{Exact match (EM).}\newline
+\subsubsection{Exact match (EM)}
 The \textbf{Exact Match} ($\EM$) metric evaluates binary equality between the generated hypothesis string $G$ and the gold-standard reference string $R$:
 \begin{equation}
 \label{eq:exact_match_def}
@@ -667,7 +721,7 @@ To prevent trivial punctuation or casing discrepancies from registering as false
 \end{itemize}
 Exact Match serves as the standard evaluation standard on extractive QA benchmarks (such as SQuAD~\cite{rajpurkar2016squad}) and mathematical datasets (such as GSM8K~\cite{cobbe2021gsm8k}).
 
-\noindent\textbf{Information retrieval and probability ranking metrics.}\newline
+\subsubsection{Information retrieval and probability ranking metrics}
 When a language model is evaluated on multiple-choice questions, cloze passage completion, or entity ranking, it produces a probability distribution over a set of candidates $\mathcal{C} = \{c_1, c_2, \dots, c_K\}$. We sort the candidates by descending model probability:
 \begin{equation*}
 P(c_{(1)}) \ge P(c_{(2)}) \ge \dots \ge P(c_{(K)}).
@@ -727,14 +781,14 @@ Despite the sophistication of $n$-gram matching, LCS alignment, and contextual e
 
 Consequently, human evaluation remains the gold standard for assessing text quality.
 
-\noindent\textbf{Human evaluation methodologies: Absolute scales versus pairwise comparisons.}\newline
+\subsubsection{Human evaluation: Absolute scales vs. pairwise comparisons}
 Two primary paradigms govern human evaluation in research and industry:
 \begin{enumerate}
     \item \textbf{Absolute Likert rating scales}: Annotators are presented with a generated response and asked to assign a score on a discrete 1-to-5 scale across specific criteria (e.g., fluency, coherence, relevance, factual accuracy).
     \item \textbf{Pairwise comparative evaluation (A/B testing)}: Annotators are presented with a prompt and two anonymized, randomized candidate outputs ($A$ and $B$) produced by competing models, and asked to answer: \textit{``Which response is better, or are they tied?''}
 \end{enumerate}
 
-\noindent\textbf{The cognitive failure mode of absolute scoring.}\newline
+\subsubsection{Cognitive failure mode of absolute scoring}
 As emphasized in lecture, humans are notoriously poor at assigning absolute grades. If ten human judges are asked to grade an essay on a 1-to-5 scale, their scores exhibit severe variance due to:
 \begin{itemize}
     \item \textbf{Calibration drift}: Annotator standards shift across time due to fatigue, mood, or exposure to previous high- or low-quality samples.
@@ -742,7 +796,7 @@ As emphasized in lecture, humans are notoriously poor at assigning absolute grad
 \end{itemize}
 In contrast, humans are remarkably consistent at \textbf{relative pairwise comparisons}: deciding whether response $A$ is more helpful, coherent, or factually sound than response $B$ is a significantly simpler cognitive task. Pairwise preferences are converted into global scalar rankings using the \textbf{Elo rating system}~\cite{zheng2023judging} (the foundation of modern public benchmarks like the LMSYS Chatbot Arena).
 
-\noindent\textbf{The scalability bottleneck and the transition to LLM-as-a-judge.}\newline
+\subsubsection{Scalability bottleneck and LLM-as-a-judge}
 While human evaluation provides the highest qualitative fidelity, it is fundamentally bottlenecked by resource constraints:
 \begin{itemize}
     \item \textbf{Extreme financial cost}: Conducting statistically significant human trials across thousands of prompts requires hundreds of thousands of dollars in crowd-sourcing compensation.
@@ -752,7 +806,7 @@ While human evaluation provides the highest qualitative fidelity, it is fundamen
 
 These constraints have catalyzed the widespread adoption of \textbf{LLM-as-a-judge}~\cite{zheng2023judging}. By supplying a state-of-the-art foundation model (such as GPT-4) with detailed evaluation rubrics, system instructions, and few-shot calibration examples, automated systems can evaluate model outputs pairwise with high correlation ($\rho > 0.8$) to human expert preferences, operating at fraction-of-a-cent costs and second-level latency.
 
-\textit{Causal bridge to tasks and benchmarks.} While metrics provide the mathematical scoring instruments, metrics cannot exist in an operational vacuum. A metric like BLEU is meaningless without the task of Machine Translation; Exact Match is meaningless without Question Answering; Accuracy is meaningless without Natural Language Inference. To understand how foundational models are developed and validated, we must examine the formal problem formulations across which these metrics are deployed.
+While metrics provide the mathematical scoring instruments, they cannot exist in an operational vacuum. A metric like BLEU is meaningless without the task of Machine Translation; Exact Match is meaningless without Question Answering; Accuracy is meaningless without Natural Language Inference. To understand how foundational models are developed and validated, we must examine the formal problem formulations across which these metrics are deployed.
 
 \clearpage
 
@@ -779,7 +833,7 @@ The most direct evaluation of an autoregressive language model is \textbf{text c
     \end{equation}
 \end{enumerate}
 
-\noindent\textbf{Canonical benchmark datasets:}\newline
+\subsubsection{Canonical QA benchmark datasets}
 \begin{itemize}
     \item \textbf{LAMBADA (Language Modeling Broadened to Account for Discourse-Level Analysis)}~\cite{paperno2016lambada}: A corpus of narrative passages specifically constructed such that human readers can guess the final target word accurately when reading the entire paragraph, but cannot guess it if exposed only to the final sentence. This benchmark directly measures the model's ability to retain long-range discourse context across dozens of tokens without succumbing to recency bias. Evaluated via Accuracy (Exact Match on the final target word) and Perplexity.
     \item \textbf{ROCStories and StoryCloze}~\cite{mostafazadeh2016rocstories}: A benchmark composed of 5-sentence commonsense stories capturing everyday events. The StoryCloze test presents the first four sentences as context and provides two candidate endings (one logical, one absurd or contradictory). Models are evaluated on their accuracy in assigning higher likelihood to the correct narrative resolution.
@@ -791,20 +845,20 @@ The most direct evaluation of an autoregressive language model is \textbf{text c
 
 Question Answering ($\QA$) evaluates a model's ability to comprehend queries, retrieve knowledge, and synthesize truthful, accurate answers. As categorized in lecture, $\QA$ problem settings differ across two foundational axes: \textbf{access to external knowledge} and \textbf{answer formulation format}.
 
-\noindent\textbf{Axis 1: Access to knowledge (Closed-book versus open-book).}\newline
+\subsubsection{Axis 1: Access to knowledge (Closed-book vs. open-book)}
 \begin{itemize}
     \item \textbf{Closed-Book QA}: The model is given only the question prompt in its context window ($x = \text{``What year was the University of Turin founded?''}$). The model must retrieve the factual answer entirely from its internal \textbf{parametric memory}---the weights optimized during pre-training. This evaluates factual retention and internal world models.
     \item \textbf{Open-Book QA}: The model is provided with external reference documents in its context window alongside the question. In modern systems, this is realized via \textbf{Retrieval-Augmented Generation (RAG)}, where an external retriever queries a document store or vector database (e.g., Wikipedia) and injects relevant context chunks into the prompt. This evaluates reading comprehension and contextual synthesis.
 \end{itemize}
 
-\noindent\textbf{Axis 2: Answer format (Extractive, abstractive, and multiple-choice).}\newline
+\subsubsection{Axis 2: Answer format}
 \begin{itemize}
     \item \textbf{Extractive QA}: The answer is guaranteed to exist as a contiguous substring (span) within the provided context passage. The model predicts the starting and ending token indices.
     \item \textbf{Abstractive QA}: The model must generate a free-form natural language response, paraphrasing and synthesizing information across multiple sentences.
     \item \textbf{Multiple-Choice QA}: The model chooses among discrete candidate options (e.g., A, B, C, D).
 \end{itemize}
 
-\noindent\textbf{Canonical QA benchmarks:}\newline
+\subsubsection{Overview of canonical QA benchmarks}
 \begin{itemize}
     \item \textbf{SQuAD (Stanford Question Answering Dataset)}~\cite{rajpurkar2016squad}: Contains over 100,000 question-answer pairs curated by crowd-workers on Wikipedia articles. Answers are exact extractive text spans. SQuAD~2.0~\cite{rajpurkar2018know} introduced over 50,000 \textit{unanswerable questions} that look syntactically plausible but cannot be answered from the text, penalizing models that hallucinate answers instead of outputting an abstention signal. Evaluated via Exact Match ($\EM$) and token-level $F_1$.
     \item \textbf{TriviaQA}~\cite{joshi2017triviaqa}: Over 650,000 question-answer pairs compiled from trivia websites paired with independently retrieved web and Wikipedia evidence documents, introducing natural linguistic noise and distant supervision.
@@ -817,10 +871,10 @@ Question Answering ($\QA$) evaluates a model's ability to comprehend queries, re
 
 Conditional sequence generation tasks require mapping an input source text into an output text with different surface syntax or different length, while preserving invariant core semantics.
 
-\noindent\textbf{Machine translation.}\newline
+\subsubsection{Machine translation tasks}
 Machine translation maps a source sequence $\vx = (x_1, \dots, x_S)$ in language $\mathcal{L}_S$ to a target sequence $\vy = (y_1, \dots, y_T)$ in language $\mathcal{L}_T$. The premier competitive venue is the annual \textbf{WMT (Workshop on Machine Translation)} benchmarks, which provide standardized training corpora, validation splits, and human reference sets across dozens of high-resource and low-resource language pairs (e.g., English-German, English-Czech). Evaluation relies on BLEU, METEOR, and neural metrics like COMET.
 
-\noindent\textbf{Text summarization.}\newline
+\subsubsection{Text summarization tasks}
 Text summarization condenses an input document $\vx$ into a concise summary $\vy$ ($|\vy| \ll |\vx|$). It is divided into:
 \begin{itemize}
     \item \textbf{Extractive summarization}: Ranking and selecting the most salient verbatim sentences from the source document.
@@ -836,7 +890,7 @@ Evaluated via ROUGE-1, ROUGE-2, and ROUGE-L.
 \subsection{Natural language inference and grammatical acceptability}
 \label{subsec:nli_grammatical_acceptability}
 
-\noindent\textbf{Natural language inference (NLI).}\newline
+\subsubsection{Natural language inference (NLI)}
 $\NLI$ (also termed \textit{recognizing textual entailment}) is the foundational benchmark for formal semantic reasoning. Given two sentences---a \textbf{Premise} ($P$) and a \textbf{Hypothesis} ($H$)---the model must determine whether the hypothesis is:
 \begin{equation}
 \label{eq:nli_labels}
@@ -849,7 +903,7 @@ $\NLI$ (also termed \textit{recognizing textual entailment}) is the foundational
 \end{itemize}
 Canonical benchmarks include \textbf{SNLI (Stanford NLI)}~\cite{bowman2015snli} (570,000 sentence pairs derived from image captions) and \textbf{MultiNLI (Multi-Genre NLI)}~\cite{williams2018multinli} (433,000 sentence pairs spanning 10 diverse spoken and written genres).
 
-\noindent\textbf{Grammatical acceptability and linguistic competence.}\newline
+\subsubsection{Grammatical acceptability and linguistic competence}
 To assess whether a model has internalized syntax independent of semantic plausibility (exemplified by Noam Chomsky's famous formulation \textit{``Colorless green ideas sleep furiously''}), researchers utilize the \textbf{Corpus of Linguistic Acceptability (CoLA)}~\cite{warstadt2019cola}. CoLA contains 10,657 English sentences drawn from theoretical linguistics publications, annotated as grammatically acceptable ($1$) or unacceptable ($0$). Because grammatical errors are subtle (e.g., auxiliary inversion, island constraints), CoLA is evaluated using the \textbf{Matthews Correlation Coefficient (MCC)}, a balanced measure for binary classification robust to class imbalance.
 
 \subsection{Text and sentiment classification}
@@ -887,7 +941,7 @@ To benchmark quantitative reasoning, researchers established two premier dataset
 
 Commonsense reasoning represents the broad repository of unstated physical, social, temporal, and causal knowledge that humans utilize to navigate daily interactions.
 
-\noindent\textbf{Ambiguity resolution: The Winograd schema challenge.}\newline
+\subsubsection{Ambiguity resolution: The Winograd schema challenge}
 Pronoun ambiguity resolution tests whether a model understands the physical and situational constraints of entities. The foundational benchmark is the \textbf{Winograd Schema Challenge (WSC)}~\cite{levesque2012winograd}, based on paired sentences called \textit{twin sentences} that differ by only one or two words:
 \begin{center}
 \begin{minipage}{0.92\textwidth}
@@ -902,7 +956,7 @@ A model cannot resolve ``it'' through grammatical parsing alone; it must underst
 
 \textbf{WinoGrande}~\cite{sakaguchi2020winogrande} scaled this paradigm to 44,000 adversarially filtered problems, systematically eliminating lexical selection biases to expose models relying on associative correlations rather than physical reasoning.
 
-\noindent\textbf{Causal reasoning: COPA and ATOMIC.}\newline
+\subsubsection{Causal reasoning: COPA and ATOMIC}
 \begin{itemize}
     \item \textbf{COPA (Choice of Plausible Alternatives)}~\cite{roemmele2011copa}: 1,000 questions composed of a premise and two alternative hypotheses. The prompt explicitly asks for either the \textbf{cause} or the \textbf{effect}:
     \begin{quote}
@@ -926,7 +980,7 @@ To address this, researchers design \textbf{synthetic probe tasks}: algorithmica
 \end{itemize}
 Synthetic tasks ensure that test data is guaranteed to be unseen, providing an untainted diagnostic probe into the model's computational capabilities.
 
-\textit{Causal bridge to benchmarks.} While evaluating models on individual tasks (such as SQuAD for QA, or CoLA for grammar) reveals localized strengths and weaknesses, reporting dozen separate accuracies is unwieldy. The research community requires holistic, standardized evaluation suites that aggregate performance across diverse tasks into unified benchmarks.
+\textit{While evaluating models on individual tasks (such as SQuAD for QA, or CoLA for grammar) reveals localized strengths and weaknesses, reporting dozens of separate accuracies is unwieldy. The research community requires holistic, standardized evaluation suites that aggregate performance across diverse tasks into unified benchmarks.}
 
 \clearpage
 
@@ -936,14 +990,14 @@ Synthetic tasks ensure that test data is guaranteed to be unseen, providing an u
 \section{Standardized benchmark suites and the contamination crisis}
 \label{sec:benchmarks_contamination}
 
-Foundation models are designed as general-purpose reasoners. Evaluating a model on a single task provides an incomplete picture: a model could excel at text classification while failing catastrophically at arithmetic or causal reasoning. To establish reproducible comparisons between competing architectures and training paradigms, the NLP community introduced \textbf{standardized multi-task benchmark suites}.
+Foundation models are designed as general-purpose reasoners. Evaluating a model on a single task provides an incomplete picture: a model could excel at text classification while failing substantially at arithmetic or causal reasoning. To establish reproducible comparisons between competing architectures and training paradigms, the NLP community introduced \textbf{standardized multi-task benchmark suites}.
 
 However, the widespread reliance on fixed, public benchmarks has triggered an epistemological crisis in AI evaluation: \textbf{benchmark data contamination}. This section examines the canonical evaluation suites and formalizes the contamination phenomenon that threatens the validity of modern LLM leaderboards.
 
 \subsection{Holistic multi-task benchmarking: GLUE and SuperGLUE}
 \label{subsec:glue_superglue}
 
-\noindent\textbf{The GLUE benchmark.}\newline
+\subsubsection{The GLUE benchmark suite}
 In 2018, Wang et al.~\cite{wang2018glue} introduced \textbf{GLUE} (\textit{General Language Understanding Evaluation}), an integrated benchmark suite designed to evaluate general-purpose sentence representations. GLUE combined nine diverse natural language understanding tasks spanning three broad families:
 \begin{enumerate}
     \item \textbf{Single-sentence tasks}: Linguistic acceptability on CoLA~\cite{warstadt2019cola} and binary sentiment analysis on SST-2~\cite{socher2013sst}.
@@ -952,7 +1006,7 @@ In 2018, Wang et al.~\cite{wang2018glue} introduced \textbf{GLUE} (\textit{Gener
 \end{enumerate}
 GLUE established a public leaderboard evaluated on hidden private test sets, aggregating performance across all nine tasks into a \textbf{single summary score} (the unweighted average of task accuracies and correlation coefficients).
 
-\noindent\textbf{The saturation of GLUE and the advent of SuperGLUE.}\newline
+\subsubsection{Benchmark saturation and the advent of SuperGLUE}
 When GLUE was introduced, state-of-the-art models scored substantially below human performance ($87.1$). However, with the advent of the Transformer pre-training revolution (BERT~\cite{devlin2019}, RoBERTa, and T5~\cite{raffel2020t5}), models rapidly saturated the benchmark, exceeding non-expert human performance within eighteen months. Analysis revealed that models were exploiting spurious statistical cues and shallow lexical overlaps in GLUE's test sets rather than exercising deep comprehension.
 
 In response, Wang et al.~\cite{wang2019superglue} introduced \textbf{SuperGLUE} in 2019. Retaining GLUE's single-metric aggregate format, SuperGLUE replaced saturated tasks with substantially harder challenges requiring multi-sentence reasoning, coreference resolution, and open-ended QA:
@@ -974,7 +1028,7 @@ As foundation models scaled past tens of billions of parameters, evaluation expa
 
 In 2020, Hendrycks et al.~\cite{hendrycks2020mmlu} introduced \textbf{MMLU} (\textit{Massive Multitask Language Understanding}), which has become the de facto gold standard for reporting foundation model capabilities (utilized to benchmark GPT-3, PaLM, LLaMA, GPT-4, and Claude).
 
-\noindent\textbf{Architecture and scope of MMLU:}\newline
+\subsubsection{Architecture and scope of MMLU}
 \begin{itemize}
     \item \textbf{Scale and format}: Comprises 15,908 multiple-choice questions, each formulated with four options (A, B, C, D).
     \item \textbf{Breadth of domains}: Spans \textbf{57 diverse subjects} categorized into four overarching disciplines:
@@ -987,7 +1041,7 @@ In 2020, Hendrycks et al.~\cite{hendrycks2020mmlu} introduced \textbf{MMLU} (\te
     \item \textbf{Difficulty stratification}: Covers elementary school facts, high school examinations, undergraduate coursework, and professional licensing standards.
 \end{itemize}
 
-\noindent\textbf{Evaluation protocol.}\newline
+\subsubsection{MMLU evaluation protocol}
 Models are evaluated on MMLU under \textbf{zero-shot} or \textbf{5-shot in-context learning} conditions. The prompt provides the question, four formatted choices, and a prompt prefix (e.g., \textit{``Answer:''}). The model's score is computed by comparing the conditional log-probabilities assigned to the four option tokens:
 \begin{equation}
 \label{eq:mmlu_scoring}
@@ -995,10 +1049,47 @@ Models are evaluated on MMLU under \textbf{zero-shot} or \textbf{5-shot in-conte
 \end{equation}
 The overall MMLU score is the unweighted percentage of questions answered correctly across all 57 subjects. A random baseline achieves $25.0\%$; modern frontier models (such as GPT-4 and Gemini~1.5) exceed $85\%$, outperforming human domain experts on the majority of specialized subjects.
 
+\subsubsection{Worked benchmark question examples}
+To illustrate the depth and format of MMLU across diverse disciplines, consider the representative questions highlighted in the lecture:
+
+\begin{center}
+\begin{minipage}{0.95\textwidth}
+\begin{tcolorbox}[colback=cardBg,colframe=cardLine,arc=2pt,boxrule=0.5pt,title=\textbf{MMLU Example 1: Conceptual Physics}]
+\small\sffamily
+\textbf{Question}: When you drop a ball from rest it accelerates downward at $9.8\text{ m/s}^2$. If you instead throw it downward assuming no air resistance its acceleration immediately after leaving your hand is:
+\begin{itemize}[leftmargin=1.5em,itemsep=1pt]
+    \item[\textbf{(A)}] $9.8\text{ m/s}^2$ \hfill \textit{[Correct]}
+    \item[\textbf{(B)}] more than $9.8\text{ m/s}^2$
+    \item[\textbf{(C)}] less than $9.8\text{ m/s}^2$
+    \item[\textbf{(D)}] Cannot say unless the speed of throw is given
+\end{itemize}
+\textit{Physics insight}: Once the ball leaves the hand, gravity is the only accelerating force acting on the mass; the initial throw velocity alters instantaneous speed, not downward acceleration ($g = 9.8\text{ m/s}^2$).
+\end{tcolorbox}
+\end{minipage}
+\end{center}
+
+\vspace{0.2cm}
+
+\begin{center}
+\begin{minipage}{0.95\textwidth}
+\begin{tcolorbox}[colback=cardBg,colframe=cardLine,arc=2pt,boxrule=0.5pt,title=\textbf{MMLU Example 2: College Mathematics}]
+\small\sffamily
+\textbf{Question}: In the complex $z$-plane, the set of points satisfying the equation $z^2 = |z|^2$ is a:
+\begin{itemize}[leftmargin=1.5em,itemsep=1pt]
+    \item[\textbf{(A)}] pair of points
+    \item[\textbf{(B)}] circle
+    \item[\textbf{(C)}] half-line
+    \item[\textbf{(D)}] line \hfill \textit{[Correct]}
+\end{itemize}
+\textit{Mathematical derivation}: Let $z = x + iy$. Then $z^2 = x^2 - y^2 + 2ixy$ and $|z|^2 = x^2 + y^2$. Equating real and imaginary components yields $2xy = 0$ (so $x=0$ or $y=0$) and $x^2 - y^2 = x^2 + y^2 \implies 2y^2 = 0 \implies y = 0$. Since $y=0$ and $x \in \R$ satisfies the equation for all $x$, the solution set is precisely the real axis, which constitutes a \textbf{line} in the complex plane.
+\end{tcolorbox}
+\end{minipage}
+\end{center}
+
 \subsection{The benchmark contamination crisis}
 \label{subsec:contamination_crisis}
 
-The astronomical performance gains reported on public benchmarks have brought to light an existential vulnerability in modern AI evaluation: \textbf{data contamination}.
+The very large performance gains reported on public benchmarks have brought to light an existential vulnerability in modern AI evaluation: \textbf{data contamination}.
 
 \begin{definition}{Benchmark Data Contamination}{contamination_def}
 \textbf{Data contamination} refers to the inadvertent or deliberate inclusion of evaluation benchmark test data (questions, passages, or gold-standard target labels) in the training corpus of a language model.
@@ -1006,7 +1097,7 @@ The astronomical performance gains reported on public benchmarks have brought to
 
 As highlighted in the lecture, Foundation models are pre-trained on multi-terabyte web crawls (such as Common Crawl, GitHub, Wikipedia, and academic preprint servers) containing hundreds of billions of web pages. Because popular benchmarks (GLUE, SQuAD, MMLU, GSM8K) are hosted on public GitHub repositories, open-access papers, and web forums, their test sets are routinely ingested by automated web scrapers during pre-training.
 
-\noindent\textbf{Taxonomy and levels of contamination:}\newline
+\subsubsection{Taxonomy and levels of benchmark contamination}
 Contamination can occur across multiple distinct stages of the model lifecycle:
 \begin{enumerate}
     \item \textbf{Pre-training contamination}: Public benchmark test splits are included directly in the pre-training scrape. The model observes the verbatim test questions and answers during self-supervised next-token prediction, memorizing them as factual text.
@@ -1014,19 +1105,19 @@ Contamination can occur across multiple distinct stages of the model lifecycle:
     \item \textbf{Post-deployment feedback contamination}: Real users paste benchmark questions into public chatbot interfaces, which are subsequently collected and added to subsequent retraining pipelines.
 \end{enumerate}
 
-\noindent\textbf{Theoretical consequences: Memorization versus reasoning.}\newline
+\subsubsection{Consequences: Memorization vs. reasoning}
 Data contamination undermines the foundational assumption of statistical machine learning: that generalization performance on a held-out test set reflects genuine out-of-distribution capability.
 
-In their seminal study \textit{``NLP Evaluation in Trouble: On the Need to Measure LLM Data Contamination for Each Benchmark''}, Sainz et al.~\cite{sainz2023contamination} demonstrated that models exhibiting near-perfect scores on popular reasoning benchmarks suffered catastrophic performance drops when evaluated on slightly perturbed or synthetically generated instances of the identical problems. A model that achieves $90\%$ on GSM8K might simply be reciting a memorized solution path observed dozens of times during pre-training, rather than executing mathematical deduction.
+In their seminal study \textit{``NLP Evaluation in Trouble: On the Need to Measure LLM Data Contamination for Each Benchmark''}, Sainz et al.~\cite{sainz2023contamination} demonstrated that models exhibiting near-perfect scores on popular reasoning benchmarks suffered substantial performance drops when evaluated on slightly perturbed or synthetically generated instances of the identical problems. A model that achieves $90\%$ on GSM8K might simply be reciting a memorized solution path observed dozens of times during pre-training, rather than executing mathematical deduction.
 
-\noindent\textbf{The closed-model auditing barrier.}\newline
+\subsubsection{The closed-model auditing barrier}
 As emphasized by Prof.~Giobergia, data contamination introduces severe asymmetries between open-weight and proprietary closed-source models:
 \begin{itemize}
     \item For open-source models (such as LLaMA or Mistral), researchers can inspect public pre-training manifests, search for exact $n$-gram overlaps, and audit decontamination pipelines.
     \item For proprietary commercial models (such as GPT-4), the exact composition of the pre-training corpus is an undisclosed trade secret. Consequently, \textbf{contamination cannot be formally proven or disproven}. Continuous benchmark gains reported by proprietary models may stem from architectural innovations, or simply from aggressive pre-training exposure to the evaluation test sets.
 \end{itemize}
 
-\noindent\textbf{Decontamination protocols and modern countermeasures.}\newline
+\subsubsection{Decontamination protocols and countermeasures}
 To safeguard evaluation integrity, modern foundation model research employs rigorous decontamination heuristics:
 \begin{itemize}
     \item \textbf{$N$-gram overlap filtering}: Scrutinizing the pre-training corpus for contiguous 13-gram or 15-gram matches against benchmark test splits and removing matching documents prior to training.
@@ -1083,7 +1174,7 @@ To provide a comprehensive reference for researchers and software engineers, Tab
 \end{tabularx}
 \end{table}
 
-\noindent\textbf{Chapter conclusion.}\newline
+
 Language model evaluation has evolved from simple probabilistic uncertainty metrics ($\PPL$) into multi-faceted empirical benchmarking across thousands of specialized tasks. As foundation models approach and surpass human performance across standard benchmarks, evaluation methodology itself becomes the central engineering frontier: moving from static public test sets toward dynamic, synthetic, and adversarial evaluation protocols capable of discriminating between superficial web memorization and genuine machine intelligence.
 
 \end{document}

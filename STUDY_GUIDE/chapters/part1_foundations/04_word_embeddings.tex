@@ -5,11 +5,11 @@
 \chapter{Distributed word representations and Word2Vec}
 \label{ch:word_embeddings}
 
-In Chapter~\ref{ch:intro_lms}, we examined statistical language modeling through $n$-gram Markov chains and smoothed frequency distributions, demonstrating how purely discrete combinatorics collapses beneath the curse of dimensionality. In Chapter~\ref{ch:deep_learning_foundations}, we established the mathematical machinery of continuous deep neural networks, proving how non-linear activations prevent rank collapse and how multivariable gradient descent optimizes parameters across continuous manifolds. Furthermore, in Chapter~\ref{ch:rnn_sequence_modeling}, we explored temporal dynamics and gating mechanisms over time-varying hidden states.
+The preceding chapters introduced discrete language models, differentiable neural networks, and recurrent state updates. These models still require a representation that maps discrete tokens to numerical inputs on which the network can compute and optimize.
 
-Yet, a fundamental representation barrier governs every neural approach to natural language and source code: while human communication is articulated through discrete symbolic tokens, deep neural networks are continuous differentiable matrix operators that can neither compute distances nor evaluate gradients on raw string literals. Treating words as atomic indices via one-hot standard basis vectors incurs extreme sparsity, geometric orthogonality, and zero parameter sharing during backpropagation.
+Tokens are discrete symbols, whereas neural networks operate on continuous numerical inputs. Assigning each word a one-hot vector makes the representation sparse; distinct words are orthogonal, and their parameters do not share updates through the input representation. Dense embeddings address this mismatch by representing tokens as vectors whose geometry can be learned from context.
 
-This chapter constructs the theoretical and mathematical bridge from discrete symbols to dense continuous metric spaces. Grounded in Harris and Firth's distributional hypothesis, we formulate self-supervised objective functions that organize latent spaces through context prediction. We dissect the Word2Vec suite---analyzing Continuous Bag-of-Words (CBOW) and Continuous Skip-Gram---and solve the full softmax computational bottleneck via Hierarchical Softmax binary trees and Noise Contrastive Negative Sampling (SGNS). We then address the out-of-vocabulary barrier and morphological blindness through FastText subword character $n$-gram compositions, analyze the emergent geometric symmetries of semantic clustering and linear vector analogies, and formalize modern subword tokenization and positional encoding pipelines that underpin contemporary foundation models.
+Distributional learning uses context to organize token vectors, following the hypothesis associated with Harris and Firth. The chapter derives the Continuous Bag-of-Words (CBOW) and Skip-Gram objectives, then considers Hierarchical Softmax and negative sampling (SGNS) as alternatives to full-vocabulary normalization. It examines how FastText character $n$-grams represent morphology and unseen words, how vector geometry supports semantic clusters and analogies, and how subword tokenization and positional encodings are used in current language models.
 
 \clearpage
 \section{The representation problem: why continuous embeddings are mandatory}
@@ -29,7 +29,7 @@ where $\mW_l \in \R^{d_l \times d_{l-1}}$ and $\vb_l \in \R^{d_l}$. Such archite
 \end{equation}
 This mathematical reality creates an immediate, fundamental impasse: \textbf{discrete text strings cannot be differentiated}. The partial derivative of a scalar loss with respect to a raw string literal, $\frac{\partial \Loss}{\partial \text{\texttt{"cat"}}}$, is mathematically undefined. Discrete symbols possess no notion of infinitesimal perturbation, tangent spaces, or linear vector combinations. One cannot add \texttt{"cat"} to \texttt{"dog"}, nor compute an inner product between \texttt{"while"} and \texttt{"for"}.
 
-To bridge this chasm between discrete symbolic communication and continuous gradient-based computation, we must establish a formal mapping from the discrete vocabulary into a continuous vector space.
+To bridge this gap between discrete symbolic communication and continuous gradient-based computation, we must establish a formal mapping from the discrete vocabulary into a continuous vector space.
 
 \begin{definition}{Continuous word embedding}{continuous_embedding}
 Let $\vocab = \{w_1, w_2, \dots, w_V\}$ denote a finite vocabulary of $V = |\vocab|$ distinct discrete symbolic tokens. A \textbf{continuous word embedding} is an injective mapping:
@@ -77,7 +77,7 @@ In the foundational guide \emph{Build a Large Language Model from Scratch} \cite
 \begin{theorem}{Embedding lookup equivalence}{embedding_lookup_equiv}
 Let $\vocab$ be a vocabulary of size $V$, and let token $w_i \in \vocab$ be encoded as the standard basis vector $\ve_i \in \{0, 1\}^V$.
 
-\noindent\textbf{Case 1: Column-Vector Orientation (Standard Basis Representation).}  
+\subsubsection{Column-vector orientation (standard basis representation)}  
 Let $\mW_{\text{in}} \in \R^{d \times V}$ be the embedding matrix whose $k$-th column corresponds to the $d$-dimensional embedding vector $\vw_k = (\mW_{\text{in}})_{:, k} \in \R^d$:
 \begin{equation}
 \label{eq:win_column_blocks}
@@ -89,7 +89,7 @@ Multiplying $\mW_{\text{in}}$ by the one-hot column vector $\ve_i$ extracts the 
 \vh = \mW_{\text{in}} \ve_i = \sum_{k=1}^V (\ve_i)_k (\mW_{\text{in}})_{:, k} = 1 \cdot (\mW_{\text{in}})_{:, i} + \sum_{k \neq i} 0 \cdot (\mW_{\text{in}})_{:, k} = \vw_i \in \R^d.
 \end{equation}
 
-\noindent\textbf{Case 2: Row-Vector Orientation (PyTorch and Modern Deep Learning Convention).}  
+\subsubsection{Row-vector orientation (PyTorch convention)}  
 Let $\mW \in \R^{V \times d}$ be an embedding table whose $k$-th row contains the embedding vector $\vw_k^\top = \mW_{k, :} \in \R^{1 \times d}$. Multiplying the one-hot row vector $\ve_i^\top$ by $\mW$ extracts the $i$-th row of $\mW$:
 \begin{equation}
 \label{eq:row_lookup_proof}
@@ -147,12 +147,12 @@ Although dense matrix multiplication $\ve_i^\top \mW$ and table indexing $\text{
 \subsection{The 5 structural failure modes of one-hot representations}
 \label{subsec:five_failure_modes}
 
-While the lookup table implementation rescues computational throughput, local one-hot representations fail catastrophically as semantic representations. They suffer from five fatal pathologies:
+The lookup-table implementation makes input projection computationally efficient, but one-hot vectors do not encode semantic relationships between words. They have five limitations:
 
-\paragraph{1. Extreme Sparsity and Curse of Dimensionality.}
-As vocabulary size scales to web scale ($V \ge 50{,}000$ to $10^6$), one-hot vectors become astronomical sparse vectors where $99.998\%$ of entries are zero. The dimensionality of the vector space equals the number of distinct words. Under this curse of dimensionality, the volume of the enclosing space grows exponentially, leaving data points isolated at the extreme vertices of independent axes.
+\subsubsection{Extreme sparsity and curse of dimensionality}
+As vocabulary size scales to web scale ($V \ge 50{,}000$ to $10^6$), one-hot vectors become very large sparse vectors where $99.998\%$ of entries are zero. The dimensionality of the vector space equals the number of distinct words. Under this curse of dimensionality, the volume of the enclosing space grows exponentially, leaving data points isolated at the extreme vertices of independent axes.
 
-\paragraph{2. Metric Collapse and Semantic Orthogonality ($\cos = 0, d_E = \sqrt{2}$).}
+\subsubsection{Metric collapse and semantic orthogonality}
 Because one-hot vectors form the standard Cartesian basis of $\R^V$, every pair of distinct words $w_i \neq w_j$ is mutually perpendicular and equidistant:
 \begin{align}
 \label{eq:onehot_cosine}
@@ -256,7 +256,7 @@ The underlying metric space collapses into a degenerate topology where open ball
 \label{fig:onehot_orthogonality_geometry}
 \end{figure}
 
-\paragraph{3. Zero Gradient Parameter Sharing During Backpropagation.}
+\subsubsection{Zero gradient parameter sharing during backpropagation}
 Because one-hot vectors activate strictly disjoint coordinates, training a neural network on an occurrence of token $w_i$ produces gradients exclusively for the parameters associated with index $i$:
 \begin{equation}
 \label{eq:weight_update_isolation}
@@ -264,7 +264,7 @@ Because one-hot vectors activate strictly disjoint coordinates, training a neura
 \end{equation}
 If a model updates its weights upon observing the sentence \emph{``The feline climbed the tree''}, the parameters associated with \texttt{"feline"} receive gradient updates, but the parameters for \texttt{"cat"}, \texttt{"kitten"}, or \texttt{"leopard"} remain completely unchanged. The model cannot transfer statistical strength across semantically synonymous or related words; it must encounter every word hundreds of times independently in every grammatical context.
 
-\paragraph{4. Simplex Confinement and Absence of Latent Manifolds.}
+\subsubsection{Simplex confinement and absence of latent manifolds}
 One-hot vectors are confined strictly to the $V$ extreme vertices of the standard $(V-1)$-dimensional probability simplex:
 \begin{equation}
 \label{eq:standard_simplex}
@@ -272,7 +272,7 @@ One-hot vectors are confined strictly to the $V$ extreme vertices of the standar
 \end{equation}
 The interior and edges of the simplex correspond to fractional probabilistic mixtures, but distinct words themselves inhabit isolated, non-overlapping boundary corners. Words cannot reside on smooth, lower-dimensional semantic submanifolds, nor can they support linear translation arithmetic ($\vw_{\text{king}} - \vw_{\text{man}} + \vw_{\text{woman}} \approx \vw_{\text{queen}}$).
 
-\paragraph{5. Software Engineering Identifier Polymorphism.}
+\subsubsection{Software engineering identifier polymorphism}
 In software engineering source code, developers routinely express identical semantic intents through differing lexical notations, identifier casings, and API conventions:
 \begin{itemize}
     \item \textbf{Casing variants}: \texttt{getUserById} vs.~\texttt{get\_user\_by\_id} vs.~\texttt{GetUserById}.
@@ -688,13 +688,13 @@ A neural language model learning distributed embeddings had been introduced a de
 \subsection{Strengths and representational bottlenecks of CBOW}
 \label{subsec:cbow_bottlenecks}
 
-\noindent\textbf{Strengths}:
+\subsubsection{Strengths of CBOW}
 \begin{itemize}
     \item \textbf{Rapid Training Convergence}: Context averaging smooths the gradient signal, allowing CBOW to converge in fewer epochs over large corpora.
     \item \textbf{Robust Representations for Frequent Words}: For high-frequency tokens with abundant contextual observations, the smoothed averaging stabilizes coordinate estimates against noisy outliers.
 \end{itemize}
 
-\noindent\textbf{Representational Bottlenecks}:
+\subsubsection{Representational bottlenecks of CBOW}
 \begin{itemize}
     \item \textbf{Loss of Sequential Word Order (Syntactic Blindness)}: Vector summation in Equation~\eqref{eq:cbow_hidden_avg} is strictly commutative: $\vv_a + \vv_b = \vv_b + \vv_a$. The model is incapable of distinguishing \emph{``the dog bit the man''} from \emph{``the man bit the dog''}.
     \item \textbf{Rare Word Dilution}: Because context words are averaged into a single vector $\vh$, if a rare technical token appears alongside multiple high-frequency stopwords (e.g., \emph{``the \textbf{polymorphism} in the''}), the rare token's embedding is diluted by the dominant stopwords: $\frac{1}{2C} \vv_{\text{rare}} \approx \mathbf{0}$. The gradient update to the rare word is severely attenuated.
@@ -780,7 +780,7 @@ The gradient is never diluted by surrounding words. Consequently, Skip-Gram prod
 \subsection{The shared computational wall: the full softmax bottleneck}
 \label{subsec:softmax_bottleneck}
 
-Despite its empirical superiority, the standard formulation of Skip-Gram crashes into an insurmountable computational wall: \textbf{the full Softmax partition function bottleneck}.
+Despite its empirical superiority, the standard formulation of Skip-Gram crashes into an prohibitive computational wall: \textbf{the full Softmax partition function bottleneck}.
 
 Examining the denominator of Equation~\eqref{eq:skipgram_softmax}:
 \begin{equation}
@@ -834,15 +834,15 @@ First developed in 2005 \cite{morin2005hierarchical} and adapted in \cite{mikolo
     where $\text{sign}(w, j) = +1$ if the path branches left at node $j$, and $-1$ if it branches right.
 \end{itemize}
 
-\paragraph{Proof of Exact Normalization.}
+
 Because probabilities sum to $1$ at each binary branching step ($\sigma(z) + \sigma(-z) = 1$), telescoping products guarantee that the sum of probabilities over all leaves equals $1$ identically:
 \begin{equation}
 \label{eq:hierarchical_norm_proof}
 \sum_{w \in \vocab} \Prob(w \mid w_I) \equiv 1.
 \end{equation}
-No global partition function $Z(w_I)$ ever needs to be computed!
+No global partition function $Z(w_I)$ ever needs to be computed.
 
-\paragraph{Complexity Reduction.}
+
 Evaluating $\Prob(w \mid w_I)$ and its gradients requires traversing only the $L(w) - 1$ nodes along the path. In a balanced or Huffman binary tree, the average path length is $\mathcal{O}(\log_2 V)$. For a vocabulary of $V = 100{,}000$:
 \begin{equation}
 \label{eq:hierarchical_speedup}
@@ -884,7 +884,7 @@ Recall the fundamental identities for the logistic sigmoid derivative:
 \frac{d}{dz} \log \sigma(-z) &= \frac{-\sigma'(-z)}{\sigma(-z)} = \frac{-\sigma(-z)(1 - \sigma(-z))}{\sigma(-z)} = -(1 - \sigma(-z)) = -\sigma(z).
 \end{align}
 
-\paragraph{1. Gradient with respect to Positive Target Vector $\vu_{w_o}$.}
+\subsubsection{Gradient with respect to positive target vector}
 The positive target vector $\vu_{w_o}$ appears exclusively in the first term of Equation~\eqref{eq:sgns_loss_display}:
 \begin{align}
 \frac{\partial \Loss_{\text{SGNS}}}{\partial \vu_{w_o}} &= -\frac{\partial}{\partial \vu_{w_o}} \log \sigma(\vu_{w_o}^\top \vv_{w_c}) \notag \\
@@ -898,7 +898,7 @@ Defining the positive prediction error as $e_{\text{pos}} = \sigma(\vu_{w_o}^\to
 \frac{\partial \Loss_{\text{SGNS}}}{\partial \vu_{w_o}} = (\hat{y}_{\text{pos}} - 1) \vv_{w_c}.
 \end{equation}
 
-\paragraph{2. Gradient with respect to Negative Noise Vector $\vu_{w_{n_k}}$.}
+\subsubsection{Gradient with respect to negative noise vector}
 Each negative sample vector $\vu_{w_{n_k}}$ appears in exactly one term of the summation in Equation~\eqref{eq:sgns_loss_display}:
 \begin{align}
 \frac{\partial \Loss_{\text{SGNS}}}{\partial \vu_{w_{n_k}}} &= -\frac{\partial}{\partial \vu_{w_{n_k}}} \log \sigma(-\vu_{w_{n_k}}^\top \vv_{w_c}) \notag \\
@@ -912,7 +912,7 @@ Defining the negative prediction error as $e_{\text{neg}, k} = \sigma(\vu_{w_{n_
 \frac{\partial \Loss_{\text{SGNS}}}{\partial \vu_{w_{n_k}}} = \hat{y}_{\text{neg}, k} \, \vv_{w_c}.
 \end{equation}
 
-\paragraph{3. Gradient with respect to Center Word Vector $\vv_{w_c}$.}
+\subsubsection{Gradient with respect to center word vector}
 The center word vector $\vv_{w_c}$ appears in both the positive term and all $K$ negative terms. Applying the chain rule to the complete loss:
 \begin{align}
 \frac{\partial \Loss_{\text{SGNS}}}{\partial \vv_{w_c}} &= -\frac{\partial}{\partial \vv_{w_c}} \log \sigma(\vu_{w_o}^\top \vv_{w_c}) - \sum_{k=1}^K \frac{\partial}{\partial \vv_{w_c}} \log \sigma(-\vu_{w_{n_k}}^\top \vv_{w_c}) \notag \\
@@ -946,7 +946,7 @@ P_n(w) = \frac{f(w)^{3/4}}{\sum_{w' \in \vocab} f(w')^{3/4}},
 \end{equation}
 where $f(w)$ denotes the raw unigram occurrence frequency of token $w$ in the corpus.
 
-\paragraph{Why $\alpha = 0.75$ instead of $\alpha = 1.0$ (Raw Frequency) or $\alpha = 0.0$ (Uniform)?}
+\subsubsection{Theoretical justification of the 3/4 unigram noise exponent}
 \begin{enumerate}
     \item \textbf{Failure of Raw Frequency ($\alpha = 1.0$)}: Natural language word frequencies follow Zipf's law ($f(r) \propto 1/r$). A tiny fraction of stopwords (\texttt{"the"}, \texttt{"of"}, \texttt{"and"}, \texttt{"to"}) account for over $50\%$ of all token occurrences in a typical corpus. If $\alpha = 1.0$, more than half of all negative samples drawn are uninformative stopwords. The model wastes its entire discriminative budget separating words from \texttt{"the"}, while rare content words (\texttt{"polymorphism"}, \texttt{"compiler"}) have near-zero probability of ever being selected as negative samples, receiving virtually zero negative gradient updates.
     
@@ -955,7 +955,7 @@ where $f(w)$ denotes the raw unigram occurrence frequency of token $w$ in the co
     \item \textbf{The Sub-linear Compromise ($\alpha = 0.75$)}: The exponent $3/4$ acts as a concave, sub-linear dampener. It compresses the gap between ultra-frequent stopwords and rare content words.
 \end{enumerate}
 
-\paragraph{Numerical Demonstration of the Rare-Word Boost.}
+
 Consider a frequent stopword $w_{\text{freq}}$ with corpus frequency $f(w_{\text{freq}}) = 0.01$ (e.g., $10^6$ occurrences in $10^8$ words) and a rare technical term $w_{\text{rare}}$ with corpus frequency $f(w_{\text{rare}}) = 10^{-6}$ (e.g., $100$ occurrences in $10^8$ words):
 \begin{itemize}
     \item Under raw unigram frequency ($\alpha = 1.0$), the sampling ratio is:
@@ -1101,7 +1101,7 @@ Rather than treating a word as an atomic token, FastText represents each word as
     \item \textbf{Subword Extraction}: All character $n$-grams of length $n \in [n_{\min}, n_{\max}]$ (typically $n \in [3, 6]$) are extracted, along with the special sequence containing the entire word itself $\tilde{w}$.
 \end{enumerate}
 
-\paragraph{Worked Example: Subword Decomposition of $\langle\text{\texttt{where}}\rangle$.}
+\subsubsection{Subword decomposition worked example}
 Consider the word \texttt{"where"} decomposed into character trigrams ($n = 3$):
 \begin{equation}
 \label{eq:fasttext_subwords}
@@ -1137,7 +1137,7 @@ This simple compositional formulation yields two decisive capabilities:
     \label{eq:fasttext_oov_synth}
     \vv_{w_{\text{oov}}} = \sum_{g \in \mathcal{G}_{w_{\text{oov}}}} \vz_g.
     \end{equation}
-    The OOV barrier is completely eliminated!
+    The OOV barrier is completely eliminated.
     
     \item \textbf{Morphological Parameter Sharing}:
     In natural language, prefixes like \texttt{"un-"}, suffixes like \texttt{"-tion"}, and inflections like \texttt{"-ing"} accumulate shared vector representations across hundreds of distinct words.
@@ -1149,7 +1149,7 @@ This simple compositional formulation yields two decisive capabilities:
     share the character subwords for \texttt{"parse"} and \texttt{"Document"}. The model immediately recognizes that both identifiers describe parsing operations on structured documents.
 \end{enumerate}
 
-\paragraph{Memory Bounding via the Fowler-Noll-Vo (FNV-1a) Hash Trick.}
+\subsubsection{Memory bounding via the Fowler-Noll-Vo hash trick}
 Because the universe of all character $n$-grams ($n \in [3, 6]$) across large vocabularies exceeds tens of millions of unique strings, allocating an unbounded matrix would cause memory blowout. FastText bounds the embedding table to $K = 2 \times 10^6$ rows using the Fowler-Noll-Vo (FNV-1a) hashing function:
 \begin{equation}
 \label{eq:fnv_hash}
@@ -1197,7 +1197,7 @@ The most celebrated emergent property of continuous word embeddings is that sema
 \vv_{w_2} - \vv_{w_1} \approx \vec{d}_{\text{relation}}.
 \end{equation}
 
-\paragraph{Country-to-Capital Analogy.}
+\subsubsection{Country-to-capital linear offsets}
 For instance, subtracting the vector for \texttt{"Berlin"} from \texttt{"Germany"} produces a directional displacement vector $\vec{d}_{\text{capital\_of}}$:
 \begin{equation}
 \label{eq:rel_germany_berlin}
@@ -1209,7 +1209,7 @@ Applying this learned offset vector to another country predicts its capital city
 \vv_{\text{Spain}} + (\vv_{\text{Germany}} - \vv_{\text{Berlin}}) \approx \vv_{\text{Madrid}}.
 \end{equation}
 
-\paragraph{The Gender-Royalty Parallelogram.}
+\subsubsection{The gender-royalty parallelogram}
 The canonical demonstration established in \cite{mikolov2013distributed} is the gender-royalty parallelogram:
 \begin{equation}
 \label{eq:king_queen_arithmetic}
@@ -1250,7 +1250,7 @@ Figure~\ref{fig:vector_parallelogram} illustrates this parallelogram in two dime
 \label{fig:vector_parallelogram}
 \end{figure}
 
-\paragraph{Software Engineering Analogy Equivalents.}
+\subsubsection{Software engineering relational analogies}
 In code representation learning (e.g., CodeBERT \cite{feng2020codebert}, OpenAI Codex embeddings \cite{chen2021codex}), relational vector arithmetic reflects runtime architectures and language toolchains:
 \begin{align}
 \label{eq:se_analogy_runtime}
@@ -1290,7 +1290,7 @@ Let $\vu, \vv \in \R^d$ be normalized to unit Euclidean length ($\|\vu\|_2 = \|\
 Consequently, nearest neighbor rankings under Euclidean distance, Cosine distance, and Dot Product are mathematically identical on the unit hypersphere $\mathbb{S}^{d-1}$.
 \end{theorem}
 
-\paragraph{Why Cosine Distance Dominates Natural Language Processing.}
+\subsubsection{Why cosine similarity dominates metric evaluations}
 As demonstrated in educational analyses \cite{enkk2023embeddings}, when word embeddings are trained without explicit length regularization, the Euclidean norm $\|\vv_w\|_2$ strongly correlates with unigram token frequency. Highly frequent words undergo millions of gradient pushes, systematically expanding their vector magnitude, whereas rare terms remain close to the origin.
 Cosine distance normalizes out vector magnitude, projecting all embeddings onto $\mathbb{S}^{d-1}$. It evaluates \textbf{pure angular orientation} (conceptual topic) rather than \textbf{vector length} (frequency artifact).
 
@@ -1346,9 +1346,9 @@ Figure~\ref{fig:modern_tokenization_pipeline} illustrates this end-to-end data p
 ]
 
 % Vertical flow nodes
-\node[block] (raw) at (0, 0) {\textbf{1. Raw Text Stream}\\[2pt]\footnotesize\ttfamily "Hello, world! <|endoftext|>"};
+\node[block] (raw) at (0, 0) {\textbf{1. Raw Text Stream}\\[2pt]\footnotesize\ttfamily "Hello, world. <|endoftext|>"};
 
-\node[tokblock] (bpe) at (0, -1.8) {\textbf{2. Byte-Level BPE Tokenizer}\\[2pt]\footnotesize\ttfamily ['Hello', ',', '{	extvisiblespace}world', '!', '<|endoftext|>']};
+\node[tokblock] (bpe) at (0, -1.8) {\textbf{2. Byte-Level BPE Tokenizer}\\[2pt]\footnotesize\ttfamily ['Hello', ',', '{	extvisiblespace}world', '.', '<|endoftext|>']};
 
 \node[tokblock] (ids) at (0, -3.6) {\textbf{3. Token ID Mapping ($\vocab \to \mathbb{Z}$)}\\[2pt]\footnotesize\ttfamily [15496, 11, 995, 0, 50256]};
 
@@ -1402,14 +1402,14 @@ Converting raw natural language or software code into discrete units reveals a f
 \end{tabularx}
 \end{table}
 
-\paragraph{Why whitespace splitting fails.}
-A naive baseline approach to text tokenization splits raw strings on whitespace characters (`\texttt{\textbackslash s}'). However, whitespace splitting fails catastrophically on punctuation:
+\subsubsection{Limitations of whitespace-based splitting}
+A naive baseline approach to text tokenization splits raw strings on whitespace characters (`\texttt{\textbackslash s}'). However, whitespace splitting fails substantially on punctuation:
 \begin{center}
-\texttt{"Hello, world! This is a test."} $\stackrel{\text{whitespace split}}{\Longrightarrow}$ \texttt{['Hello,', 'world!', 'This', 'is', 'a', 'test.']}
+\texttt{"Hello, world. This is a test."} $\stackrel{\text{whitespace split}}{\Longrightarrow}$ \texttt{['Hello,', 'world.', 'This', 'is', 'a', 'test.']}
 \end{center}
-The comma is fused to \texttt{"Hello"}, and periods are fused to \texttt{"world"} and \texttt{"test"}. Consequently, the model assigns distinct vocabulary indices to \texttt{"world"}, \texttt{"world!"}, \texttt{"world,"}, and \texttt{"world?"}. This fragments training counts, bloats the vocabulary with redundant punctuation variants, and destroys syntactic generalization.
+The comma is fused to \texttt{"Hello"}, and periods are fused to \texttt{"world"} and \texttt{"test"}. Consequently, the model assigns distinct vocabulary indices to \texttt{"world"}, \texttt{"world."}, \texttt{"world,"}, and \texttt{"world?"}. This fragments training counts, bloats the vocabulary with redundant punctuation variants, and destroys syntactic generalization.
 
-\paragraph{Regex-based tokenization with punctuation isolation.}
+\subsubsection{Regex-based tokenization with punctuation isolation}
 To isolate punctuation while preserving them as distinct semantic tokens, a regular expression splitting rule can be formulated \cite{raschka2024llm} that captures punctuation symbols, em-dashes, and whitespaces:
 \begin{lstlisting}[language=Python, caption={Basic regular expression text tokenization with punctuation isolation and vocabulary construction \cite{raschka2024llm}.}, label={lst:simple_tokenizer}]
 import re
@@ -1421,7 +1421,7 @@ class SimpleTokenizerV1:
     
     def encode(self, text):
         # Split on whitespace, punctuation marks, and special dash patterns
-        tokens = re.split(r'([,.:;?_!"()\']|--|\s)', text)
+        tokens = re.split(r'([,.:;?_."()\']|--|\s)', text)
         tokens = [t.strip() for t in tokens if t.strip()]
         token_ids = [self.str_to_int[t] for t in tokens]
         return token_ids
@@ -1429,12 +1429,12 @@ class SimpleTokenizerV1:
     def decode(self, token_ids):
         text = " ".join([self.int_to_str[i] for i in token_ids])
         # Clean up spaces before punctuation marks
-        text = re.sub(r'\s+([,.?!])', r'\1', text)
+        text = re.sub(r'\s+([,.?.])', r'\1', text)
         return text
 
 # Building the vocabulary from unique preprocessed tokens
 text = "Hello, world. Is this-- a test?"
-raw_tokens = re.split(r'([,.:;?_!"()\']|--|\s)', text)
+raw_tokens = re.split(r'([,.:;?_."()\']|--|\s)', text)
 tokens = [t.strip() for t in raw_tokens if t.strip()]
 vocab = {token: idx for idx, token in enumerate(sorted(set(tokens)))}
 tokenizer = SimpleTokenizerV1(vocab)
@@ -1453,7 +1453,7 @@ In practical machine learning and software engineering workflows, a vocabulary c
     In fixed-vocabulary systems, words unseen during training cannot be mapped to an integer index. Such tokens are mapped to $\text{\texttt{<|unk|}>}$. While this prevents code execution errors, it irreversibly destroys semantic information: a technical identifier or typo is flattened into a generic void.
     
     \item \textbf{Document Boundary Delimiter} ($\text{\texttt{<|endoftext|>}}$):
-    In large-scale autoregressive pretraining, billions of tokens spanning Wikipedia articles, books, and GitHub repositories are concatenated into continuous sequential streams. Without an explicit separator, the causal attention mechanism would assume that the first sentence of an article is the causal continuation of an unrelated previous document!
+    In large-scale autoregressive pretraining, billions of tokens spanning Wikipedia articles, books, and GitHub repositories are concatenated into continuous sequential streams. Without an explicit separator, the causal attention mechanism would assume that the first sentence of an article is the causal continuation of an unrelated previous document.
     The token $\text{\texttt{<|endoftext|>}}$ signals that all preceding context is decoupled from subsequent tokens, allowing clean document demarcation.
     
     \item \textbf{Padding Token} ($\text{\texttt{<|pad|>}}$):
@@ -1470,7 +1470,7 @@ In practical machine learning and software engineering workflows, a vocabulary c
 
 To conquer the Out-of-Vocabulary barrier without blowing up sequence length, modern LLMs deploy \textbf{Byte Pair Encoding (BPE)}. Originally invented for data compression in \cite{gage1994}, BPE was adapted to natural language processing in \cite{sennrich2016}.
 
-\paragraph{Algorithmic formalization.}
+
 BPE constructs a subword vocabulary through an iterative bottom-up statistical merge procedure partitioned into distinct training and inference phases:
 \begin{enumerate}
     \item \textbf{Base Alphabet Initialization}: Initialize base vocabulary $\mathcal{V}_0$ with all individual characters occurring across the training corpus $\mathcal{C}$, augmenting each word with an explicit end-of-word boundary marker (e.g., `\texttt{</w>}'):
@@ -1501,7 +1501,7 @@ BPE constructs a subword vocabulary through an iterative bottom-up statistical m
     \item \textbf{Termination and Inference Application}: Repeat Steps 2--4 until reaching the target vocabulary budget $|\mathcal{V}_k| = V_{\text{target}}$. At inference time, any arbitrary input word is first split into its constituent base characters, and the learned merge rules in $\mathcal{M}$ are applied sequentially according to their training rank.
 \end{enumerate}
 
-\paragraph{A concrete clarification example: training merges and inference on unseen words.}
+\subsubsection{BPE training merge mechanics and vocabulary growth}
 To illustrate how BPE resolves out-of-vocabulary tokens without explosion, consider a small transparent corpus consisting of four words with their occurrence frequencies:
 \begin{equation}
 \label{eq:toy_bpe_corpus}
@@ -1545,7 +1545,7 @@ The segmented corpus begins as:
     \end{center}
 \end{itemize}
 
-\paragraph{Inference walkthrough on the unseen word \texttt{"pugs"}.}
+\subsubsection{Inference segmentation walkthrough on unseen tokens}
 Now consider what happens when a model deployed in production encounters the word \texttt{"pugs"} (the plural of pug).
 Notice that \texttt{"pugs"} \textbf{never appeared in the training corpus as a complete word} (the training data only contained \texttt{"pug"} and \texttt{"hugs"}).
 \begin{enumerate}
@@ -1553,7 +1553,7 @@ Notice that \texttt{"pugs"} \textbf{never appeared in the training corpus as a c
     \item Under Byte Pair Encoding:
     \begin{itemize}
         \item The word is initialized into base characters: $[\text{\texttt{'p'}}, \text{\texttt{'u'}}, \text{\texttt{'g'}}, \text{\texttt{'s'}}]$.
-        \item The tokenizer queries the learned merge rules in priority order. Merge Rule 1 $(\text{\texttt{'u'}}, \text{\texttt{'g'}}) \to \text{\texttt{'ug'}}$ matches immediately! The sequence is rewritten as:
+        \item The tokenizer queries the learned merge rules in priority order. Merge Rule 1 $(\text{\texttt{'u'}}, \text{\texttt{'g'}}) \to \text{\texttt{'ug'}}$ matches immediately. The sequence is rewritten as:
         \begin{equation*}
         [\text{\texttt{'p'}}, \text{\texttt{'u'}}, \text{\texttt{'g'}}, \text{\texttt{'s'}}] \xrightarrow{\text{Merge 1}} [\text{\texttt{'p'}}, \text{\texttt{'ug'}}, \text{\texttt{'s'}}].
         \end{equation*}
@@ -1641,7 +1641,7 @@ Figure~\ref{fig:bpe_merge_tree} visualizes both the bottom-up hierarchical merge
 \draw[arr] (i_g.south) -- (rule1.north -| i_g);
 \draw[arr] (rule1.south) -- (out_ug.north);
 
-\node[rectangle, draw=deepdiveTeal, fill=deepdiveTealBg, rounded corners=3pt, font=\scriptsize\bfseries\sffamily, text=deepdiveTeal, inner sep=4pt] at (10.6, -0.6) {Zero OOV! Output Subwords: \texttt{['p', 'ug', 's']}};
+\node[rectangle, draw=deepdiveTeal, fill=deepdiveTealBg, rounded corners=3pt, font=\scriptsize\bfseries\sffamily, text=deepdiveTeal, inner sep=4pt] at (10.6, -0.6) {Zero OOV. Output Subwords: \texttt{['p', 'ug', 's']}};
 
 \end{tikzpicture}%
 }
@@ -1654,7 +1654,7 @@ Figure~\ref{fig:bpe_merge_tree} visualizes both the bottom-up hierarchical merge
 
 Despite the success of character-level BPE, applying it directly to Unicode strings faces a severe scaling barrier: the Unicode standard contains over $150{,}000$ unique characters spanning hundreds of languages and symbol sets. Initializing $\mathcal{V}_0$ with every conceivable character creates an unmanageably large base alphabet, yet still fails when a user inputs rare historical glyphs or newly released emojis.
 
-\paragraph{The 256 UTF-8 base byte breakthrough.}
+\subsubsection{The 256 UTF-8 base byte formulation}
 In GPT-2, this dilemma was solved in \cite{radford2019} by introducing \textbf{Byte-Level Byte Pair Encoding (BBPE)}. Instead of characters, the base alphabet $\mathcal{V}_0$ is initialized strictly with the \textbf{256 distinct byte values} ($0x00$ through $0xFF$) of the UTF-8 encoding standard:
 \begin{equation}
 \label{eq:byte_alphabet}
@@ -1669,11 +1669,11 @@ Under Byte-Level BPE with base alphabet $\mathcal{V}_0 = \{0x00, \dots, 0xFF\}$,
 \end{equation}
 \end{theorem}
 
-\paragraph{Proof.}
+
 By definition of the Unicode transformation format (UTF-8), any arbitrary character or sequence of symbols in the Unicode code space ($U+0000$ to $U+10FFFF$) encodes deterministically into a sequence of between 1 and 4 raw bytes in $\{0x00, \dots, 0xFF\}$.
 Because the base alphabet $\mathcal{V}_0$ contains all 256 possible 8-bit byte values, every byte sequence can be parsed. If an input string contains an unseen compound word, a programming syntax construct, a severe typo, or an unknown emoji, the tokenizer attempts to apply merged subword rules; if no higher-level merge rule applies, the tokenizer simply falls back to emitting individual byte tokens from $\mathcal{V}_0$. Because no input byte can ever fall outside $\{0x00, \dots, 0xFF\}$, no token can ever be unmapped. The token $\text{\texttt{<|unk|>}}$ is completely eliminated. $\blacksquare$
 
-\paragraph{Lossless whitespace preservation.}
+\subsubsection{Lossless whitespace preservation}
 Standard natural language processing pipelines strip whitespace or split on spaces, making exact detokenization ambiguous. In Byte-Level BPE, whitespaces are treated as regular characters/bytes. In GPT-2 and Hugging Face tokenizers, a leading whitespace is mapped to a special character (e.g., `\texttt{{	extvisiblespace}}' or byte $0x20$), binding the space directly to the succeeding word:
 \begin{center}
 \texttt{"Hello world"} $\stackrel{\text{BBPE}}{\Longrightarrow}$ \texttt{['Hello', '{	extvisiblespace}world']}
@@ -1684,7 +1684,7 @@ This guarantees that tokenization is \textbf{strictly lossless and fully inverti
 \text{\texttt{decode}}(\text{\texttt{encode}}(S)) \equiv S \quad \forall S \in \Sigma^*.
 \end{equation}
 
-\paragraph{Production implementations: OpenAI's \texttt{tiktoken}.}
+\subsubsection{Production implementations: OpenAI's tiktoken}
 In modern production LLM engineering, tokenization must process terabytes of training data without creating CPU bottlenecks. OpenAI's open-source library \texttt{tiktoken} implements byte-level BPE in pure Rust, executing tokenization orders of magnitude faster than Python regular expressions:
 \begin{itemize}
     \item \textbf{GPT-2 Tokenizer} (\texttt{gpt2}): Vocabulary size $V = 50{,}257$ (composed of 256 base byte tokens $+ 50{,}000$ learned BPE merges $+ 1$ special $\text{\texttt{<|endoftext|>}}$ token).
@@ -1705,15 +1705,15 @@ print("Token IDs:", integers)
 # Zero-shot handling of unknown words:
 # 'someunknownPlace' is decomposed into subwords: ['some', 'unknown', 'Place']
 for token_id in integers:
-    print(f"{token_id:>5} -> {tokenizer.decode([token_id])!r}")
+    print(f"{token_id:>5} -> {tokenizer.decode([token_id]).r}")
 
 # Lossless roundtrip reconstruction
 decoded_text = tokenizer.decode(integers)
-assert decoded_text == text, "Decoded text must match original string identically!"
-print("Lossless decoding confirmed!")
+assert decoded_text == text, "Decoded text must match original string identically."
+print("Lossless decoding confirmed.")
 \end{lstlisting}
 
-\paragraph{Transition to continuous vector representations.}
+
 Having established how Byte-Level BPE eliminates the out-of-vocabulary barrier and deterministically encodes raw text streams into discrete integer token IDs $\mathbf{T} = [t_0, t_1, \dots, t_{L-1}] \in \mathbb{Z}^L$, we now confront the final representational bridge: how do discrete numerical indices enter the continuous, differentiable computational graph of modern neural networks? In the following subsections, we first establish the high-level architecture of the language model input pipeline, and then embark on an exhaustive investigation into positional representations.
 
 \subsection{From token IDs to composite inputs: high-level architecture of the foundation model input pipeline}
@@ -1721,7 +1721,7 @@ Having established how Byte-Level BPE eliminates the out-of-vocabulary barrier a
 
 Having transformed raw text into sequences of discrete token IDs $\mathbf{T} \in \mathbb{Z}^L$ (batched into mini-batch integer tensors $\mathbf{X} \in \mathbb{Z}^{B \times L}$), modern foundation models execute a unified input preparation pipeline that maps discrete token indices into continuous, differentiable vector representations equipped with sequential order prior to Transformer ingestion.
 
-\paragraph{1. Delimiter and architectural control tokens.}
+\subsubsection{Delimiter and architectural control tokens}
 Before projecting indices into continuous embedding space, language models inject dedicated \textbf{special control tokens} into the sequence to regulate generation boundaries and downstream task execution:
 \begin{itemize}
     \item \textbf{Sequence demarcation tokens}:
@@ -1736,7 +1736,7 @@ Before projecting indices into continuous embedding space, language models injec
     \end{itemize}
 \end{itemize}
 
-\paragraph{2. The token embedding layer.}
+\subsubsection{The token embedding lookup layer}
 In PyTorch, continuous token representations are instantiated via an embedding matrix:
 \begin{lstlisting}[language=Python]
 token_embedding_layer = torch.nn.Embedding(num_embeddings=vocab_size, embedding_dim=d)
@@ -1748,7 +1748,7 @@ Passing batch tensor $\mathbf{X} \in \mathbb{Z}^{B \times L}$ retrieves the corr
 \end{equation}
 where slice $(\mathbf{E}_{\text{tok}})_{b, t, :} = \vw_{X_{b, t}} \in \R^d$ is the $d$-dimensional embedding vector for the token at position $t$ in batch item $b$.
 
-\paragraph{3. High-level additive synthesis of the composite Transformer input.}
+\subsubsection{Composite Transformer input synthesis}
 To endow the model with sequential awareness, the input pipeline combines the lexical token representation $\mathbf{E}_{\text{tok}}$ and a dedicated positional tensor $\mathbf{E}_{\text{pos}} \in \R^{1 \times L \times d}$ via \textbf{elementwise addition} rather than concatenation:
 \begin{equation}
 \label{eq:composite_input_tensor}
@@ -1793,13 +1793,13 @@ print("Pos Embeddings Shape:  ", pos_embeddings.shape)    # torch.Size([4, 256])
 print("Final Composite Shape: ", input_embeddings.shape)  # torch.Size([2, 4, 256])
 \end{lstlisting}
 
-\paragraph{Causal motivation for a deep dive into positional representations.}
-While Equation~\eqref{eq:composite_input_tensor} and Listing~\ref{lst:token_pos_embeddings} summarize the high-level computational contract of the LM input pipeline, they raise foundational questions: \emph{Why is the positional tensor $\mathbf{E}_{\text{pos}}$ strictly mandatory? Why do naive indexing schemes fail catastrophically? And what mathematical principles govern its construction?} We now dedicate the next subsection to an exhaustive investigation into positional representations.
+
+While Equation~\eqref{eq:composite_input_tensor} and Listing~\ref{lst:token_pos_embeddings} summarize the high-level computational contract of the LM input pipeline, they raise foundational questions: \emph{Why is the positional tensor $\mathbf{E}_{\text{pos}}$ strictly mandatory? Why do naive indexing schemes fail substantially? And what mathematical principles govern its construction?} We now dedicate the next subsection to an exhaustive investigation into positional representations.
 
 \subsection{Positional representations: intuition, mathematical formulation, and implementations}
 \label{subsec:positional_representations_deep}
 
-\paragraph{1. The permutation invariance dilemma: why positional encoding is mandatory.}
+\subsubsection{Permutation invariance dilemma in self-attention}
 In classical Recurrent Neural Networks (RNNs), sequential order is implicitly baked into the architecture: the hidden state transitions recurrently via $\vh_t = f(\vh_{t-1}, \vx_t)$, guaranteeing that token $\vx_t$ is processed strictly after token $\vx_{t-1}$. In Convolutional Neural Networks (CNNs), sequential order is preserved through localized spatial receptive fields.
 
 In contrast, the cornerstone mathematical operator of the Transformer---\textbf{Self-Attention}---is strictly \textbf{permutation-equivariant}:
@@ -1833,10 +1833,10 @@ Finally, multiplying by the value projection $\mV' = \mP \mX \mW_V$:
 where the identity $\mP^\top \mP = \mathbf{I}$ collapses the internal permutation. $\blacksquare$
 \end{proof}
 
-\paragraph{The unordered multiset collapse.}
-Theorem~\ref{thm:attention_permutation_invariance} establishes that if we permute the input tokens, the output vectors undergo the exact same permutation with \emph{identical values}. The attention mechanism treats the input sequence as an \textbf{unordered multiset} (a ``bag of vectors'') with zero intrinsic knowledge of temporal order!
 
-To understand the catastrophic consequence of this property, consider two contrasting sentence pairs:
+Theorem~\ref{thm:attention_permutation_invariance} establishes that if we permute the input tokens, the output vectors undergo the exact same permutation with \emph{identical values}. The attention mechanism treats the input sequence as an \textbf{unordered multiset} (a ``bag of vectors'') with zero intrinsic knowledge of temporal order.
+
+To understand the substantial consequence of this property, consider two contrasting sentence pairs:
 \begin{center}
 \textbf{Sentence 1}: \textit{``I ate an apple''} \quad $\Longrightarrow$ \quad $\{\mathbf{e}_{\text{I}}, \mathbf{e}_{\text{ate}}, \mathbf{e}_{\text{an}}, \mathbf{e}_{\text{apple}}\}$ \\
 \textbf{Sentence 2}: \textit{``An apple, I ate''} \quad $\Longrightarrow$ \quad $\{\mathbf{e}_{\text{an}}, \mathbf{e}_{\text{apple}}, \mathbf{e}_{\text{I}}, \mathbf{e}_{\text{ate}}\}$
@@ -1848,7 +1848,7 @@ Or similarly:
 \end{center}
 In both pairs, the sentences express fundamentally different or opposite semantic realities. Yet, because each pair comprises the exact same multiset of token embeddings, an unaugmented Transformer evaluates identical attention weights. To the model, subject, verb, and object become entirely conflated. Sequential order must therefore be injected into the representations explicitly.
 
-\paragraph{Why naive positional representations fail.}
+\subsubsection{Why naive positional indexing fails}
 Before arriving at the modern formulation, it is vital to understand why naive indexing schemes break down:
 \begin{enumerate}
     \item \textbf{Naive Integer Addition ($pos \in \{0, 1, 2, \dots, L-1\}$)}: If we add scalar indices $pos$ to token embeddings, early tokens receive tiny perturbations ($+0, +1$), while token $2048$ receives $+2048$. Because embedding vectors are initialized with mean $0$ and unit variance, large coordinates overwhelm the semantic representations completely, and models fail to generalize to sequence lengths beyond training.
@@ -1856,7 +1856,7 @@ Before arriving at the modern formulation, it is vital to understand why naive i
     \item \textbf{Coordinate Concatenation ($[\vw_t; \vp_t]$)}: Concatenating positional coordinates expands embedding dimensionality to $d + d_{\text{pos}}$, increasing parameter counts across all subsequent projection matrices ($\mW_Q, \mW_K, \mW_V, \mW_O$) and preventing seamless parameter sharing.
 \end{enumerate}
 
-\paragraph{The geometric clock intuition (the ``Clock Way of Thought'').}
+\subsubsection{The geometric clock intuition for positional encoding}
 How can we construct an encoding that remains strictly bounded within $[-1, 1]$, assigns a unique signature to every position, and preserves consistent geometric notions of distance?
 
 \noindent\textit{From binary counting to continuous multi-scale clocks}.\newline
@@ -1875,15 +1875,15 @@ Rather than binary square waves, we assign continuous trigonometric waves oscill
     \item \textbf{Slow Clocks (Hours Hand)}: Oscillate extremely slowly across high dimension indices, capturing document-level flow and paragraphs.
 \end{itemize}
 
-\paragraph{The clock hand problem: why sine alone fails.}
+
 Why can we not simply use sine waves with varying frequencies?
-Consider an analog clock where you can only observe the vertical height of the hand ($Y = \sin \theta$). Because $\sin(\theta) = \sin(\pi - \theta)$, the hand is at the exact same vertical height at 2:00 and 10:00! Furthermore, $\sin(0) = \sin(\pi) = 0$. A single 1D wave suffers from severe directional ambiguity (aliasing).
+Consider an analog clock where you can only observe the vertical height of the hand ($Y = \sin \theta$). Because $\sin(\theta) = \sin(\pi - \theta)$, the hand is at the exact same vertical height at 2:00 and 10:00. Furthermore, $\sin(0) = \sin(\pi) = 0$. A single 1D wave suffers from severe directional ambiguity (aliasing).
 
 To establish an unambiguous position, we need both coordinates of the clock face:
 \begin{equation}
 (X, Y) = (\cos \theta, \sin \theta).
 \end{equation}
-Together, $(\sin \theta, \cos \theta)$ traces a point along the unit circle $S^1$. On a 2D circle, every angular orientation $\theta \in [0, 2\pi)$ has an unambiguous coordinate! This is why Transformer positional encodings alternate $\sin$ and $\cos$ across dimension pairs.
+Together, $(\sin \theta, \cos \theta)$ traces a point along the unit circle $S^1$. On a 2D circle, every angular orientation $\theta \in [0, 2\pi)$ has an unambiguous coordinate. This is why Transformer positional encodings alternate $\sin$ and $\cos$ across dimension pairs.
 
 Figure~\ref{fig:clock_positional_intuition} illustrates this multi-frequency clock mechanism and demonstrates how pairing sine and cosine eliminates 1D wave aliasing.
 
@@ -1949,14 +1949,14 @@ Figure~\ref{fig:clock_positional_intuition} illustrates this multi-frequency clo
     \filldraw[crimsonRed] (11.5, -1.6) ++(120:1.0) circle (2pt) node[above left, font=\tiny\sffamily\bfseries] {10:00 ($\sin = 0.87$)};
     \draw[dotted, thick, crimsonRed] (11.5, -1.6) ++(120:1.0) -- ++(1.0, 0);
     \draw[hand, draw=crimsonRed] (11.5, -1.6) -- ++(60:0.95);
-    \node[sublabel, below=0.2cm of circle_alias] {\textbf{The 1D Aliasing Trap}\\At 2:00 and 10:00, height $\sin\theta = 0.87$ is identical!\\Pairing $(\sin, \cos)$ yields unique coordinates:\\$(X_1, Y_1) = (0.5, 0.87) \neq (-0.5, 0.87) = (X_2, Y_2)$.};
+    \node[sublabel, below=0.2cm of circle_alias] {\textbf{The 1D Aliasing Trap}\\At 2:00 and 10:00, height $\sin\theta = 0.87$ is identical.\\Pairing $(\sin, \cos)$ yields unique coordinates:\\$(X_1, Y_1) = (0.5, 0.87) \neq (-0.5, 0.87) = (X_2, Y_2)$.};
 
 \end{tikzpicture}
 \caption{The geometric clock intuition behind positional encodings. Each dimension pair acts as an analog clock hand rotating at an angular frequency $\omega_i$. Fast clocks disambiguate immediate neighbors (local syntax), while slow clocks preserve long-range sequence context. Pairing $\sin$ and $\cos$ prevents 1D wave aliasing by establishing a unique 2D coordinate on the unit circle $S^1$.}
 \label{fig:clock_positional_intuition}
 \end{figure}
 
-\paragraph{3. Taxonomy of positional representations in language models.}
+\subsubsection{Taxonomy of positional representations}
 Modern architectures implement positional awareness through three primary paradigms:
 \begin{enumerate}
     \item \textbf{Fixed Sinusoidal Positional Encodings \cite{vaswani2017}}: Fully deterministic, parameter-free functions computed from geometric progressions of trigonometric frequencies.
@@ -1964,7 +1964,7 @@ Modern architectures implement positional awareness through three primary paradi
     \item \textbf{Relative and Rotary Positional Embeddings (RoPE / ALiBi) \cite{shaw2018, su2024roformer, press2022alibi}}: Encodings that inject positional information directly into attention scores as a function of relative distance $|i - j|$. Notably, Rotary Position Embedding (RoPE) \cite{su2024roformer} directly generalizes the 2D rotation matrix property of sinusoidal encodings into query and key representations.
 \end{enumerate}
 
-\paragraph{4. Sinusoidal positional encodings: step-by-step mathematical derivation.}
+\subsubsection{Sinusoidal positional encodings mathematical derivation}
 In the seminal architecture introduced in \cite{vaswani2017}, positional coordinates are generated deterministically:
 \begin{definition}{Sinusoidal positional encoding}{sinusoidal_pe}
 For a token at temporal sequence coordinate $pos \in \{0, 1, \dots, L-1\}$ and channel index $i \in \{0, 1, \dots, \frac{d}{2}-1\}$, the components of the positional vector $\vp_{pos} = \text{\texttt{PE}}_{(pos, :)} \in \R^d$ are defined by:
@@ -1990,7 +1990,7 @@ Let us examine every term in this formulation:
     \item \textbf{Why the base 10000?} As highlighted by the professor, $10{,}000$ guarantees that within typical context lengths (up to $\approx 60{,}000$ tokens), the slowest frequency does not complete a single cycle. This guarantees that every position vector in the operational horizon is globally unique.
 \end{itemize}
 
-\paragraph{Mathematical properties and proofs.}
+
 Sinusoidal positional encodings satisfy three pivotal theoretical properties:
 \begin{enumerate}
     \item \textbf{Positional uniqueness}: Because each channel $i$ oscillates at a distinct frequency $\omega_i$, no two positional vectors are identical. The vectors remain distinct for at least $2\pi \cdot 10000 \approx 62{,}832$ positions before periodic recurrence can occur.
@@ -2028,7 +2028,7 @@ Sinusoidal positional encodings satisfy three pivotal theoretical properties:
     \end{itemize}
 \end{enumerate}
 
-\paragraph{Concrete numerical calculation of sinusoidal coordinates.}
+\subsubsection{Numerical calculation of sinusoidal coordinates}
 To illustrate this formulation concretely, consider a canonical numerical configuration: sequence position $pos = 1$ (the second token, under $0$-indexed coordinates) within a standard latent embedding space of dimension $d = 768$:
 \begin{enumerate}
     \item \textbf{Lowest channel pair ($i = 0$, high-frequency regime)}:
@@ -2044,7 +2044,7 @@ To illustrate this formulation concretely, consider a canonical numerical config
 \end{enumerate}
 These exact values ($0.8415$, $0.5403$, and $0.8153$) illustrate how trigonometric arguments shift smoothly across embedding indices, providing each positional coordinate with an unambiguous, deterministic signature.
 
-\paragraph{Learned positional embeddings (GPT convention).}
+\subsubsection{Learned positional embeddings (GPT convention)}
 An alternative approach, adopted by architectures such as GPT-2 and GPT-3 \cite{radford2019, brown2020}, treats positional encodings as trainable parameter weights rather than fixed sinusoidal functions:
 \begin{equation}
 \label{eq:pos_embedding_layer}
@@ -2072,8 +2072,8 @@ Each integer coordinate $p \in \{0, 1, \dots, L_{\max}-1\}$ indexes a row vector
 
 Computing the cosine similarity matrix of learned GPT-2 embeddings reveals high values along the main diagonal, accompanied by periodic secondary peaks at larger distances. These secondary peaks reflect statistical regularities in the training corpus (such as paragraph transitions, section breaks, or dialogue conventions).
 
-\paragraph{Final clarification walkthrough: disambiguating opposite sentences.}
-To crystallize all of these principles into an indelible mental picture, let us trace how a mini 2-clock system disambiguates our contrasting sentences:
+\subsubsection{Walkthrough: disambiguating opposite sequential orders}
+To crystallize all of these principles into an intuitive interpretation, let us trace how a mini 2-clock system disambiguates our contrasting sentences:
 \begin{center}
 \textbf{Sentence 1}: \textit{``The dog bit the man.''} \quad vs. \quad \textbf{Sentence 2}: \textit{``The man bit the dog.''}
 \end{center}
@@ -2114,7 +2114,7 @@ Now consider the additive inputs:
     $\vx_{\text{dog}} = \mathbf{E}_{\text{dog}} + \vp_4$.
 \end{itemize}
 
-\paragraph{How attention identifies the subject.}
+
 In English syntax, the grammatical subject of the active verb ``bit'' resides $1$ step prior (relative offset $k = -1$).
 At position $pos = 2$, Clock 1 points South ($180^\circ$, vector $[0.0, -1.0]$).
 To identify the doer of the action, an attention head querying offset $k = -1$ rotates $90^\circ$ counterclockwise:
@@ -2126,7 +2126,7 @@ The attention query searches for the token whose Clock 1 points East ($[1.0, 0.0
     \item In \textbf{Sentence 1}, the token at position $1$ with East-pointing clock is \textbf{``dog''}. The attention mechanism routes information from ``dog'' to ``bit'', resolving the dog as the subject.
     \item In \textbf{Sentence 2}, the token at position $1$ with East-pointing clock is \textbf{``man''}. The attention mechanism routes information from ``man'' to ``bit'', resolving the man as the subject.
 \end{itemize}
-The ambiguity is completely resolved: through sinusoidal clock rotations, the Transformer effortlessly deciphers who bit whom!
+The ambiguity is completely resolved: through sinusoidal clock rotations, the Transformer  deciphers who bit whom.
 
 \clearpage
 \thispagestyle{empty}
