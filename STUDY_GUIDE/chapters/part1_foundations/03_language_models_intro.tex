@@ -1,7 +1,7 @@
 \documentclass[../../main.tex]{subfiles}
 \begin{document}
 
-\chapter{Introduction to language models}
+\chapter{Language Models}
 \label{ch:intro_lms}
 
 Human language and software engineering source code represent discrete symbolic systems governed by intricate, multi-level structural constraints spanning phonology, syntax, semantics, and pragmatics. For decades, computational linguistics attempted to capture these phenomena through hand-crafted rule bases and formal context-free grammars. However, natural language is inherently ambiguous, productive, and elastic: speakers continuously coin new expressions, tolerate grammatical ellipses, and convey contextual connotations that elude rigid deterministic parsers.
@@ -9,7 +9,7 @@ Human language and software engineering source code represent discrete symbolic 
 To construct computational systems capable of understanding, completing, and generating coherent text, modern computer science reframes language processing from deterministic rule parsing into a discrete stochastic process. By treating words or subword tokens as discrete random variables, language modeling formalizes the quantification of joint probability distributions over arbitrary token sequences. Through the unconditional factorization of the chain rule of probability, this joint estimation problem collapses into sequential conditional next-token prediction. This formulation—estimating the conditional distribution over a vocabulary given preceding context—constitutes the foundational principle uniting early statistical Markov models with modern deep neural foundation architectures. In this chapter, we establish the mathematical foundations of probabilistic language modeling, formalize the trade-offs of classical $n$-gram representations, analyze the breakdown of discrete frequency counting on unseen data, derive statistical smoothing algorithms, and establish information-theoretic metrics for sequence evaluation.
 
 \clearpage
-\section{The sequence prediction problem and probabilistic language modeling}
+\section{The Language Modeling Task}
 \label{sec:prob_lm}
 
 At its core, a language model formalizes the mechanism by which computational systems evaluate the fluency, plausibility, and likelihood of word sequences. In natural language processing and modern AI-assisted software engineering, we model language and source code not through brittle deterministic rules, but as a discrete stochastic process governed by formal probability distributions.
@@ -111,7 +111,7 @@ Crucially, this equivalence demonstrates that estimating local conditional proba
 Geometrically, sequence generation can be interpreted as path traversal down a directed probability tree, as depicted in Figure~\ref{fig:prob_tree}. At the root node $\langle s \rangle$, outgoing edges partition the total probability mass across the vocabulary $\vocab$. Selecting a token $w_1$ traverses an edge with probability $\Prob(w_1)$ to reach a new conditioning state, from which a new set of branches opens with conditional probabilities $\Prob(w_2 \mid w_1)$. The joint probability of an entire sentence equals the product of edge weights along that unique trajectory, and text generation corresponds to sampling a directed path from the root to a designated sequence-termination token $\langle /s \rangle$.
 
 \clearpage
-\section{Markov assumptions and $n$-gram language models}
+\section{Markov Assumptions and $n$-gram Models}
 \label{sec:markov_ngram}
 
 Although Equation~\eqref{eq:chain_rule_exact} is mathematically exact and preserves all syntactic and semantic dependencies, estimating $\Prob(w_t \mid w_{<t})$ directly from empirical frequencies presents an exponential combinatorial obstacle. As the sequence index $t$ grows, the conditioning history $w_{<t} = (w_1, \dots, w_{t-1})$ expands monotonically. Because each constituent token is drawn from a vocabulary $\vocab$ of size $V = |\vocab|$, the space of potential prefix histories preceding token $t$ is the Cartesian product space $\vocab^{t-1}$, whose cardinality is:
@@ -198,7 +198,7 @@ where $C(\cdot)$ denotes the raw frequency of that exact sequence in the trainin
 Normalizing each row by the unigram count of the conditioning prefix ensures that $\sum_{w \in \vocab} \Prob_{\text{MLE}}(w \mid w_{t-1}) = 1$.
 
 \clearpage
-\section{Transition count matrix construction walkthrough}
+\section{Transition Matrix Walkthrough}
 \label{sec:count_matrix}
 
 To observe the concrete mechanics of statistical $n$-gram estimation, we trace the extraction of bigram frequencies and transition probabilities from a controlled corpus comprising two sentences:
@@ -327,7 +327,7 @@ In Table~\ref{tab:transition_matrix}, terminal tokens such as \textit{``cheese''
 Because bigram models condition exclusively on the single preceding token $w_{t-1}$, deterministic decoding strategies such as greedy search ($\argmax_{w} \Prob(w \mid w_{t-1})$) easily fall into repetitive limit cycles. In our transition graph, the path from \textit{``the''} to \textit{``mouse''} ($0.50$), from \textit{``mouse''} to \textit{``ate''} ($0.50$), and from \textit{``ate''} back to \textit{``the''} ($1.00$) forms a closed directed loop. Under deterministic selection, the model generates the infinite repetition \textit{``the mouse ate the mouse ate the \dots''}. Modern foundation models mitigate repetitive degeneracy through extensive self-attention horizons, temperature scaling, nucleus sampling, and repetition penalties.
 
 \clearpage
-\section{Structural limitations of statistical $n$-gram models: sparsity and context horizons}
+\section{Limitations of Statistical Models}
 \label{sec:ngram_limitations}
 
 While $n$-gram models provided the foundation for speech recognition, statistical machine translation, and spelling correction throughout the 1980s and 1990s, they suffer from structural constraints that ultimately motivated the transition toward continuous neural architectures.
@@ -396,7 +396,7 @@ Because \textit{``cat''} and \textit{``feline''} correspond to distinct row indi
 While long-range context degradation and semantic orthogonality ultimately require continuous neural representations (examined in Chapters~\ref{ch:deep_learning_foundations} and~\ref{ch:word_embeddings}), the immediate mathematical obstacle in statistical language modeling is the zero-frequency problem ($C=0 \implies \Prob=0 \implies \PPL=\infty$). To make $n$-gram models evaluable and robust against unseen sequences, we must redistribute probability mass from observed events to unobserved combinations. This redistribution is the objective of statistical smoothing.
 
 \clearpage
-\section{Statistical smoothing and discounting algorithms}
+\section{Smoothing and Discounting}
 \label{sec:smoothing}
 
 To prevent probability collapse ($\Prob=0$) and infinite perplexity ($\PPL=\infty$) on unseen test sequences, statistical language modeling relies on smoothing and discounting algorithms. The governing principle of smoothing is conservative probability reallocation: a fraction of probability mass is discounted from frequently observed events and redistributed across unseen combinations, ensuring that every valid sequence receives a strictly positive probability:
@@ -550,7 +550,7 @@ Interpolated Kneser-Ney consistently outperforms other statistical smoothing tec
 With competing smoothing algorithms established—each reallocating probability mass under different statistical assumptions—we require objective, quantitative criteria to evaluate and compare models on held-out test data. This necessitates formal information-theoretic evaluation metrics.
 
 \clearpage
-\section{Evaluation metrics: cross-entropy and perplexity}
+\section{Evaluation Metrics}
 \label{sec:eval_metrics}
 
 To benchmark and compare different language models quantitatively without executing costly downstream applications, natural language processing relies on intrinsic, information-theoretic metrics: \emph{Cross-Entropy} and \emph{Perplexity} \cite{shannon1948,jurafsky2024}.
@@ -689,283 +689,7 @@ While Kneser-Ney smoothing substantially reduces test perplexity by eliminating 
 These structural limits motivated researchers to explore paradigms that replace discrete counting tables with continuous, parameterized functions.
 
 \clearpage
-\section{Historical evolution of language models}
-\label{sec:history_lms}
 
-Understanding modern large language models requires appreciating the 75-year evolutionary trajectory that progressively addressed the mathematical and computational barriers of discrete symbol counting. Figure~\ref{fig:history_timeline} synthesizes the macro-historical progression of language modeling from Claude Shannon's foundational 1948 information theory to modern autonomous software engineering systems.
-
-\begin{figure}[htbp]
-\centering
-\begin{tikzpicture}[
-    scale=0.88, transform shape,
-    eraCard/.style={
-        rounded corners=6pt, line width=1pt,
-        inner sep=7pt, text width=14.5cm, align=left
-    },
-    badge/.style={
-        text=white, font=\bfseries\footnotesize\sffamily,
-        rounded corners=3pt, inner sep=3pt
-    },
-    linkArr/.style={
-        -{Stealth[scale=1.1]}, line width=1.5pt, draw=bodyGray!70
-    }
-]
-
-% Era 1: Statistical Foundations
-\node[eraCard, draw=politoNavy, fill=politoNavy!6] (era1) at (0, 0) {
-    \begin{minipage}{14.2cm}
-        \textcolor{politoNavy}{\faCalculator\enspace\textbf{\textsf{Era 1: Statistical foundations \& discrete counting (1948--1990s)}}}\\[3pt]
-        \tikz \node[badge, fill=politoNavy] {1948}; \textbf{Information Theory and Markov Approximations}: Entropy, Markov chains, $n$-gram letter approximations, predictive games \cite{shannon1948}.\\[2pt]
-        \tikz \node[badge, fill=politoNavy] {1990s}; \textbf{Statistical Smoothing \& Decision Trees}: Good-Turing, Kneser-Ney backoff, decision-tree context equivalence classes \cite{potamianos1998,katz1987,kneser1995}.\\
-        \textit{Core limitation}: Orthogonal one-hot representations, combinatorial state explosion $|\vocab|^n$, zero-frequency catastrophe.
-    \end{minipage}
-};
-
-% Era 2: Distributed Embeddings
-\node[eraCard, draw=deepdiveTeal, fill=deepdiveTeal!6, below=12pt of era1] (era2) {
-    \begin{minipage}{14.2cm}
-        \textcolor{deepdiveTeal}{\faProjectDiagram\enspace\textbf{\textsf{Era 2: Continuous distributed representations (2000--2014)}}}\\[3pt]
-        \tikz \node[badge, fill=deepdiveTeal] {2003}; \textbf{Neural Probabilistic Language Model (NPLM)}: Continuous dense lookup $\mathbf{C} \in \R^{|\vocab| \times d}$, MLP, softmax over vocabulary \cite{bengio2003}.\\[2pt]
-        \tikz \node[badge, fill=deepdiveTeal] {2013}; \textbf{Word2Vec (CBOW \& Skip-gram)}: Continuous vector projections, negative sampling for billion-word corpus training.\\
-        \textit{Core limitation}: Static embeddings unable to handle polysemy; fixed Markov window sizes; expensive softmax normalization.
-    \end{minipage}
-};
-
-% Era 3: Sequential Deep Learning
-\node[eraCard, draw=intuitionPurple, fill=intuitionPurple!6, below=12pt of era2] (era3) {
-    \begin{minipage}{14.2cm}
-        \textcolor{intuitionPurple}{\faSync\enspace\textbf{\textsf{Era 3: Sequential deep learning \& dynamic attention (2014--2017)}}}\\[3pt]
-        \tikz \node[badge, fill=intuitionPurple] {2014}; \textbf{Seq2Seq \& Recurrent Networks}: LSTM/GRU recurrence mapping variable-length inputs to dynamic hidden states.\\[2pt]
-        \tikz \node[badge, fill=intuitionPurple] {2014}; \textbf{Additive Attention}: Dynamic alignment weights computing adaptive context vectors across input sequences.\\
-        \textit{Core limitation}: Sequential recurrence $\vh_t = f(\vh_{t-1}, \vx_t)$ prevents parallelization on GPUs; gradient degradation over long sequences.
-    \end{minipage}
-};
-
-% Era 4: The Transformer Revolution
-\node[eraCard, draw=examAmber, fill=examAmber!6, below=12pt of era3] (era4) {
-    \begin{minipage}{14.2cm}
-        \textcolor{examAmber}{\faBolt\enspace\textbf{\textsf{Era 4: The Transformer revolution \& pre-trained foundation models (2017--2021)}}}\\[3pt]
-        \tikz \node[badge, fill=examAmber] {2017}; \textbf{Transformer Architecture}: Scaled dot-product self-attention, $\mathcal{O}(1)$ path length, massive parallelization.\\[2pt]
-        \tikz \node[badge, fill=examAmber] {2019}; \textbf{Autoregressive Decoders (GPT-2)}: Generative pre-training, zero-shot task transfer \cite{radford2019}.\\[2pt]
-        \tikz \node[badge, fill=examAmber] {2020}; \textbf{Scaling Frontiers (Megatron-Turing NLG 530B)}: Scaling parameters and dense foundation models.\\
-        \textit{Core limitation}: Inefficient scaling heuristics resulting in oversized, severely undertrained models; quadratic $\mathcal{O}(T^2)$ memory cost.
-    \end{minipage}
-};
-
-% Era 5: Scaling, Alignment, and SE Agents
-\node[eraCard, draw=thmGreen, fill=thmGreen!6, below=12pt of era4] (era5) {
-    \begin{minipage}{14.2cm}
-        \textcolor{thmGreen}{\faRobot\enspace\textbf{\textsf{Era 5: Compute-optimal scaling, alignment \& autonomous agents (2022--present)}}}\\[3pt]
-        \tikz \node[badge, fill=thmGreen] {2022}; \textbf{Chinchilla Scaling Laws}: Equal parameter-data scaling ($D \approx 20N$) ending the undertrained era \cite{hoffmann2022}; birth of compact high-throughput models (LLaMA \cite{touvron2023llama}).\\[2pt]
-        \tikz \node[badge, fill=thmGreen] {2022+}; \textbf{Alignment \& Autonomous SE Agents}: Preference optimization (RLHF, DPO), tool-using software engineering agents.\\
-        \textit{Modern frontier}: Test-time compute scaling, verifiable code synthesis, autonomous bug reproduction and repair.
-    \end{minipage}
-};
-
-\draw[linkArr] (era1.south) -- (era2.north);
-\draw[linkArr] (era2.south) -- (era3.north);
-\draw[linkArr] (era3.south) -- (era4.north);
-\draw[linkArr] (era4.south) -- (era5.north);
-
-\end{tikzpicture}
-\caption{Chronological timeline of language model evolution from 1948 to the present.}
-\label{fig:history_timeline}
-\end{figure}
-
-\subsection{1948--1980s: Shannon's information theory and Markov n-grams}
-\label{subsec:milestone_shannon_markov}
-
-The conceptual origin of language modeling stems from Claude Shannon's landmark 1948 paper \textit{``A Mathematical Theory of Communication''} \cite{shannon1948}. In that work, written language was modeled as a discrete stochastic process generated by an underlying stationary Markov source over a finite alphabet. 
-
-Shannon introduced the \emph{Shannon game}—a thought experiment in which an observer predicts the next letter in an unknown sequence given preceding characters. Shannon demonstrated that as the conditioning context length increases from zero-order (uniform random selection) to unigram (letter frequencies), bigram (character pairs), and trigram (triplets), generated text converges progressively toward natural English orthography and syntax.
-
-\begin{figure}[htbp]
-\centering
-\begin{tikzpicture}[
-    scale=0.9, transform shape,
-    state/.style={circle, draw=politoNavy, fill=skyBlue, line width=1pt, minimum size=1.35cm, font=\small\ttfamily\bfseries, align=center},
-    term/.style={circle, draw=thmGreen, fill=thmGreenBg, line width=1pt, minimum size=1.35cm, font=\small\ttfamily\bfseries, align=center},
-    edgeLabel/.style={font=\footnotesize\sffamily\bfseries, fill=white, inner sep=2pt, rounded corners=2pt},
-    arr/.style={-{Stealth[scale=1.0]}, line width=1.1pt, draw=politoNavy}
-]
-\node[state] (s0) at (0, 0) {public};
-\node[state] (s1) at (3.4, 1.2) {static};
-\node[state] (s2) at (3.4, -1.2) {class};
-\node[state] (s3) at (7.0, 1.8) {void};
-\node[state] (s4) at (7.0, 0.4) {int};
-\node[state] (s5) at (7.0, -1.2) {Parser};
-\node[term] (s6) at (10.6, 1.8) {main};
-\node[term] (s7) at (10.6, 0.4) {count};
-
-\draw[arr] (s0) -- node[edgeLabel, above left] {0.65} (s1);
-\draw[arr] (s0) -- node[edgeLabel, below left] {0.35} (s2);
-\draw[arr] (s1) -- node[edgeLabel, above] {0.80} (s3);
-\draw[arr] (s1) -- node[edgeLabel, below] {0.20} (s4);
-\draw[arr] (s2) -- node[edgeLabel, above] {0.90} (s5);
-\draw[arr] (s3) -- node[edgeLabel, above] {0.92} (s6);
-\draw[arr] (s4) -- node[edgeLabel, above] {0.75} (s7);
-\end{tikzpicture}
-\caption{Markov chain state transition graph for software tokens.}
-\label{fig:markov_chain_graph}
-\end{figure}
-
-In this framework, the conditional probability of token $w_t$ given context $w_1, \dots, w_{t-1}$ is simplified via an order-$(n-1)$ Markov assumption, as illustrated in Figure~\ref{fig:markov_chain_graph} for programming language tokens.
-
-\subsection{1990s: statistical decision trees and context partitioning}
-\label{subsec:milestone_smoothing_trees}
-
-Throughout the 1990s, as speech recognition and machine translation systems expanded, flat $n$-gram tables could not accommodate long histories without exponential parameter growth. To address this limitation, \emph{decision-tree language models} were developed in \cite{potamianos1998}. Rather than conditioning on an exact sequence of $n-1$ tokens, a binary decision tree poses a hierarchy of lexical and syntactic queries regarding the history $\mathcal{H} = (w_{t-1}, w_{t-2}, \dots)$.
-
-\begin{figure}[htbp]
-\centering
-\begin{tikzpicture}[
-    scale=0.88, transform shape,
-    qnode/.style={rectangle, draw=defBlue, fill=defBlueBg, rounded corners=4pt, line width=1pt, inner sep=6pt, font=\small\sffamily, align=center},
-    leaf/.style={rectangle, draw=thmGreen, fill=thmGreenBg, rounded corners=4pt, line width=1pt, inner sep=6pt, font=\footnotesize\sffamily, align=center},
-    edgeLabel/.style={font=\scriptsize\sffamily\bfseries, fill=white, inner sep=1.5pt},
-    arr/.style={-{Stealth[scale=0.9]}, line width=1pt, draw=bodyGray}
-]
-\node[qnode] (q1) at (0, 0) {\textbf{Question 1}: Is $w_{t-1} \in \{\texttt{public}, \texttt{private}, \texttt{protected}\}$?};
-\node[qnode] (q2) at (-3.8, -1.8) {\textbf{Question 2}: Is $w_{t-2} == \texttt{@Override}$?};
-\node[qnode] (q3) at (3.8, -1.8) {\textbf{Question 3}: Is $w_{t-1} == \texttt{=}$ (assignment)?};
-
-\node[leaf] (l1) at (-5.6, -3.8) {\textbf{Leaf} $\mathcal{L}_1$:\\$P(\texttt{void})=0.42$\\$P(\texttt{int})=0.25$\\$P(\texttt{String})=0.18$};
-\node[leaf] (l2) at (-2.0, -3.8) {\textbf{Leaf} $\mathcal{L}_2$:\\$P(\texttt{static})=0.55$\\$P(\texttt{final})=0.30$\\$P(\texttt{class})=0.12$};
-\node[leaf] (l3) at (2.0, -3.8) {\textbf{Leaf} $\mathcal{L}_3$:\\$P(\texttt{new})=0.48$\\$P(\texttt{null})=0.22$\\$P(\text{id})=0.20$};
-\node[leaf] (l4) at (5.6, -3.8) {\textbf{Leaf} $\mathcal{L}_4$ (Backoff):\\$P_{\text{unigram}}(w_t)$};
-
-\draw[arr] (q1) -- node[edgeLabel, above left] {Yes} (q2);
-\draw[arr] (q1) -- node[edgeLabel, above right] {No} (q3);
-\draw[arr] (q2) -- node[edgeLabel, above left] {Yes} (l1);
-\draw[arr] (q2) -- node[edgeLabel, above right] {No} (l2);
-\draw[arr] (q3) -- node[edgeLabel, above left] {Yes} (l3);
-\draw[arr] (q3) -- node[edgeLabel, above right] {No} (l4);
-\end{tikzpicture}
-\caption{Decision tree context partitioning for conditional language modeling \cite{potamianos1998}.}
-\label{fig:decision_tree_lm}
-\end{figure}
-
-As shown in Figure~\ref{fig:decision_tree_lm}, context histories that exhibit similar predictive patterns are pooled into the same leaf node $\mathcal{L}_k$, yielding distributions $\Prob(w_t \mid \mathcal{L}_k)$. While this reduced free parameters relative to full combinatorial tables, the architecture remained reliant on discrete categorical partitions without smooth semantic interpolation.
-
-\subsection{2000--2003: The neural probabilistic language model}
-\label{subsec:milestone_bengio_nplm}
-
-In the seminal 2003 paper \textit{``A Neural Probabilistic Language Model''} \cite{bengio2003}, Yoshua Bengio and colleagues introduced continuous distributed representations to alleviate the curse of dimensionality.
-
-\begin{figure}[htbp]
-\centering
-\begin{tikzpicture}[
-    scale=0.88, transform shape,
-    layerBox/.style={rectangle, draw=politoNavy, fill=skyBlue!20, rounded corners=4pt, line width=1pt, inner sep=6pt, font=\small\sffamily\bfseries, align=center},
-    opBox/.style={rectangle, draw=deepdiveTeal, fill=deepdiveTealBg, rounded corners=4pt, line width=1pt, inner sep=5pt, font=\footnotesize\sffamily, align=center},
-    vecNode/.style={rectangle, draw=intuitionPurple, fill=intuitionPurpleBg, rounded corners=2pt, minimum height=0.6cm, minimum width=1.1cm, font=\scriptsize\ttfamily},
-    arr/.style={-{Stealth[scale=0.9]}, line width=1pt, draw=bodyGray}
-]
-
-% Input Tokens
-\node[font=\small\ttfamily\bfseries] (w1) at (-3.6, 0) {$w_{t-3}$};
-\node[font=\small\ttfamily\bfseries] (w2) at (-1.2, 0) {$w_{t-2}$};
-\node[font=\small\ttfamily\bfseries] (w3) at (1.2, 0) {$w_{t-1}$};
-\node[font=\small\sffamily, text=bodyGray] at (3.6, 0) {Target: $w_t$};
-
-% Embedding Matrix C
-\node[layerBox, minimum width=7.2cm, fill=politoNavy!10] (embLayer) at (-1.2, 1.4) {
-    Shared Continuous Embedding Matrix $\mathbf{C} \in \R^{|\vocab| \times d}$
-};
-
-% Projected Vectors
-\node[vecNode] (v1) at (-3.6, 2.7) {$\mathbf{C}(w_{t-3})$};
-\node[vecNode] (v2) at (-1.2, 2.7) {$\mathbf{C}(w_{t-2})$};
-\node[vecNode] (v3) at (1.2, 2.7) {$\mathbf{C}(w_{t-1})$};
-
-% Concatenation
-\node[opBox, minimum width=6.5cm] (concat) at (-1.2, 3.8) {
-    Concatenation: $\vx = [\mathbf{C}(w_{t-3})^\top, \mathbf{C}(w_{t-2})^\top, \mathbf{C}(w_{t-1})^\top]^\top \in \R^{(n-1)d}$
-};
-
-% Hidden Layer
-\node[layerBox, minimum width=6.5cm, draw=intuitionPurple, fill=intuitionPurpleBg] (hidden) at (-1.2, 5.2) {
-    Non-Linear Hidden Layer: $\vh = \tanh(\mW^\top \vx + \vb) \in \R^h$
-};
-
-% Output Softmax
-\node[layerBox, minimum width=7.5cm, draw=thmGreen, fill=thmGreenBg] (output) at (-1.2, 6.7) {
-    Softmax Output Layer: $\hat{\vy} = \softmax(\mathbf{U}^\top \vh + \mathbf{W}_{\text{dir}}^\top \vx + \vb_{\text{out}}) \in \Delta^{|\vocab|-1}$
-};
-
-% Prediction
-\node[font=\small\sffamily\bfseries, text=thmGreen] (pred) at (-1.2, 8.0) {$\Prob(w_t = w \mid w_{t-3}, w_{t-2}, w_{t-1})$};
-
-% Arrows
-\draw[arr] (w1) -- (w1 |- embLayer.south);
-\draw[arr] (w2) -- (w2 |- embLayer.south);
-\draw[arr] (w3) -- (w3 |- embLayer.south);
-
-\draw[arr] (-3.6, 1.8) -- (v1);
-\draw[arr] (-1.2, 1.8) -- (v2);
-\draw[arr] (1.2, 1.8) -- (v3);
-
-\draw[arr] (v1) -- (v1 |- concat.south);
-\draw[arr] (v2) -- (v2 |- concat.south);
-\draw[arr] (v3) -- (v3 |- concat.south);
-
-\draw[arr] (concat) -- (hidden);
-\draw[arr] (hidden) -- (output);
-\draw[arr] (output) -- (pred);
-
-% Direct skip connection
-\draw[arr, dashed, draw=bodyGray!80] (concat.east) to[bend right=45] node[right, font=\tiny\sffamily] {Direct skip $\mathbf{W}_{\text{dir}}$} (output.east);
-
-\end{tikzpicture}
-\caption{The Neural Probabilistic Language Model (NPLM) architecture \cite{bengio2003}. Discrete context words are mapped into continuous dense feature vectors via shared matrix $\mathbf{C} \in \R^{|\vocab| \times d}$, concatenated, and processed through a non-linear hidden layer to predict next-token probabilities via softmax.}
-\label{fig:bengio_nplm_arch}
-\end{figure}
-
-The neural probabilistic formulation in \cite{bengio2003} replaced discrete count tables with a continuous parameterized architecture (Figure~\ref{fig:bengio_nplm_arch}):
-\begin{enumerate}
-    \item \textbf{Continuous Embedding Projection}: Each word $w \in \vocab$ is associated with a real-valued distributed feature vector $\mathbf{c}_w \in \R^d$ (where $d \ll |\vocab|$, e.g., $d = 100$). The vocabulary lookup matrix $\mathbf{C} \in \R^{|\vocab| \times d}$ is learned jointly via backpropagation.
-    \item \textbf{Semantic Smoothing via Continuous Space}: If \textit{``cat''} and \textit{``feline''} share similar embedding vectors ($\mathbf{c}_{\text{cat}} \approx \mathbf{c}_{\text{feline}}$), observing \textit{``the cat chased the mouse''} automatically increases the model's confidence in \textit{``the feline chased the mouse''}. Continuous geometry overcomes the orthogonal symbol limitation.
-    \item \textbf{Softmax Output Normalization}: The network projects hidden activations to $|\vocab|$ unnormalized logits and applies the softmax function to guarantee a valid probability distribution:
-    \begin{equation}
-    \label{eq:bengio_softmax}
-    \Prob(w_t = i \mid w_{<t}) = \frac{\exp(z_i)}{\sum_{j=1}^{|\vocab|} \exp(z_j)}.
-    \end{equation}
-\end{enumerate}
-
-\subsection{2018--2019: Generative pre-training and GPT-2}
-\label{subsec:milestone_gpt2}
-
-While continuous representations were established in \cite{bengio2003}, models throughout the 2000s and early 2010s remained constrained in parameter scale and context length. In 2018--2019, the GPT-2 architecture was introduced in \cite{radford2019} (\textit{``Language Models are Unsupervised Multitask Learners''}).
-
-GPT-2 demonstrated that autoregressive decoder-only models trained on hundreds of gigabytes of uncurated web text could perform diverse natural language and software engineering tasks without task-specific supervised fine-tuning. By predicting next tokens across context windows of $1{,}024$ tokens, the model exhibited emergent zero-shot transfer across reading comprehension, machine translation, and Python code generation.
-
-\subsection{2020--2022: Megatron-Turing NLG 530B and compute-optimal scaling}
-\label{subsec:milestone_scaling}
-
-Following GPT-2 and GPT-3, deep learning research prioritized aggressive model scaling, culminating in dense models such as Megatron-Turing NLG 530B \cite{smith2022mtnlg}. However, early power-law scaling heuristics \cite{kaplan2020} recommended scaling parameters faster than training data. Consequently, models such as Megatron-Turing NLG 530B and GPT-3 (175B parameters trained on 300B tokens) were undertrained relative to their computational capacity.
-
-In 2022, the study \textit{``Training Compute-Optimal Large Language Models''} \cite{hoffmann2022} established the \textbf{Chinchilla} scaling laws:
-\begin{equation}
-\label{eq:chinchilla_ratio}
-D \approx 20 \times N,
-\end{equation}
-where $N$ denotes parameter count and $D$ represents training token volume. For compute optimality, model size and training data must scale in equal proportion. This insight initiated the current era of compact, thoroughly trained open-weight models (e.g., LLaMA \cite{touvron2023llama} trained on trillions of tokens), improving inference efficiency in production and software engineering environments.
-
-\subsection{From discrete counting tables to continuous parametric learners: bridge to deep learning}
-\label{subsec:bridge_to_ch02}
-
-The formal trajectory examined throughout this chapter highlights two structural constraints inherent in discrete language modeling:
-\begin{itemize}
-    \item \textbf{The Discrete Counting Limit}: Exact probability factorization via the chain rule of probability is mathematically unconstrained, yet empirical $n$-gram tables suffer from exponential state-space growth ($V^n$), rigid context truncation ($n-1$), and orthogonal symbol representation.
-    \item \textbf{The Smoothing Ceiling}: While statistical smoothing methods prevent zero-frequency collapse ($\Prob=0 \implies \PPL=\infty$), they operate solely by reallocating probability mass across discrete table entries. Consequently, they cannot capture non-linear feature interactions or transfer statistical strength between semantically related tokens.
-\end{itemize}
-
-To overcome the discrete counting paradigm, natural language processing transitioned from frequency tables to continuous, parameterized neural networks:
-\begin{equation}
-\label{eq:linear_model_intro}
-f(\vx; \bm{\theta}) = \mW^\top \vx + \vb.
-\end{equation}
-Rather than counting token co-occurrences directly, modern language modeling parameterizes estimators as continuous differentiable functions whose weights $\bm{\theta}$ are optimized systematically through gradient descent and backpropagation, establishing the computational framework developed in subsequent chapters.
 
 \clearpage
 \thispagestyle{empty}

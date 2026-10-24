@@ -1,20 +1,20 @@
 \documentclass[../../main.tex]{subfiles}
 \begin{document}
 
-\chapter{Deep learning foundations for NLP}
+\chapter{Foundations of Deep Learning}
 \label{ch:deep_learning_foundations}
 
-Chapter~\ref{ch:intro_lms} expressed sequence probabilities as products of conditional next-token probabilities. Estimating these distributions with frequency tables becomes unreliable as the number of possible contexts grows as $V^n$, while an $n$-gram model retains only the preceding $n-1$ tokens. The representation also assigns independent entries to distinct token identities, so the counts provide no direct measure of semantic similarity. These limitations make it difficult to estimate probabilities for the varied contexts found in natural language and source code.
+Human language, perceptual reasoning, and software engineering systems represent complex functional landscapes governed by intricate structural constraints. For decades, classical artificial intelligence attempted to model these phenomena through deterministic, hand-crafted rule systems and formal logic. However, natural patterns are inherently continuous, ambiguous, and noisy, resisting rigid symbolic formalization.
 
-Neural language models address these limitations by representing inputs and model parameters in continuous spaces. A predictor is then a parameterized function over vectors in $\R^d$, and its parameters can be optimized by differentiating a loss through the computation that produces each prediction. Learned vector representations allow statistical information to be shared across contexts, while the network's nonlinear functions determine how those representations combine. This formulation connects language modeling to differentiable programming and provides the basis for training multilayer models.
+To build computational systems capable of learning representations directly from empirical data, modern artificial intelligence reframes functional approximation through connectionism and differentiable programming. Rather than specifying algorithmic rules manually, we parameterize predictors as continuous mathematical functions mapping inputs onto high-dimensional metric spaces $\R^d$. In this continuous formulation, semantic similarity corresponds to geometric proximity, decision boundaries correspond to smooth separating manifolds, and model parameters are learned systematically by propagating error gradients through computational graphs via multivariable calculus.
 
-The chapter develops the perceptron and its decision boundary, then examines why a single linear layer cannot represent nonlinear decision rules such as XOR and why composing linear layers without nonlinear activations is equivalent to one linear transformation. It relates common activations ($\sigma, \tanh, \relu, \gelu$) to the functions they represent, presents the Universal Approximation Theorem through localized wavelet bump constructions, compares the convexity properties of maximum-likelihood and mean-squared-error objectives, and derives reverse-mode automatic differentiation on directed acyclic graphs.
+This chapter establishes the foundational principles of artificial neural networks. We begin by examining the historical motivation of connectionism, formalize the perceptron and its linear decision boundary, and prove why single layers fail on non-linear problems such as XOR. We then demonstrate why composing linear transformations without non-linear activations is mathematically equivalent to a single linear map, analyze the functional geometry of activation functions, formalize the Universal Approximation Theorem through localized bump constructions, examine loss landscapes under Maximum Likelihood Estimation, and derive reverse-mode automatic differentiation on directed acyclic graphs.
 
 \clearpage
-\section{From biological neurons to the artificial perceptron}
+\section{Historical Motivation of Neural Networks}
 \label{sec:perceptron}
 
-The probabilistic language-modeling objective from Chapter~\ref{ch:intro_lms} can be retained while changing how conditional probabilities are estimated. Instead of storing a separate count for each observed context, a neural predictor maps continuous input representations to a distribution over the next token. Its parameters are adjusted by gradient descent, allowing contexts to share information through the learned representation and function. The perceptron provides the simplest model of this computation.
+The foundational building block of modern deep learning is the artificial neuron, originally motivated by biological neurophysiology. Rather than specifying explicit logical deduction rules, connectionist architectures construct expressive functions through networks of interconnected, parameterized processing units that adapt their internal connection strengths in response to empirical data.
 
 The \emph{perceptron} is a basic computational unit in neural networks and was historically motivated by biological neurons. A biological neuron receives electrochemical signals through its dendrites, integrates them in the cell body (soma), and emits an action potential through its axon when the resulting voltage crosses a threshold. The perceptron abstracts this process as a weighted sum followed by an activation function.
 
@@ -517,7 +517,7 @@ Three foundational theoretical and geometric arguments answer this fundamental q
 Deep architectures are therefore fundamentally more efficient: they factorize high-dimensional manifolds into hierarchical abstractions, extracting local lexical tokens at early layers, compositional syntactic trees at intermediate layers, and long-range semantic discourse at deep layers.
 
 \clearpage
-\section{Taxonomy of neural activation functions}
+\section{Activation Functions}
 \label{sec:activations_taxonomy}
 
 Modern neural NLP architectures deploy diverse activation functions tailored to hidden representations and output heads. Figure~\ref{fig:activation_functions_pgfplots} presents exact mathematical plots and derivatives for the primary activation functions.

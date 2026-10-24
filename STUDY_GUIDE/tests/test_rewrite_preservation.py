@@ -11,7 +11,7 @@ BASELINE = GUIDE / "scratch" / "rewrite_baseline.json"
 
 def test_active_chapter_structure_and_protected_artifacts_are_preserved():
     manifest = json.loads(BASELINE.read_text(encoding="utf-8"))
-    assert len(manifest["chapters"]) == 7
+    assert len(manifest["chapters"]) == 8
 
     for row in manifest["chapters"]:
         source = (GUIDE.parent / row["path"]).read_text(encoding="utf-8")
