@@ -1,912 +1,930 @@
 \documentclass[../../main.tex]{subfiles}
+
 \begin{document}
 
-\chapter{Recurrent neural networks and sequence modeling}
+\chapter{Recurrent neural networks}
+\label{ch:recurrent_neural_networks}
 \label{ch:rnn_sequence_modeling}
 
-Chapter~\ref{ch:deep_learning_foundations} established how nonlinear activations enable expressive neural functions and how reverse-mode automatic differentiation computes parameter gradients. A feedforward network, however, maps a fixed-dimensional input $\vx \in \R^{d_{\text{in}}}$ to an output without retaining state between inputs. This makes it unsuitable for processing variable-length sequences when predictions depend on information encountered at earlier positions.
+The foundational feed-forward architectures established in the preceding chapter operate as static spatial mappings between fixed-dimensional Euclidean vector spaces. In a conventional multi-layer perceptron, an input vector $\mathbf{x} \in \mathbb{R}^{d_{\text{in}}}$ is mapped deterministically to an output vector $\mathbf{y} \in \mathbb{R}^{d_{\text{out}}}$ through a sequence of parameterized affine transformations interleaved with coordinate-wise non-linearities. While this formulation provides universal function approximation under compact domains, its topological contract assumes that every input observation arrives as a self-contained, isolated point of fixed dimensionality, devoid of internal temporal ordering or dynamic duration.
 
-Natural language and source code are sequential: token interpretation can depend on earlier context, grammatical relations may span multiple positions, and program execution unfolds over time. Sequence models therefore need mechanisms for carrying information between positions and for applying a consistent transition rule as the sequence advances. Recurrent networks implement these properties through a hidden state and shared parameters.
+Real-world perceptual and symbolic processes—most notably natural language text, acoustic speech signals, software execution traces, and biological macromolecules—fundamentally violate this static spatial premise. Natural sequences exhibit variable lengths across observations, temporal dependencies where the interpretation of a token depends intrinsically on antecedent context, and translation-invariant motifs that retain identical semantic meaning regardless of the temporal index at which they appear. Applying static feed-forward networks to such sequential signals requires ad-hoc zero-padding, rigid context window truncation, or the redundant allocation of localized parameters across spatial coordinates, inducing severe sample inefficiencies and representational brittleness.
 
-The chapter compares the inductive biases of convolutional and recurrent architectures, derives the recurrent cell and its shared parameters, and analyzes gradient propagation through Backpropagation Through Time (BPTT), including vanishing and exploding regimes and Pascanu's spectral-radius result. It also examines character-level training on a literary corpus, the Constant Error Carousel (CEC) in LSTM and GRU networks, and encoder-decoder models with Bahdanau additive attention.
+This chapter establishes the theoretical, algorithmic, and architectural foundations of Recurrent Neural Networks (RNNs). We begin by formalizing the structural failure modes of feed-forward networks on sequential data, motivating the necessity of persistent internal memory and position-invariant parameter sharing. We derive the mathematical mechanics of recurrent state transitions, unroll the network across time into an equivalent directed acyclic graph, and formulate the exact gradient accumulation dynamics of Backpropagation Through Time (BPTT). We then analyze the analytical pathologies of vanilla recurrence—specifically the exponential decay and explosion of temporal Jacobians—and examine how gated recurrent architectures, such as the Long Short-Term Memory network and the Gated Recurrent Unit, enforce constant error propagation. Finally, we explore the sequence-to-sequence encoder-decoder paradigm and demonstrate how the fundamental information bottleneck of compressing variable-length sequences into a single static context vector directly motivates the Attention mechanism.
 
 \clearpage
-\section{Sequential data and constraints of feed-forward neural networks}
-\label{sec:fcnn_limits}
+\section{Limitations of feed-forward architectures on sequential data}
+\label{sec:rnn_limitations_fcn}
 
-In Chapter~\ref{ch:deep_learning_foundations}, we formulated the mathematical and architectural foundations of deep feedforward neural networks (FCNNs) and backpropagation across computational DAGs. As established at the conclusion of that chapter, however, feedforward architectures operate under a rigid, memoryless paradigm: they assume fixed-dimensional Euclidean inputs $\vx \in \R^{d_{\text{in}}}$, possess no internal recurrence or persistent temporal state across sequential time steps, and cannot enforce grammatical agreement across temporal horizons.
+Understanding the emergence of recurrent architectures requires analyzing why standard feed-forward networks, despite their universal approximation capabilities, are structurally ill-suited for sequence processing. The limitations of feed-forward networks stem from their rigid dimensional contracts, their localized parameter binding, and their inability to model temporal dynamics without severe compromises.
 
-In standard deep learning, a Fully-Connected Neural Network (FCNN) or Multi-Layer Perceptron is represented as a cascade of weight matrices interleaved with non-linear activation functions:
+\subsection{Fixed dimensionality constraints on inputs and outputs}
+\label{subsec:rnn_fixed_dimensions}
+
+A standard fully connected neural layer computes an affine transformation followed by an activation function:
 \begin{equation}
-\label{eq:fcnn_cascade}
-f(\vx) = \sigma\left( \mW_{\text{out}} \relu\left( \mW_2 \relu\left( \mW_1 \vx + \vb_1 \right) + \vb_2 \right) + \vb_{\text{out}} \right).
+\mathbf{h} = \sigma\left(\mathbf{W} \mathbf{x} + \mathbf{b}\right),
+\label{eq:fcn_layer_definition}
 \end{equation}
-While FCNNs excel on tabular datasets with fixed, predefined attributes, they exhibit three critical architectural constraints when applied to natural language and temporal sequences:
+where $\mathbf{x} \in \mathbb{R}^{d_{\text{in}}}$ denotes the input vector, $\mathbf{W} \in \mathbb{R}^{d_{\text{out}} \times d_{\text{in}}}$ represents the weight parameter matrix, and $\mathbf{b} \in \mathbb{R}^{d_{\text{out}}}$ is the bias vector \citep{goodfellow2016}. The algebraic definition of matrix multiplication requires that the column dimension of $\mathbf{W}$ strictly matches the dimensionality of the input vector $\mathbf{x}$. Consequently, any neural network constructed from feed-forward layers imposes an unyielding contract: every input vector must possess exactly $d_{\text{in}}$ coordinates, and every output prediction must produce exactly $d_{\text{out}}$ values.
+
+In structured machine learning domains, such as tabular databases, this fixed dimensional contract is entirely appropriate because each coordinate of $\mathbf{x}$ corresponds to a specific, predefined feature column. However, unstructured perceptual and symbolic signals are intrinsically variable in extent. In natural language processing, a text sample may span a single-word query, a five-token sentence, or a document containing thousands of words. Similarly, raw acoustic recordings vary in duration from fractions of a second to multiple hours, and computer vision images vary across capture devices in height and width before standardization.
+
+When practitioners attempt to process variable-length sequences using static feed-forward networks, they are forced to define an arbitrary upper bound on sequence length, denoted $T_{\max}$, and enforce dimensional uniformity via artificial zero-padding or heuristic truncation. If an observation sequence has length $T < T_{\max}$, the remaining $T_{\max} - T$ slots are populated with synthetic null tokens; conversely, if $T > T_{\max}$, the sequence is truncated, discarding all information residing beyond the arbitrary horizon. This operational compromise introduces substantial structural deficiencies:
 \begin{enumerate}
-    \item \textbf{Rigid Input Dimensionality}: The input dimensionality is rigidly fixed by the column dimension of the input weight matrix $\mW_1 \in \R^{d_1 \times d_{\text{in}}}$. While structured tabular data naturally adheres to fixed attribute vectors, natural language utterances exhibit variable sequence lengths $T$ (spanning from single-word imperatives to multi-clause legal sentences). Flattening variable-length sequences into a static vector $\vx \in \R^{d_{\text{in}}}$ requires choosing an arbitrary upper bound $T_{\max}$, truncating longer sequences and zero-padding shorter ones, which wastes memory and degrades efficiency.
-    \item \textbf{Absence of Parameter Sharing and Translation Invariance}: In an FCNN, each coordinate in the flattened input vector is governed by independent weight parameters. Consequently, identical syntactic or semantic constructs appearing at different positions in a sentence (such as a noun phrase located at token position 1 versus token position 10) must be learned independently from scratch, destroying sample efficiency.
-    \item \textbf{Rigid Output Dimensionality}: The output dimensionality is strictly predetermined by the row dimension of the final projection matrix $\mW_{\text{out}}$. In generative sequential tasks such as machine translation, summarization, and dialogue generation, the target output length is unknown a priori and varies dynamically relative to the input (for example, translating a 5-word English sentence into a 4-word Italian clause). Feedforward networks cannot dynamically modulate their output dimension to emit variable-length token sequences.
+    \item \textbf{Computational waste}: Zero-padded dimensions must undergo full matrix multiplications throughout all layers, consuming memory bandwidth and floating-point operations on non-informative null values.
+    \item \textbf{Information loss}: Rigid truncation destroys long-range context and truncates syntactic clauses that are essential for accurate semantic inference.
+    \item \textbf{Spurious gradient signals}: Unless complex masking logic is manually applied at every layer, artificial padding tokens contribute synthetic activations that skew batch statistics and destabilize optimization.
 \end{enumerate}
 
-\subsection{Inductive biases and the twin physical symmetries: CNNs vs.~RNNs}
-\label{subsec:inductive_biases_symmetries}
+The dimensional rigidity of the output layer is equally problematic. In sequential tasks such as syntactic parsing, semantic segmentation, or machine translation, the target output sequence is not a static scalar or fixed-size vector; it is itself an ordered sequence whose length $T_{\text{out}}$ varies dynamically and cannot be determined prior to observing the input signal. A feed-forward network with a fixed output dimension $d_{\text{out}}$ is mathematically incapable of generating variable-length sequences without enforcing artificial output horizons.
 
-As articulated in modern deep learning theory \cite{bishop2024deep, goodfellow2016}, unconstrained multi-layer perceptrons possess minimal \emph{inductive bias}: they treat every input dimension as an arbitrary coordinate, ignoring any topological or temporal relationships between adjacent dimensions. To scale deep learning to complex domains, architectures must incorporate inductive biases that exploit the intrinsic \textbf{physical symmetries} of the underlying data:
+\subsection{Lack of position invariance and weight localization}
+\label{subsec:rnn_weight_localization}
 
-\subsubsection{Spatial translation equivariance in CNNs}
-In spatial domains (such as 2D images), the data-generating distribution is characterized by two fundamental symmetries:
-\begin{itemize}
-    \item \textbf{Locality}: Pixels that are spatially adjacent exhibit strong mutual statistical correlations, whereas pixels separated by large Euclidean distances are approximately independent.
-    \item \textbf{Translation Invariance / Equivariance}: Shifting an input feature map $\vx$ by spatial displacement vector $\mathbf{g}$ should produce a correspondingly shifted feature representation $f(g(\vx)) = g(f(\vx))$.
-\end{itemize}
-Imposing locality and translation equivariance forces the dense weight matrix $\mW \in \R^{D_{\text{out}} \times D_{\text{in}}}$ to collapse into a localized discrete convolution operator $\mK \in \R^{k \times k}$ ($k \ll \sqrt{D_{\text{in}}}$). By sliding this compact kernel across all spatial coordinates, the parameter footprint is reduced by several orders of magnitude, enabling sample-efficient visual recognition.
+The second fundamental pathology of feed-forward networks is their spatial and temporal parameter localization. In a dense layer, each scalar weight $W_{ji}$ is dedicated exclusively to the connection between input coordinate $i$ and hidden neuron $j$. This architecture binds each parameter to an absolute coordinate index in the input vector space \citep{bishop2024deep}.
 
-\subsubsection{Temporal stationarity and parameter sharing in RNNs}
-In temporal and linguistic domains, the governing symmetry is \textbf{temporal stationarity}:
+To conceptualize the consequences of parameter localization, consider an image classification task evaluated on flattened pixel vectors. Suppose an image contains the visual motif of a dog located in the upper-left quadrant of the frame. The feed-forward network activates the subset of weights associated with those specific coordinate indices to detect the object. If an identical dog appears in the lower-right quadrant of another image, the corresponding visual features activate an entirely disjoint set of pixel coordinates, corresponding to completely different columns of $\mathbf{W}$. Because the network lacks parameter sharing across spatial positions, it cannot transfer what it learned about dogs in the upper-left corner to dogs appearing in the lower-right corner. The model is forced to independently rediscover and parameterize the visual concept of a dog at every discrete spatial coordinate.
+
+When applied to sequential text processing, this parameter localization leads to severe sample inefficiency. Consider a character-level capitalization task where an input character sequence must be mapped to its correctly cased variant. In natural language, an opening quotation mark \texttt{"} serves as a structural syntactic cue indicating that the immediately following character must be capitalized as the start of a dialogue utterance. In a feed-forward network where a sequence of $T$ characters is concatenated into a single input vector:
 \begin{equation}
-\label{eq:temporal_stationarity}
-\Prob(X_t \mid X_{t-1}, \dots, X_1) \approx \mathcal{T}(X_t, X_{t-1}, \dots; \Theta),
+\mathbf{x} = \left[\mathbf{x}_1^\top, \mathbf{x}_2^\top, \dots, \mathbf{x}_T^\top\right]^\top \in \mathbb{R}^{T \cdot d_c},
 \end{equation}
-meaning that the fundamental grammatical rules, syntactic patterns, and conditional transition probabilities of a language do not alter their mathematical structure simply because an utterance takes place at token index $t=1$ versus index $t=50$. 
+the network must learn separate, independent weight parameters to detect quotation marks at position $t=1$, position $t=2$, position $t=3$, and every subsequent temporal offset up to $T$. If the training corpus contains numerous examples of dialogue starting at index $1$ but none starting at index $14$, the model will fail to capitalize a dialogue quote appearing at index $14$, despite possessing the relevant knowledge at index $1$.
 
-While an FCNN requires separate, independent weight matrices $\mW_t \in \R^{d \times d}$ for each position $t \in \{1, \dots, T\}$---causing parameter count to scale as $\mathcal{O}(T \cdot d^2)$---a recurrent architecture models sequence progression through a stationary state-transition mapping $\vh_t = f(\vh_{t-1}, \vx_t; \Theta)$. By sharing the parameter set $\Theta = \{\mW_{hh}, \mW_{xh}, \vb_h\}$ across all time steps, the parameter footprint remains completely invariant to sequence length: $\mathcal{O}(d_h^2 + d_h d_{\text{in}})$.
+Because identical linguistic and acoustic motifs occur at arbitrary temporal offsets, a sequence processing model must satisfy \textit{temporal translation equivariance}: shifting an input pattern in time should produce an identical, equivalently shifted representation without requiring separate parameters. A feed-forward network completely lacks this inductive bias, demanding a parameter budget that scales quadratically with sequence length:
+\begin{equation}
+N_{\text{parameters}} = \mathcal{O}\left(T \cdot d_{\text{in}} \cdot d_{\text{hidden}}\right),
+\end{equation}
+which becomes computationally intractable for long textual contexts and renders generalization to unseen sequence positions virtually impossible.
 
-\subsubsection{1D Temporal Convolutions vs.~Recurrence}
-Simon Prince \cite{prince2023udl} highlights an alternative formulation: 1D Temporal Convolutions (e.g., WaveNet, Temporal Convolutional Networks / TCNs). Instead of maintaining an evolving recurrent state $\vh_t$, a 1D TCN applies causal dilated 1D convolutions over time. While 1D CNNs achieve $\mathcal{O}(1)$ sequential parallelization during training, their effective memory horizon is strictly bounded by their receptive field, scaling exponentially with network depth as $\mathcal{O}(K^L)$. In contrast, recurrent networks maintain a theoretically unbounded memory horizon within a single compact state $\vh_t$, albeit at the expense of strictly sequential training.
+\subsection{The structural requirement for dynamic temporal processing}
+\label{subsec:rnn_dynamic_temporal_processing}
 
-Table~\ref{tab:paradigm_comparison_matrix} formalizes the architectural trade-offs across the four foundational deep learning paradigms.
+The failure of feed-forward architectures establishes the formal requirements for an authentic sequential learning paradigm. Mathematically, an ordered sequence is defined as a tuple:
+\begin{equation}
+\mathbf{X} = \left(\mathbf{x}_1, \mathbf{x}_2, \dots, \mathbf{x}_T\right), \quad \mathbf{x}_t \in \mathbb{R}^{d_x}, \quad T \in \mathbb{N}^+,
+\end{equation}
+where the temporal index $t$ specifies chronological or symbolic ordering, and the total length $T$ varies across observations.
+
+To process such sequences effectively, an architecture must satisfy three primary design imperatives:
+\begin{enumerate}
+    \item \textbf{Length-agnostic ingestion}: The model must operate on sequences of arbitrary length $T$ through an iterative transition operator whose parametric specification is strictly independent of $T$.
+    \item \textbf{Position-invariant parameter sharing}: The transformation applied at time step $t$ must utilize the exact same parameter tensors as the transformation applied at time step $t'$, enabling structural motifs learned at one temporal position to generalize across all positions.
+    \item \textbf{Contextual persistence and state propagation}: The representation computed at step $t$ must not depend solely on the isolated token $\mathbf{x}_t$, but must integrate a synthesized historical record of all prior observations $\left(\mathbf{x}_1, \dots, \mathbf{x}_{t-1}\right)$.
+\end{enumerate}
+
+These three requirements directly motivate the architecture of Recurrent Neural Networks, which replace the static, one-shot feed-forward mapping with a dynamical system governed by an internal recurrent state.
+
+\clearpage
+\section{Recurrent neural networks: intuition, unrolling, and cell mechanics}
+\label{sec:rnn_intuition_mechanics}
+
+Recurrent Neural Networks address the structural limitations of feed-forward networks by introducing an internal state that persists across temporal steps. Instead of consuming an entire sequence simultaneously, an RNN ingests one token at a time, continuously updating its internal memory to synthesize past observations with current sensory input.
+
+\subsection{The recurrent intuition and persistent hidden state}
+\label{subsec:rnn_intuition_hidden_state}
+
+The fundamental conceptual mechanism of a recurrent neural network can be understood through the pedagogical analogy of a human reader taking running notes while reading a document. A human reader does not attempt to ingest an entire book in a single visual fixation; rather, the reader scans the text sequentially, word by word. As each new word is read, the reader does not discard previous knowledge, nor do they carry the verbatim text of every preceding page in immediate working memory. Instead, the reader maintains a continuous mental summary—a running piece of paper—recording essential context, active subjects, unresolved clauses, and grammatical state. When a new word is encountered, the reader combines their current mental notes with the incoming word, updates the notes, and optionally generates an interpretation or expectation of upcoming text.
+
+In a Recurrent Neural Network, this mental notepad is formalized as the \textit{hidden state vector}, denoted $\mathbf{h}_t \in \mathbb{R}^{d_h}$. The hidden state serves as an internal, distributed latent representation that encodes the historical trajectory of the sequence up to time step $t$ \citep{elman1990}. At each discrete time step $t \in \{1, \dots, T\}$, the recurrent unit operates as an operator characterized by a dual-input, dual-output interface:
+\begin{align}
+\text{Inputs at step } t: & \quad \mathbf{x}_t \in \mathbb{R}^{d_x} \text{ (current sequence element)}, \quad \mathbf{h}_{t-1} \in \mathbb{R}^{d_h} \text{ (previous state)}, \\
+\text{Outputs at step } t: & \quad \hat{\mathbf{y}}_t \in \mathbb{R}^{d_y} \text{ (step prediction)}, \quad \mathbf{h}_t \in \mathbb{R}^{d_h} \text{ (updated state)}.
+\end{align}
+
+Before any sequence elements are observed (at step $t = 0$), the network must initialize its internal memory. In the absence of prior context, the initial state is typically defined as a vector of zeros:
+\begin{equation}
+\mathbf{h}_0 = \mathbf{0} \in \mathbb{R}^{d_h},
+\label{eq:rnn_zero_initialization}
+\end{equation}
+representing a clean, unwritten slate. As sequence tokens $\mathbf{x}_1, \mathbf{x}_2, \dots$ arrive, the recurrent transition function modifies $\mathbf{h}_t$ at every step, allowing downstream predictions $\hat{\mathbf{y}}_t$ to be conditioned on the complete historical context $\mathbf{x}_{\le t}$.
+
+\subsection{Time unfolding and unrolled computational graphs}
+\label{subsec:rnn_time_unfolding}
+
+The recurrent relationship is traditionally depicted in two equivalent representational forms: the compact \textit{folded} diagram and the explicit \textit{unfolded} computational graph.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    >=stealth,
+    node distance=1.8cm,
+    every node/.style={font=\small},
+    unit/.style={draw=tfBlueBorder, fill=tfBlue, rounded corners=4pt, minimum width=1.6cm, minimum height=1.0cm, align=center, thick},
+    io/.style={draw=tfPinkBorder, fill=tfPink, circle, minimum size=0.8cm, align=center, thick},
+    outnode/.style={draw=tfGreenBorder, fill=tfGreen, circle, minimum size=0.8cm, align=center, thick},
+    state/.style={draw=tfPurpleBorder, fill=tfPurple, rounded corners=2pt, minimum width=0.9cm, minimum height=0.6cm, align=center, thick}
+]
+
+% Left: Folded Representation
+\node[unit] (cell) at (0, 0) {$\text{RNN}$};
+\node[io] (x) [below of=cell, node distance=1.5cm] {$\mathbf{x}_t$};
+\node[outnode] (y) [above of=cell, node distance=1.5cm] {$\hat{\mathbf{y}}_t$};
+
+\draw[->, thick] (x) -- (cell);
+\draw[->, thick] (cell) -- (y);
+\draw[->, thick] (cell.east) -- ++(0.7,0) arc (-90:180:0.5) -- (cell.north east);
+\node at (0.9, 0.7) {$\mathbf{h}_t$};
+\node at (0, -2.1) {\textbf{(a) Folded representation}};
+
+% Divider
+\draw[dashed, gray!60, thick] (2.2, -2.0) -- (2.2, 2.0);
+
+% Right: Unfolded Representation
+\node[unit] (c1) at (4.0, 0) {$\text{RNN}$};
+\node[unit] (c2) at (6.5, 0) {$\text{RNN}$};
+\node[unit] (c3) at (9.0, 0) {$\text{RNN}$};
+
+\node[io] (x1) at (4.0, -1.5) {$\mathbf{x}_{t-1}$};
+\node[io] (x2) at (6.5, -1.5) {$\mathbf{x}_t$};
+\node[io] (x3) at (9.0, -1.5) {$\mathbf{x}_{t+1}$};
+
+\node[outnode] (y1) at (4.0, 1.5) {$\hat{\mathbf{y}}_{t-1}$};
+\node[outnode] (y2) at (6.5, 1.5) {$\hat{\mathbf{y}}_t$};
+\node[outnode] (y3) at (9.0, 1.5) {$\hat{\mathbf{y}}_{t+1}$};
+
+\node[state] (h0) at (2.4, 0) {$\mathbf{h}_{t-2}$};
+\node[state] (h3) at (10.6, 0) {$\mathbf{h}_{t+1}$};
+
+\draw[->, thick] (x1) -- (c1);
+\draw[->, thick] (x2) -- (c2);
+\draw[->, thick] (x3) -- (c3);
+
+\draw[->, thick] (c1) -- (y1);
+\draw[->, thick] (c2) -- (y2);
+\draw[->, thick] (c3) -- (y3);
+
+\draw[->, thick] (h0) -- (c1);
+\draw[->, thick] (c1) -- node[above] {$\mathbf{h}_{t-1}$} (c2);
+\draw[->, thick] (c2) -- node[above] {$\mathbf{h}_t$} (c3);
+\draw[->, thick] (c3) -- (h3);
+
+\node at (6.5, -2.1) {\textbf{(b) Unfolded computational graph across time}};
+
+\end{tikzpicture}
+\caption{Comparison between the compact folded representation of a recurrent neural network with a self-referential temporal feedback loop and its unfolded computational Directed Acyclic Graph (DAG) across consecutive time steps.}
+\label{fig:rnn_folded_unrolled}
+\end{figure}
+
+In the folded representation (Figure~\ref{fig:rnn_folded_unrolled}a), the network is illustrated as a single processing unit possessing a directed cyclic feedback loop: the hidden state output $\mathbf{h}_t$ is fed directly back into the cell to serve as the state input for the subsequent step. While algebraically concise, cyclic graphs cannot be directly evaluated by standard automatic differentiation engines, which require acyclic computation paths to establish reverse topological orderings.
+
+To resolve this cyclic dependency, the recurrent execution is \textit{unfolded in time} (Figure~\ref{fig:rnn_folded_unrolled}b). Unfolding expands the recurrent unit across the temporal sequence of length $T$, replicating the cell into a chain of $T$ interconnected feed-forward units. In this unfolded representation, the cyclic feedback loop is mapped onto a sequence of forward-directed horizontal edges connecting unit $t-1$ to unit $t$. The resulting structure forms a classical Directed Acyclic Graph (DAG), enabling standard forward inference and reverse-mode automatic differentiation across the temporal chain.
+
+To observe how time unfolding coordinates contextual reasoning, consider tracking the character-level casing problem introduced earlier. Suppose the model receives the sequential lowercase stream \texttt{['"', 'y', 'o', 'u']}:
+\begin{enumerate}
+    \item \textbf{Step 1 ($t=1$)}: The model ingests $\mathbf{x}_1 = \texttt{'"'}$ and initial state $\mathbf{h}_0 = \mathbf{0}$. The network emits $\hat{\mathbf{y}}_1 = \texttt{'"'}$ and transitions to state $\mathbf{h}_1$. Internally, the parameter transformations configure $\mathbf{h}_1$ to encode the semantic feature: \textit{"an opening quotation mark has occurred; dialogue has begun; the subsequent token must be capitalized"}.
+    \item \textbf{Step 2 ($t=2$)}: The model ingests $\mathbf{x}_2 = \texttt{'y'}$ alongside $\mathbf{h}_1$. Driven by the contextual indicator stored in $\mathbf{h}_1$, the output projection produces an uppercase token $\hat{\mathbf{y}}_2 = \texttt{'Y'}$. Concurrently, the state updates to $\mathbf{h}_2$, encoding: \textit{"the initial dialogue letter has been capitalized; subsequent letters in the current token should revert to lowercase"}.
+    \item \textbf{Step 3 ($t=3$)}: The model ingests $\mathbf{x}_3 = \texttt{'o'}$ alongside $\mathbf{h}_2$. Consulting $\mathbf{h}_2$, the model emits lowercase $\hat{\mathbf{y}}_3 = \texttt{'o'}$ and maintains a state reflecting active word continuation.
+\end{enumerate}
+
+Through this sequential unfolding, the network resolves local contextual ambiguities dynamically, utilizing the persistent state vector to propagate structural syntactic memory across successive steps.
+
+\subsection{Internal cell mechanics and state-space transformations}
+\label{subsec:rnn_internal_cell_mechanics}
+
+Having examined the external input-output behavior of the recurrent unit, we now formulate the internal algebraic operations governing the Elman recurrent cell \citep{elman1990}. The interior of an Elman cell consists of three parameterized affine projections and two non-linear mapping stages.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    >=stealth,
+    node distance=1.5cm,
+    every node/.style={font=\small},
+    box/.style={draw=tfBlueBorder, fill=tfBlue, rounded corners=3pt, minimum width=2.0cm, minimum height=0.8cm, align=center, thick},
+    op/.style={draw=tfYellowBorder, fill=tfYellow, circle, minimum size=0.8cm, align=center, thick},
+    io/.style={draw=tfPinkBorder, fill=tfPink, circle, minimum size=0.8cm, align=center, thick},
+    outnode/.style={draw=tfGreenBorder, fill=tfGreen, circle, minimum size=0.8cm, align=center, thick},
+    state/.style={draw=tfPurpleBorder, fill=tfPurple, rounded corners=2pt, minimum width=1.0cm, minimum height=0.6cm, align=center, thick}
+]
+
+% Coordinates
+\node[io] (xt) at (0, -2.0) {$\mathbf{x}_t$};
+\node[state] (htm1) at (-3.2, 0) {$\mathbf{h}_{t-1}$};
+
+\node[box] (wxh) at (0, -0.8) {$\mathbf{W}_{xh}$};
+\node[box] (whh) at (-1.8, 0) {$\mathbf{W}_{hh}$};
+
+\node[op] (sum) at (0, 0) {$+$};
+\node[box] (tanh) at (1.5, 0) {$\tanh$};
+\node[state] (ht) at (3.8, 0) {$\mathbf{h}_t$};
+
+\node[box] (why) at (3.8, 1.4) {$\mathbf{W}_{hy}$};
+\node[outnode] (yt) at (3.8, 2.8) {$\hat{\mathbf{y}}_t$};
+
+% Flow arrows
+\draw[->, thick] (xt) -- (wxh);
+\draw[->, thick] (wxh) -- (sum);
+
+\draw[->, thick] (htm1) -- (whh);
+\draw[->, thick] (whh) -- (sum);
+
+\draw[->, thick] (sum) -- node[above] {$\mathbf{a}_t$} (tanh);
+\draw[->, thick] (tanh) -- (ht);
+
+\draw[->, thick] (ht) -- (why);
+\draw[->, thick] (why) -- node[right] {$\operatorname{softmax}$} (yt);
+
+% Branching out to next step
+\draw[->, thick] (ht.east) -- ++(0.8, 0);
+
+% Container border
+\draw[draw=tfGrayBorder, fill=tfGrayBg, fill opacity=0.15, dashed, rounded corners=6pt] (-2.8, -1.4) rectangle (4.6, 2.1);
+\node[font=\footnotesize\itshape, text=gray] at (1.0, -1.2) {Interior of the Elman recurrent cell};
+
+\end{tikzpicture}
+\caption{Detailed architectural anatomy of the Elman recurrent cell, illustrating the affine projections of the incoming token $\mathbf{x}_t$ and antecedent state $\mathbf{h}_{t-1}$, the linear state aggregation node, the hyperbolic tangent activation function, and the output classification head.}
+\label{fig:rnn_cell_architecture}
+\end{figure}
+
+The mathematical transformation unfolds in four explicit stages:
+\begin{enumerate}
+    \item \textbf{Input projection}: The input vector $\mathbf{x}_t \in \mathbb{R}^{d_x}$ is projected into the hidden state space via the input-to-hidden parameter matrix $\mathbf{W}_{xh} \in \mathbb{R}^{d_h \times d_x}$:
+    \begin{equation}
+    \mathbf{u}_t = \mathbf{W}_{xh} \mathbf{x}_t \in \mathbb{R}^{d_h}.
+    \end{equation}
+    This operation aligns the dimensionality of the incoming observation with the hidden representation space, mapping disparate input modalities (such as one-hot character vectors or continuous embeddings) into a standardized coordinate frame.
+    
+    \item \textbf{Recurrent state transformation}: The previous hidden state $\mathbf{h}_{t-1} \in \mathbb{R}^{d_h}$ is transformed through the hidden-to-hidden recurrent transition matrix $\mathbf{W}_{hh} \in \mathbb{R}^{d_h \times d_h}$:
+    \begin{equation}
+    \mathbf{v}_t = \mathbf{W}_{hh} \mathbf{h}_{t-1} \in \mathbb{R}^{d_h}.
+    \end{equation}
+    This transformation rotates and scales the historical memory representation, filtering and projecting antecedent information into coordinates compatible with the incoming input.
+    
+    \item \textbf{Linear aggregation and activation}: The projected input $\mathbf{u}_t$ and projected antecedent state $\mathbf{v}_t$ are summed coordinate-wise alongside a learnable hidden bias vector $\mathbf{b}_h \in \mathbb{R}^{d_h}$, yielding the pre-activation state vector $\mathbf{a}_t \in \mathbb{R}^{d_h}$:
+    \begin{equation}
+    \mathbf{a}_t = \mathbf{W}_{xh} \mathbf{x}_t + \mathbf{W}_{hh} \mathbf{h}_{t-1} + \mathbf{b}_h.
+    \label{eq:rnn_preactivation}
+    \end{equation}
+    The pre-activation vector is then mapped through an element-wise non-linear activation function, canonically chosen as the hyperbolic tangent ($\tanh$):
+    \begin{equation}
+    \mathbf{h}_t = \tanh\left(\mathbf{a}_t\right) = \frac{\exp\left(\mathbf{a}_t\right) - \exp\left(-\mathbf{a}_t\right)}{\exp\left(\mathbf{a}_t\right) + \exp\left(-\mathbf{a}_t\right)} \in (-1, 1)^{d_h}.
+    \label{eq:rnn_hidden_state}
+    \end{equation}
+    The hyperbolic tangent squashes state activations into the symmetric bounded interval $(-1, 1)$, preventing unbounded numerical growth across successive temporal steps while centering activations around zero.
+    
+    \item \textbf{Output projection and distribution}: If the task demands a token prediction at time step $t$, the updated state $\mathbf{h}_t$ is projected into the output target space via the hidden-to-output matrix $\mathbf{W}_{hy} \in \mathbb{R}^{d_y \times d_h}$ and bias $\mathbf{b}_y \in \mathbb{R}^{d_y}$:
+    \begin{equation}
+    \mathbf{z}_t = \mathbf{W}_{hy} \mathbf{h}_t + \mathbf{b}_y \in \mathbb{R}^{d_y},
+    \label{eq:rnn_logits}
+    \end{equation}
+    where $\mathbf{z}_t$ represents the unnormalized logit vector. For categorical prediction over a discrete vocabulary $\mathcal{V}$ with dimension $d_y = |\mathcal{V}|$, normalized class probabilities are computed via the softmax operator:
+    \begin{equation}
+    \hat{\mathbf{y}}_t = \operatorname{softmax}\left(\mathbf{z}_t\right) = \frac{\exp\left(\mathbf{z}_t\right)}{\sum_{k=1}^{d_y} \exp\left(z_{t, k}\right)} \in \Delta^{d_y - 1}.
+    \label{eq:rnn_softmax_output}
+    \end{equation}
+\end{enumerate}
+
+To maintain rigorous mathematical clarity, Table~\ref{tab:rnn_tensor_dimensions} summarizes the explicit shapes and functional roles of all parameters and representations comprising the Elman recurrent architecture.
 
 \begin{table}[htbp]
 \centering
 \small
-\caption{Architectural comparison across deep learning paradigms: Inductive biases, computational complexity, and sequence handling.}
-\label{tab:paradigm_comparison_matrix}
-\begin{tabularx}{\textwidth}{l p{2.4cm} p{2.8cm} p{2.6cm} X}
+\begin{tabularx}{\textwidth}{l l l X}
 \toprule
-\textbf{Dimension} & \textbf{Feedforward (FCNN)} & \textbf{1D Temporal CNN (TCN)} & \textbf{Recurrent (RNN/LSTM)} & \textbf{Transformer} \\
+\textbf{Mathematical Symbol} & \textbf{Tensor Shape} & \textbf{Space / Domain} & \textbf{Functional Role} \\
 \midrule
-\textbf{Input Elasticity} & Rigid ($T_{\max}$ fixed) & Elastic (up to receptive field) & Elastic (unbounded variable length) & Elastic (bounded by context window $L_{\max}$) \\
-\midrule
-\textbf{Parameter Sharing} & None (position-specific) & 1D sliding causal kernel & Replay over time (temporal recurrence) & Shared projection weights across tokens \\
-\midrule
-\textbf{Training Latency} & $\mathcal{O}(1)$ parallel matrix pass & $\mathcal{O}(1)$ parallel causal convolutions & $\mathcal{O}(T)$ strictly sequential & $\mathcal{O}(1)$ parallel self-attention \\
-\midrule
-\textbf{Receptive Field} & Memoryless (fixed window) & Bounded by depth $\mathcal{O}(K^L)$ & Theoretically unbounded ($\vh_t$) & Direct $\mathcal{O}(1)$ all-to-all token routing \\
-\midrule
-\textbf{Inference Cost / Step} & Re-evaluates entire window & Causal FIFO buffer rolling & $\mathcal{O}(1)$ update step $f(\vh_{t-1}, \vx_t)$ & KV Cache lookup $\mathcal{O}(T)$ operations \\
+$\mathbf{x}_t$ & $d_x \times 1$ & $\mathbb{R}^{d_x}$ & Input sequence token at step $t$ \\
+$\mathbf{h}_t$ & $d_h \times 1$ & $(-1, 1)^{d_h}$ & Recurrent latent state vector at step $t$ \\
+$\hat{\mathbf{y}}_t$ & $d_y \times 1$ & $\Delta^{d_y-1}$ & Predicted probability distribution at step $t$ \\
+$\mathbf{W}_{xh}$ & $d_h \times d_x$ & $\mathbb{R}^{d_h \times d_x}$ & Input-to-hidden projection matrix \\
+$\mathbf{W}_{hh}$ & $d_h \times d_h$ & $\mathbb{R}^{d_h \times d_h}$ & Hidden-to-hidden recurrent transition matrix \\
+$\mathbf{W}_{hy}$ & $d_y \times d_h$ & $\mathbb{R}^{d_y \times d_h}$ & Hidden-to-output projection matrix \\
+$\mathbf{b}_h$ & $d_h \times 1$ & $\mathbb{R}^{d_h}$ & Hidden pre-activation bias vector \\
+$\mathbf{b}_y$ & $d_y \times 1$ & $\mathbb{R}^{d_y}$ & Output logit bias vector \\
 \bottomrule
 \end{tabularx}
+\caption{Explicit tensor dimensions, mathematical domains, and functional roles of representations and learnable parameters in the standard Elman recurrent cell.}
+\label{tab:rnn_tensor_dimensions}
 \end{table}
 
 \clearpage
-\section{The recurrent neural network cell and weight sharing}
-\label{sec:rnn_cell}
+\section{Weight sharing and backpropagation through time}
+\label{sec:rnn_weight_sharing_bptt}
 
-To overcome the constraints of FCNNs, \textbf{Recurrent Neural Networks (RNNs)}---first formalized as the Simple Recurrent Network in \cite{elman1990}---process sequential data element by element, maintaining an internal continuous \emph{hidden state} $\vh_t \in \R^{d_h}$ that acts as a recurrent memory summarizing the sequence history observed up to time step $t$.
+The computational elegance and representational power of Recurrent Neural Networks arise from two structural principles: the strict sharing of parameter tensors across all sequence coordinates, and the recursive backpropagation of error signals through the unfolded computational graph.
 
-\subsection{Recurrent cell architecture}
-At each discrete time step $t \in \{1, 2, \dots, T\}$, the recurrent cell is characterized by two inputs and two outputs:
-\begin{itemize}
-    \item \textbf{Input 1}: The current sequence element $\vx_t \in \R^{d_{\text{in}}}$ (e.g., a one-hot vector or continuous embedding).
-    \item \textbf{Input 2}: The hidden state produced in the previous time step $\vh_{t-1} \in \R^{d_h}$.
-    \item \textbf{Output 1}: The model's prediction for the current time step $\hat{\vy}_t \in \R^{d_{\text{out}}}$.
-    \item \textbf{Output 2}: The updated hidden state $\vh_t \in \R^{d_h}$, which is recursively forwarded to time step $t+1$.
-\end{itemize}
+\subsection{The weight-sharing paradigm and position invariance}
+\label{subsec:rnn_weight_sharing}
 
-\subsection{Mathematical formulation with explicit tensor dimensions}
-Internally, the vanilla RNN cell comprises an input projection layer, a recurrent state transition layer, and an output projection layer:
-\begin{align}
-\underbrace{\vh_t}_{[d_h \times 1]} &= \tanhact\left( \underbrace{\mW_{hh}}_{[d_h \times d_h]} \underbrace{\vh_{t-1}}_{[d_h \times 1]} + \underbrace{\mW_{xh}}_{[d_h \times d_{\text{in}}]} \underbrace{\vx_t}_{[d_{\text{in}} \times 1]} + \underbrace{\vb_h}_{[d_h \times 1]} \right), \label{eq:rnn_hidden_step} \\
-\underbrace{\hat{\vy}_t}_{[V \times 1]} &= \softmax\left( \underbrace{\mW_{hy}}_{[V \times d_h]} \underbrace{\vh_t}_{[d_h \times 1]} + \underbrace{\vb_y}_{[V \times 1]} \right). \label{eq:rnn_output_step}
-\end{align}
+In standard feed-forward networks, processing an input sequence of length $T$ requires distinct weight matrices for each temporal offset, causing parameter count to explode linearly with sequence duration. In sharp contrast, a recurrent neural network enforces \textit{parameter tying}: the exact same weight matrices and bias vectors are reused at every time step:
+\begin{equation}
+\mathbf{W}_{xh}^{(1)} = \mathbf{W}_{xh}^{(2)} = \dots = \mathbf{W}_{xh}^{(T)} = \mathbf{W}_{xh}, \quad \mathbf{W}_{hh}^{(1)} = \mathbf{W}_{hh}^{(2)} = \dots = \mathbf{W}_{hh}^{(T)} = \mathbf{W}_{hh}.
+\end{equation}
 
-\subsection{Weight sharing across time}
-The defining feature of RNNs is \textbf{temporal weight sharing}. The parameter matrices $\mW_{xh}$, $\mW_{hh}$, and $\mW_{hy}$ are \emph{strictly identical} across all time steps $t \in \{1, \dots, T\}$. 
-Because the same weights are applied regardless of time step, the model develops \textbf{translation invariance}: if the same context occurs at step $t=2$ or step $t=50$, the recurrent cell behaves identically. The network learns grammatical rules (such as capitalizing the first letter after a quotation mark) once, and applies that rule everywhere in the text.
+This architectural invariance yields two decisive advantages:
+\begin{enumerate}
+    \item \textbf{Position-invariant inference}: Because the transition function is parameterized identically across time, the network applies uniform operational logic to input tokens regardless of their absolute temporal offset. An opening quotation mark encountered at $t=1$, $t=25$, or $t=100$ activates the exact same input projection $\mathbf{W}_{xh}$ and recurrent transition $\mathbf{W}_{hh}$, triggering identical state updates and eliminating the need to independently learn position-specific rules.
+    \item \textbf{Length-invariant parameter complexity}: The total number of learnable parameters in an Elman RNN is:
+    \begin{equation}
+    N_{\text{parameters}} = d_h \cdot d_x + d_h^2 + d_h + d_y \cdot d_h + d_y.
+    \label{eq:rnn_parameter_count}
+    \end{equation}
+    Crucially, Equation~\ref{eq:rnn_parameter_count} contains no term depending on sequence length $T$. The model can process a sequence of 5 tokens or 500 tokens using the exact same parameter budget, enabling deployment on sequences of arbitrary and varying lengths.
+\end{enumerate}
 
-\medskip
+\subsection{Backpropagation through time (BPTT) formulation}
+\label{subsec:rnn_bptt_formulation}
 
-\textit{As visualized in geometric visual analyses \cite{sanderson2024embeddings}, the hidden state $\vh_t \in \R^{d_h}$ can be understood geometrically as the position of a particle traveling through a continuous $d_h$-dimensional phase space:}
-\begin{itemize}
-    \item At rest ($t=0$), the system sits at initial coordinate $\vh_{-1} = \mathbf{0}$.
-    \item When each discrete input token $\vx_t$ arrives, the linear projection $\mW_{xh} \vx_t$ applies an external directional impulse or ``vector nudge'' to the particle.
-    \item Simultaneously, the recurrent transformation $\mW_{hh} \vh_{t-1}$ rotates, scales, and folds the previous position, while the non-linear squashing activation $\tanhact$ confines the entire state space within the hypercube $(-1, 1)^{d_h}$.
-    \item The unfolding sequence of text traces a smooth continuous trajectory through state space. Regions of this phase space function as \textbf{attractor basins}: for instance, reading an opening quote mark (\texttt{"}) knocks the state into a specific sub-manifold where the emission projection $\mW_{hy}$ naturally maps coordinates into uppercase character distributions. The state remains trapped in this basin until an exit trigger (such as a whitespace or subsequent character) forces the trajectory out into the lowercase manifold.
-\end{itemize}
+Because the computational graph of an RNN unrolls across time into an interconnected chain of operations sharing identical parameters, computing the gradients of the training objective requires a specialized formulation of reverse-mode automatic differentiation termed \textit{Backpropagation Through Time} (BPTT) \citep{werbos1990}.
 
-\subsection{Unrolling the recurrent cell across time}
-To trace how an RNN processes a sequence, we \emph{unroll} the recursive feedback loop across discrete time steps $t = 0, 1, \dots, T$.
+Consider a training sequence of length $T$ paired with target ground-truth one-hot vectors $\mathbf{y}_1^*, \dots, \mathbf{y}_T^*$. At each time step $t$, the network outputs a predicted probability distribution $\hat{\mathbf{y}}_t$ and evaluates a token-level categorical cross-entropy loss:
+\begin{equation}
+\mathcal{L}_t\left(\hat{\mathbf{y}}_t, \mathbf{y}_t^*\right) = -\sum_{k=1}^{d_y} y_{t, k}^* \log \hat{y}_{t, k}.
+\end{equation}
+The total scalar sequence loss $\mathcal{L}$ is defined as the temporal summation over all token losses:
+\begin{equation}
+\mathcal{L} = \sum_{t=1}^T \mathcal{L}_t\left(\hat{\mathbf{y}}_t, \mathbf{y}_t^*\right).
+\label{eq:rnn_total_loss}
+\end{equation}
 
-Consider the character casing task:
-\begin{itemize}
-    \item Input sequence: \texttt{"you are very kind, mr. holmes, but i cannot do that"}
-    \item Target sequence: \texttt{"You are very kind, Mr. Holmes, but I cannot do that"}
-\end{itemize}
-Each ASCII character is represented as a 256-dimensional one-hot vector $\vx_t \in \{0, 1\}^{256}$:
-\begin{itemize}
-    \item \textbf{Step $t=0$}: Receives input $s_0 = \text{\texttt{"}}$ with initial state $\vh_{-1} = \mathbf{0}$. The cell produces state $\vh_0$. The network realizes: \textit{``We just encountered an opening quote (\texttt{"}), which signals the beginning of dialogue; the following character should be capitalized.''}
-    \item \textbf{Step $t=1$}: Receives input $s_1 = \text{\texttt{y}}$ and prior state $\vh_0$. The network emits output $\hat{y}_1 = \text{\texttt{Y}}$ and produces updated state $\vh_1$. The state records: \textit{``We just emitted a capitalized letter at the start of dialogue; following letters in this word should probably be lowercase.''}
-    \item \textbf{Step $t=2$}: Receives input $s_2 = \text{\texttt{o}}$ and prior state $\vh_1$. The network emits output $\hat{y}_2 = \text{\texttt{o}}$ and produces state $\vh_2$, continuing lowercase word progression.
-\end{itemize}
-
-Figure~\ref{fig:unrolled_rnn} illustrates this unrolled computational structure and the backward flow of gradients.
+To update the parameters via gradient descent, we must evaluate the partial derivatives of $\mathcal{L}$ with respect to the shared weight matrices: $\frac{\partial \mathcal{L}}{\partial \mathbf{W}_{hy}}$, $\frac{\partial \mathcal{L}}{\partial \mathbf{W}_{xh}}$, and $\frac{\partial \mathcal{L}}{\partial \mathbf{W}_{hh}}$.
 
 \begin{figure}[htbp]
 \centering
-\resizebox{0.95\textwidth}{!}{%
 \begin{tikzpicture}[
-    node distance=1.6cm and 2.4cm,
-    cell/.style={rectangle, rounded corners=4pt, draw=pogreen, fill=thmGreenBg, thick, minimum width=20mm, minimum height=14mm, align=center, font=\small},
-    inout/.style={circle, draw=politoNavy, fill=skyBlue!30, thick, minimum size=10mm, font=\small\bfseries},
-    outnode/.style={circle, draw=intuitionPurple, fill=intuitionPurpleBg, thick, minimum size=10mm, font=\small\bfseries},
-    fwdarr/.style={-{Stealth[scale=1.1]}, thick, draw=bodyDark},
-    bwdarr/.style={-{Stealth[scale=1.1]}, very thick, dashed, draw=red!75!black}
+    >=stealth,
+    node distance=2.2cm,
+    every node/.style={font=\small},
+    unit/.style={draw=tfBlueBorder, fill=tfBlue, rounded corners=4pt, minimum width=1.5cm, minimum height=0.9cm, align=center, thick},
+    loss/.style={draw=tfPinkBorder, fill=tfPink, circle, minimum size=0.8cm, align=center, thick},
+    param/.style={draw=tfOrangeBorder, fill=tfOrange, rounded corners=3pt, minimum width=1.8cm, minimum height=0.7cm, align=center, thick}
 ]
 
-% Time Steps: t-1, t, t+1
-\node[cell] (ht_prev) at (0, 0) {$\vh_{t-1}$};
-\node[cell] (ht) [right=2.6cm of ht_prev] {$\vh_t$};
-\node[cell] (ht_next) [right=2.6cm of ht] {$\vh_{t+1}$};
-
-% Inputs
-\node[inout] (xt_prev) [below=1.4cm of ht_prev] {$\vx_{t-1}$};
-\node[inout] (xt) [below=1.4cm of ht] {$\vx_t$};
-\node[inout] (xt_next) [below=1.4cm of ht_next] {$\vx_{t+1}$};
-
-% Outputs
-\node[outnode] (yt_prev) [above=1.4cm of ht_prev] {$\hat{\vy}_{t-1}$};
-\node[outnode] (yt) [above=1.4cm of ht] {$\hat{\vy}_t$};
-\node[outnode] (yt_next) [above=1.4cm of ht_next] {$\hat{\vy}_{t+1}$};
+% RNN Steps
+\node[unit] (c1) at (0, 0) {$\mathbf{h}_1$};
+\node[unit] (c2) at (3.0, 0) {$\mathbf{h}_2$};
+\node[unit] (c3) at (6.0, 0) {$\mathbf{h}_3$};
+\node[unit] (ct) at (9.0, 0) {$\mathbf{h}_T$};
 
 % Losses
-\node (loss_prev) [above=0.8cm of yt_prev, font=\small] {$\Loss_{t-1}$};
-\node (loss_t) [above=0.8cm of yt] {$\Loss_t$};
-\node (loss_next) [above=0.8cm of yt_next, font=\small] {$\Loss_{t+1}$};
+\node[loss] (l1) at (0, 1.8) {$\mathcal{L}_1$};
+\node[loss] (l2) at (3.0, 1.8) {$\mathcal{L}_2$};
+\node[loss] (l3) at (6.0, 1.8) {$\mathcal{L}_3$};
+\node[loss] (lt) at (9.0, 1.8) {$\mathcal{L}_T$};
 
-% Forward Connections
-\draw[fwdarr] (xt_prev) -- node[right, font=\footnotesize] {$\mW_{xh}$} (ht_prev);
-\draw[fwdarr] (xt) -- node[right, font=\footnotesize] {$\mW_{xh}$} (ht);
-\draw[fwdarr] (xt_next) -- node[right, font=\footnotesize] {$\mW_{xh}$} (ht_next);
+% Shared Parameter Box
+\node[param] (w) at (4.5, -2.0) {$\text{Shared } \mathbf{W}_{hh}$};
 
-\draw[fwdarr] (ht_prev) -- node[above, font=\footnotesize] {$\mW_{hh}$} (ht);
-\draw[fwdarr] (ht) -- node[above, font=\footnotesize] {$\mW_{hh}$} (ht_next);
+% Forward connections
+\draw[->, thick, tfBlueBorder] (c1) -- node[above] {$\mathbf{h}_1$} (c2);
+\draw[->, thick, tfBlueBorder] (c2) -- node[above] {$\mathbf{h}_2$} (c3);
+\draw[->, dashed, thick, tfBlueBorder] (c3) -- (ct);
 
-\draw[fwdarr] (ht_prev) -- node[right, font=\footnotesize] {$\mW_{hy}$} (yt_prev);
-\draw[fwdarr] (ht) -- node[right, font=\footnotesize] {$\mW_{hy}$} (yt);
-\draw[fwdarr] (ht_next) -- node[right, font=\footnotesize] {$\mW_{hy}$} (yt_next);
+\draw[->, thick, tfBlueBorder] (c1) -- (l1);
+\draw[->, thick, tfBlueBorder] (c2) -- (l2);
+\draw[->, thick, tfBlueBorder] (c3) -- (l3);
+\draw[->, thick, tfBlueBorder] (ct) -- (lt);
 
-\draw[fwdarr] (yt_prev) -- (loss_prev);
-\draw[fwdarr] (yt) -- (loss_t);
-\draw[fwdarr] (yt_next) -- (loss_next);
+% Backward error propagation through time
+\draw[<-, thick, red!80!black] (c1.north east) -- node[above, font=\footnotesize, red!80!black] {$\frac{\partial \mathbf{h}_2}{\partial \mathbf{h}_1}$} (c2.north west);
+\draw[<-, thick, red!80!black] (c2.north east) -- node[above, font=\footnotesize, red!80!black] {$\frac{\partial \mathbf{h}_3}{\partial \mathbf{h}_2}$} (c3.north west);
+\draw[<-, dashed, thick, red!80!black] (c3.north east) -- (ct.north west);
 
-% BPTT Backward Gradient Arrows
-\draw[bwdarr] ($(ht_next.south west)+(0, 2pt)$) -- node[below, font=\scriptsize, text=red!75!black] {$\mW_{hh}^\top \mathbf{D}_{t+1}$} ($(ht.south east)+(0, 2pt)$);
-\draw[bwdarr] ($(ht.south west)+(0, 2pt)$) -- node[below, font=\scriptsize, text=red!75!black] {$\mW_{hh}^\top \mathbf{D}_t$} ($(ht_prev.south east)+(0, 2pt)$);
+\draw[<-, thick, red!80!black] (c1.north) -- (l1.south);
+\draw[<-, thick, red!80!black] (c2.north) -- (l2.south);
+\draw[<-, thick, red!80!black] (c3.north) -- (l3.south);
+\draw[<-, thick, red!80!black] (ct.north) -- (lt.south);
 
-\end{tikzpicture}%
-}
-\caption{Unrolling an RNN cell across time steps $t-1, t, t+1$. Solid black arrows show the forward propagation of inputs $\vx_t$ and recurrent states $\vh_t$. Dashed red arrows trace Backpropagation Through Time (BPTT), where gradients accumulate across time via repeated multiplications by the Jacobian $\mW_{hh}^\top \mathbf{D}_t$.}
-\label{fig:unrolled_rnn}
+% Parameter gradient accumulation
+\draw[<-, thick, purple!80!black] (w.north west) -- (c1.south);
+\draw[<-, thick, purple!80!black] (w.north) -- (c2.south);
+\draw[<-, thick, purple!80!black] (w.north east) -- (c3.south);
+\draw[<-, dashed, thick, purple!80!black] (w.east) -| (ct.south);
+
+\node[font=\footnotesize, text=red!80!black] at (4.5, 0.9) {Backward error flow across temporal chain};
+\node[font=\footnotesize, text=purple!80!black] at (4.5, -1.2) {Gradient contributions accumulated across all steps};
+
+\end{tikzpicture}
+\caption{The computational flow of Backpropagation Through Time (BPTT). Forward activations propagate chronologically (blue arrows), generating per-step losses. Error signals propagate backward along the temporal chain (red arrows), and local gradient contributions are accumulated into the shared parameter tensor (purple arrows).}
+\label{fig:rnn_bptt_flow}
 \end{figure}
 
-\clearpage
-\section{Backpropagation through time and the proof of vanishing gradients}
-\label{sec:bptt_proof}
-
-When an RNN processes a sequence of length $T$, the computational graph is unrolled $T$ times. The total sequence loss is the sum of cross-entropy losses incurred at each time step:
+The output projection gradient $\frac{\partial \mathcal{L}}{\partial \mathbf{W}_{hy}}$ depends only on current state activations. By applying the standard cross-entropy softmax gradient derived in Chapter 1:
 \begin{equation}
-\label{eq:total_rnn_loss}
-\Loss = \sum_{t=1}^T \Loss_t.
-\end{equation}
-To optimize the shared recurrent weight matrix $\mW_{hh}$ via Gradient Descent, we apply \textbf{Backpropagation Through Time (BPTT)}, first formalized for recurrent structures in \cite{werbos1990}. The fundamental difficulty of learning long-term dependencies through gradient descent was rigorously analyzed in \cite{bengio1994} and \cite{pascanu2013difficulty}. The gradient of the total loss with respect to $\mW_{hh}$ accumulates the contributions across all time steps:
-\begin{equation}
-\label{eq:bptt_grad_whh}
-\frac{\partial \Loss}{\partial \mW_{hh}} = \sum_{t=1}^T \sum_{k=1}^t \frac{\partial \Loss_t}{\partial \vh_t} \frac{\partial \vh_t}{\partial \vh_k} \frac{\partial^+ \vh_k}{\partial \mW_{hh}},
-\end{equation}
-where $\frac{\partial^+ \vh_k}{\partial \mW_{hh}}$ denotes the direct derivative of $\vh_k$ with respect to $\mW_{hh}$ treating $\vh_{k-1}$ as constant.
-
-The temporal transmission term $\frac{\partial \vh_t}{\partial \vh_k}$ represents the sensitivity of state $\vh_t$ to an earlier state $\vh_k$ ($t > k$). By the multivariate chain rule, this sensitivity decomposes into a product of single-step Jacobian matrices:
-\begin{equation}
-\label{eq:temporal_jacobian_product}
-\frac{\partial \vh_t}{\partial \vh_k} = \prod_{j=k+1}^t \frac{\partial \vh_j}{\partial \vh_{j-1}}.
+\frac{\partial \mathcal{L}}{\partial \mathbf{W}_{hy}} = \sum_{t=1}^T \frac{\partial \mathcal{L}_t}{\partial \mathbf{W}_{hy}} = \sum_{t=1}^T \left(\hat{\mathbf{y}}_t - \mathbf{y}_t^*\right) \mathbf{h}_t^\top.
+\label{eq:bptt_why}
 \end{equation}
 
-\subsection{Rigorous mathematical proof of gradient pathology}
-We now derive the explicit single-step Jacobian and prove why vanilla RNNs suffer from vanishing and exploding gradients.
+In contrast, evaluating the gradient with respect to the recurrent matrix $\mathbf{W}_{hh}$ requires accounting for the multivariable chain rule across all ancestral steps. Because $\mathbf{W}_{hh}$ was used to compute $\mathbf{h}_t$, which in turn depended on $\mathbf{h}_{t-1}$, which depended on $\mathbf{h}_{t-2}$, a perturbation in $\mathbf{W}_{hh}$ affects the loss $\mathcal{L}_t$ through multiple distinct pathways across time.
 
-\begin{theorem}{Jacobian product and spectral radius gradient decay}{jacobian_decay_proof}
-Let the recurrent state transition be $\vh_j = \tanhact(\vz_j)$ where $\vz_j = \mW_{hh} \vh_{j-1} + \mW_{xh} \vx_j + \vb_h$ with $\vh_j \in \R^{d_h}$ and $\mW_{hh} \in \R^{d_h \times d_h}$.
-Under standard column-vector convention, the single-step forward temporal Jacobian $\mathbf{J}_j = \frac{\partial \vh_j}{\partial \vh_{j-1}} \in \R^{d_h \times d_h}$ is:
+\textit{Derivation of the recurrent gradient accumulation.} To formalize this temporal dependence, let $\frac{\partial^+ \mathbf{h}_k}{\partial \mathbf{W}_{hh}}$ denote the \textit{direct} partial derivative of $\mathbf{h}_k$ with respect to $\mathbf{W}_{hh}$, treating antecedent state $\mathbf{h}_{k-1}$ as a constant:
 \begin{equation}
-\label{eq:single_step_jacobian}
-\mathbf{J}_j = \frac{\partial \vh_j}{\partial \vh_{j-1}} = \operatorname{diag}\left( 1 - \vh_j^2 \right) \mW_{hh} = \mathbf{D}_j \mW_{hh},
+\frac{\partial^+ \mathbf{h}_k}{\partial \mathbf{W}_{hh}} = \operatorname{diag}\left(1 - \mathbf{h}_k^2\right) \otimes \mathbf{h}_{k-1}^\top,
+\label{eq:direct_derivative_whh}
 \end{equation}
-where $\mathbf{D}_j = \operatorname{diag}(1 - \tanh^2(\vz_j)) \in \R^{d_h \times d_h}$ is a diagonal matrix containing the local derivatives of the hyperbolic tangent function. Consequently, the multi-step temporal transmission evaluates to:
+where $\otimes$ denotes the tensor outer product. The total derivative of step loss $\mathcal{L}_t$ with respect to $\mathbf{W}_{hh}$ sums over all temporal paths from step $k=1$ up to $k=t$:
 \begin{equation}
-\label{eq:full_chain_product}
-\frac{\partial \vh_t}{\partial \vh_k} = \prod_{j=k+1}^t \mathbf{D}_j \mW_{hh}.
+\frac{\partial \mathcal{L}_t}{\partial \mathbf{W}_{hh}} = \sum_{k=1}^t \frac{\partial \mathcal{L}_t}{\partial \mathbf{h}_t} \frac{\partial \mathbf{h}_t}{\partial \mathbf{h}_k} \frac{\partial^+ \mathbf{h}_k}{\partial \mathbf{W}_{hh}},
+\label{eq:step_loss_whh}
 \end{equation}
-When transmitting the gradient of a scalar loss $\Loss_t$ backward through time, the column-vector gradient $\nabla_{\vh_{j-1}} \Loss_t \in \R^{d_h}$ satisfies the adjoint recurrence $\nabla_{\vh_{j-1}} \Loss_t = \mW_{hh}^\top \mathbf{D}_j \nabla_{\vh_j} \Loss_t$.
-Let $\lambda_{\max} = \|\mW_{hh}\|_2 = \sigma_{\max}(\mW_{hh})$ denote the spectral norm (maximum singular value) of $\mW_{hh}$, and let $\rho(\mW_{hh}) = \max_i |\lambda_i|$ denote its spectral radius. The Euclidean norm of the transmitted gradient is bounded by:
+where $\frac{\partial \mathbf{h}_t}{\partial \mathbf{h}_k}$ represents the temporal Jacobian matrix describing how hidden activations at step $k$ propagate forward to influence hidden activations at step $t$.
+
+Summing over all sequence time steps $t \in \{1, \dots, T\}$, the complete gradient with respect to $\mathbf{W}_{hh}$ evaluates to:
 \begin{equation}
-\label{eq:gradient_bound}
-\norm{\frac{\partial \Loss_t}{\partial \vh_k}} \le \norm{\frac{\partial \Loss_t}{\partial \vh_t}} \left( \lambda_{\max} \right)^{t-k}.
+\frac{\partial \mathcal{L}}{\partial \mathbf{W}_{hh}} = \sum_{t=1}^T \sum_{k=1}^t \frac{\partial \mathcal{L}_t}{\partial \mathbf{h}_t} \frac{\partial \mathbf{h}_t}{\partial \mathbf{h}_k} \frac{\partial^+ \mathbf{h}_k}{\partial \mathbf{W}_{hh}}.
+\label{eq:full_bptt_whh}
 \end{equation}
-\end{theorem}
-
-\begin{proof}
-Differentiating the $i$-th component of $\vh_j$ with respect to the $m$-th component of $\vh_{j-1}$:
-\[
-\frac{\partial h_{j, i}}{\partial h_{j-1, m}} = \frac{\partial \tanh(z_{j, i})}{\partial z_{j, i}} \frac{\partial z_{j, i}}{\partial h_{j-1, m}} = (1 - h_{j, i}^2) W_{hh, i, m}.
-\]
-In matrix notation, the entry in row $i$ and column $m$ of $\frac{\partial \vh_j}{\partial \vh_{j-1}}$ is $(1 - h_{j, i}^2) W_{hh, i, m} = (\mathbf{D}_j)_{ii} W_{hh, i, m}$, which corresponds exactly to the matrix product $\mathbf{D}_j \mW_{hh}$.
-Taking the transpose for backward column-vector gradient propagation yields $(\mathbf{D}_j \mW_{hh})^\top = \mW_{hh}^\top \mathbf{D}_j$, matching the backward adjoint arrows in Figure~\ref{fig:unrolled_rnn}.
-Because $|\tanh'(z)| = 1 - \tanh^2(z) \in [0, 1]$, the operator 2-norm of each diagonal matrix satisfies $\|\mathbf{D}_j\|_2 \le 1$. Applying the sub-multiplicative property of matrix norms to Equation~\eqref{eq:full_chain_product}:
-\begin{align*}
-\norm{\frac{\partial \vh_t}{\partial \vh_k}}_2 &= \norm{\prod_{j=k+1}^t \mathbf{D}_j \mW_{hh}}_2 \le \prod_{j=k+1}^t \norm{\mathbf{D}_j}_2 \norm{\mW_{hh}}_2 \\
-&\le \prod_{j=k+1}^t 1 \cdot \lambda_{\max} = \left( \lambda_{\max} \right)^{t-k}.
-\end{align*}
-Multiplying by $\norm{\frac{\partial \Loss_t}{\partial \vh_t}}_2$ yields Equation~\eqref{eq:gradient_bound}.
-\end{proof}
-
-\subsection{Two pathological regimes: vanishing and exploding gradients}
-As proved by Pascanu et al.~\cite{pascanu2013difficulty}, the asymptotic behavior of the temporal Jacobian product $\prod_{j=k+1}^t \mathbf{D}_j \mW_{hh}$ bifurcates into two destructive regimes dictated by the spectrum of $\mW_{hh}$:
-\begin{enumerate}
-    \item \textbf{Vanishing Gradient ($\lambda_{\max} < 1$ or $\rho(\mW_{hh}) < 1$)}: If the largest singular value or spectral radius of $\mW_{hh}$ is strictly less than 1 (e.g., $\lambda_{\max} = 0.9$), over a temporal distance of 50 steps:
-    \[
-    0.9^{50} \approx 0.00515 \quad (\text{over } 99.5\% \text{ of the gradient signal is extinguished}).
-    \]
-    Over 100 steps, $0.9^{100} \approx 0.000026$. By Gelfand's formula ($\lim_{n \to \infty} \|\mW^n\|^{1/n} = \rho(\mW)$), the gradient decays exponentially to zero. Parameter updates from distal tokens vanish completely, meaning the network cannot learn long-range temporal dependencies. Saturated activations ($\tanh'(z) \to 0$) accelerate this decay exponentially.
-    \item \textbf{Exploding Gradient ($\lambda_{\max} > 1$ or $\rho(\mW_{hh}) > 1$)}: If the singular values exceed 1 (e.g., $\lambda_{\max} = 1.1$), over 50 steps:
-    \[
-    1.1^{50} \approx 117.39.
-    \]
-    Over 100 steps, $1.1^{100} \approx 13{,}780$. Gradients grow exponentially along the dominant eigenvectors, destabilizing training, inducing severe numerical overflow, and producing \texttt{NaN} parameter corruptions.
-\end{enumerate}
-
-\subsubsection{Global norm gradient clipping}
-To combat exploding gradients, Pascanu et al.~\cite{pascanu2013difficulty} introduced the technique of \emph{global norm clipping}. Instead of clipping individual scalar gradient elements independently (which alters the geometric direction of the descent vector), global norm clipping rescales the collective parameter gradient vector $\mathbf{g} = \nabla_\Theta \Loss$ whenever its total Euclidean norm exceeds a predefined threshold $\gamma > 0$:
+By identical reasoning, the gradient with respect to the input projection matrix $\mathbf{W}_{xh}$ accumulates across time as:
 \begin{equation}
-\label{eq:global_norm_clipping}
-\mathbf{g} \leftarrow \min\left(1, \; \frac{\gamma}{\|\mathbf{g}\|_2}\right) \mathbf{g}.
+\frac{\partial \mathcal{L}}{\partial \mathbf{W}_{xh}} = \sum_{t=1}^T \sum_{k=1}^t \frac{\partial \mathcal{L}_t}{\partial \mathbf{h}_t} \frac{\partial \mathbf{h}_t}{\partial \mathbf{h}_k} \frac{\partial^+ \mathbf{h}_k}{\partial \mathbf{W}_{xh}}, \quad \text{where} \quad \frac{\partial^+ \mathbf{h}_k}{\partial \mathbf{W}_{xh}} = \operatorname{diag}\left(1 - \mathbf{h}_k^2\right) \otimes \mathbf{x}_k^\top.
+\label{eq:full_bptt_wxh}
 \end{equation}
-Geometrically, Equation~\eqref{eq:global_norm_clipping} leaves the gradient direction strictly unaltered ($\frac{\mathbf{g}}{\|\mathbf{g}\|}$ is preserved) while projecting the step magnitude onto the hypersphere of radius $\gamma$. This prevents gradient descent from taking destabilizing parameter leaps across steep loss ravines and cliff-like bifurcations.
 
-\subsubsection{Long-term dependency degradation}
-Because hidden states are rewritten at every time step without persistent memory protection, vanilla RNNs exhibit pronounced recency bias: they retain information primarily from the most recent tokens. When tested on long-range word prediction:
-\begin{center}
-\textit{``The \textbf{mouse} was getting chased by the cat through the big house. After a long chase, the cat finally managed to catch the \rule{1.5cm}{0.4pt}''}
-\end{center}
-the target word is unambiguously \textit{``mouse''}. However, vanilla RNNs fail completely because the hidden state has overwritten the subject \textit{``mouse''} across the intervening 20 tokens.
+Equation~\ref{eq:full_bptt_whh} embodies the core operational mechanism of BPTT: during training, the network first performs a forward pass from $t=1$ to $T$, computing and caching all states $\mathbf{h}_t$ and per-step losses $\mathcal{L}_t$. Subsequently, the backward pass propagates error vectors backward through time, accumulating gradient contributions from every historical step into the shared parameter tensors.
 
-\clearpage
-\section{Character Prediction Case Study}
-\label{sec:sherlock_demo}
+\subsection{Empirical training dynamics: the Sherlock Holmes casing benchmark}
+\label{subsec:rnn_sherlock_holmes_casing}
 
-To demonstrate how an RNN learns sequential syntax in practice, we examine an empirical case study trained on Arthur Conan Doyle's \textit{The Adventures of Sherlock Holmes}:
+To ground the mathematical formulation of BPTT in empirical practice, we analyze the training dynamics of a character-level Elman recurrent network tasked with sentence case correction. The experimental framework directly mirrors the diagnostic benchmark evaluated during course lectures.
 
-\subsubsection{Experimental configuration}
-\begin{itemize}
-    \item \textbf{Corpus}: Raw text from Arthur Conan Doyle's \textit{The Adventures of Sherlock Holmes}.
-    \item \textbf{Sequence Length}: Subsequences sliced between 10 and 100 ASCII characters.
-    \item \textbf{Token Representation}: 256-dimensional one-hot vectors ($d_{\text{in}} = 256$).
-    \item \textbf{Architecture}: Single-layer vanilla RNN with hidden dimension $d_h = 32$.
-    \item \textbf{Optimization}: Adam optimizer ($\text{lr} = 0.001$), batch size 32, trained for 10 epochs.
-    \item \textbf{Padding Mechanism}: Null bytes (\texttt{0x00}, rendered visually as \texttt{X}) used to pad variable-length sequences to 100 characters.
-\end{itemize}
+\textit{Experimental setup.} A vanilla Elman RNN is trained on textual excerpts drawn from Arthur Conan Doyle's \textit{The Adventures of Sherlock Holmes}. The input sequence consists of raw sentences converted entirely to lowercase, represented as a stream of 256-dimensional one-hot vectors corresponding to standard ASCII characters ($d_x = 256$). The network utilizes a hidden state dimension $d_h = 32$, initialized with $\mathbf{h}_0 = \mathbf{0}$, and projects to a 256-dimensional categorical output distribution ($d_y = 256$). Optimization is conducted over 10 epochs using the Adam optimizer \citep{kingma2014adam} minimizing token-level cross-entropy loss.
 
-\subsubsection{Evaluation benchmark sentence}
-The model is evaluated after each epoch on a fixed unseen test string:
-\begin{itemize}
-    \item \textbf{Input Test Sequence}: \texttt{upon his pale face. "it may be so, or it may not, mr. holmes," said he, "but if you are so very sharp}
-    \item \textbf{Target Test Sequence}: \texttt{upon his pale face. "It may be so, or it may not, Mr. Holmes," said he, "but if you are so very sharp}
-\end{itemize}
-
-\subsubsection{Qualitative phase transitions across training epochs}
-Table~\ref{tab:sherlock_epochs} records the loss trajectory and qualitative phase transitions across training:
+The global training loss trajectory exhibits a characteristic progression: starting from an initial loss $\mathcal{L} \approx 3.0$, the loss drops to $2.0$ after 2 epochs, reaches $1.72$ at epoch 4, drops sharply to $0.95$ at epoch 6, and asymptotically plateaus around $0.85$ by epoch 10. Inspecting the qualitative outputs generated for a held-out test utterance reveals five distinct developmental stages of sequential pattern acquisition:
+\begin{equation}
+\text{Input text: } \quad \texttt{"it may be so, mr. holmes"}
+\end{equation}
 
 \begin{table}[htbp]
 \centering
 \small
-\caption{Epoch-by-epoch loss progression and qualitative phase transitions on the Sherlock Holmes casing task.}
-\label{tab:sherlock_epochs}
 \begin{tabularx}{\textwidth}{c c X}
 \toprule
-\textbf{Epoch} & \textbf{Loss} & \textbf{Observed Generation \& Qualitative Linguistic Transition} \\
+\textbf{Epoch} & \textbf{Loss $\mathcal{L}$} & \textbf{Predicted Character Sequence Output} \\
 \midrule
-\textbf{01} & 3.1681 & \texttt{XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX} \newline \emph{Phase 1 (Null-byte frequency)}: The model discovers that null padding bytes (\texttt{0x00} / \texttt{X}) appear with high statistical frequency due to padding imbalance, predicting all \texttt{X}'s. \\
+0 & $3.00$ & \texttt{\textbackslash x00 \dots \textbackslash x00} (repeated null padding bytes) \\
+1 & $2.45$ & \texttt{eeee eeee eeee eeee eeee eeee} \\
+3 & $1.72$ & \texttt{ie mae be so, mr. holmes} \\
+5 & $0.95$ & \texttt{"it may be so, mr. holmes"} \\
+7 & $0.88$ & \texttt{"It may be so, mr. Holmes"} \\
+10 & $0.84$ & \texttt{"It may be so, mr. Holmes"} \\
 \midrule
-\textbf{02} & 2.3334 & \texttt{eXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX} \newline \emph{Phase 2 (Vowel emergence)}: The model predicts \texttt{e} (the most frequent character in English orthography) alongside padding characters. \\
-\midrule
-\textbf{03} & 1.7436 & \texttt{tst X s te e eee t e e e te se ee se e e ee eee XXXee} \newline \emph{Phase 3 (Whitespace and unigrams)}: The model learns that whitespace characters occur regularly, predicting spaces, \texttt{e}, \texttt{t}, and \texttt{s}. \\
-\midrule
-\textbf{04} & 0.9519 & \texttt{upon his pale face. cit may be sos or it may nots mr. holresst} \newline \emph{Phase 4 (The Identity Breakthrough)}: A massive drop in loss occurs when the network learns to forward lowercase letters directly from input to output (\texttt{W.grad} captures the identity diagonal). \\
-\midrule
-\textbf{05--06} & 0.3579 & \texttt{upon his pale face. "it may be so, or it may not, mr. holmes,"} \newline \emph{Phase 5 (Punctuation and Syntax)}: The model captures quotation marks (\texttt{"}), commas, and spaces accurately. \\
-\midrule
-\textbf{07--08} & 0.1009 & \texttt{upon his pale face. "It may be so, or it may not, mr. holmes,"} \newline \emph{Phase 6 (Quote Capitalization)}: The model learns that characters immediately following opening quotes (\texttt{"}) must be capitalized (\texttt{"It}). \\
-\midrule
-\textbf{09--10} & 0.0515 & \texttt{upon his pale face. "It may be so, or it may not, mr. Holmes,"} \newline \emph{Phase 7 (Period Capitalization and Causal Blindness)}: The model capitalizes \texttt{Holmes} because it follows a period (\texttt{.}). Crucially, the model \textbf{fails to capitalize} \texttt{mr.} because it cannot see into the future. It does not know that \texttt{m} begins the title \texttt{Mr.} until the \texttt{r.} arrives. \\
+\textbf{Target} & --- & \texttt{"It may be so, Mr. Holmes"} \\
 \bottomrule
 \end{tabularx}
+\caption{Empirical evolution of character-level casing predictions produced by a 32-dimensional Elman RNN across 10 training epochs on an excerpt from \textit{The Adventures of Sherlock Holmes}. The progression illustrates the acquisition of padding bias, unigram frequency priors, whitespace structure, identity copying, and local punctuation-driven capitalization.}
+\label{tab:rnn_casing_progression}
 \end{table}
 
-\subsection{Character-level modeling, temperature sampling, and hidden state interpretability}
-\label{sec:karpathy_char_rnn}
-
-The Sherlock Holmes casing experiment exemplifies a broader paradigm analyzed in the landmark study \emph{``The Unreasonable Effectiveness of Recurrent Neural Networks''} \cite{karpathy2015rnn}: \textbf{character-level sequence modeling}.
-
-\medskip
-
-Unlike word-level models that require complex tokenizers, morphological analyzers, and massive vocabularies ($V \ge 50{,}000$), character-level RNNs operate over an extremely compact alphabet (e.g., standard 256-dimensional ASCII). 
-\begin{itemize}
-    \item There are \textbf{zero Out-of-Vocabulary (OOV) tokens}: any arbitrary string, code snippet, mathematical formula, or neologism can be represented as an sequence of bytes.
-    \item The model is forced to discover the hierarchical structure of language entirely from scratch: it must learn how characters form words, that words are separated by spaces, how punctuation delimits clauses, and how grammatical agreement spans across clauses.
-\end{itemize}
-
-\medskip
-
-During text generation, the RNN emits an unnormalized logit vector $\vz_t = \mW_{hy} \vh_t + \vb_y \in \R^V$. Rather than taking the deterministic $\argmax$, we convert logits into a sampling distribution modulated by a scalar hyperparameter: the \textbf{temperature} $T > 0$:
-\begin{equation}
-\label{eq:temperature_sampling}
-\Prob(y_t = c \mid \vh_t) = \frac{\exp\left( \frac{z_{t, c}}{T} \right)}{\sum_{j=1}^V \exp\left( \frac{z_{t, j}}{T} \right)}.
-\end{equation}
-The temperature controls the entropy and randomness of the emitted sequence:
-\begin{itemize}
-    \item \textbf{Low Temperature ($T \to 0$ / Greedy Decoding)}: Exaggerates differences between logits. The largest logit absorbs almost all probability mass ($p_{\max} \to 1$). The model makes confident, conservative predictions, but frequently falls into pathological mode collapse---getting trapped in infinite repetitive loops (e.g., \texttt{"the the the the"} or repeating identical sentence fragments).
-    \item \textbf{Balanced Temperature ($T \in [0.6, 0.8]$)}: Preserves the syntactic and morphological structure discovered by the network while introducing sufficient stochastic diversity to produce coherent, rich generations. In empirical experiments demonstrated in \cite{karpathy2015rnn}, character-level LSTMs trained at $T=0.7$ generated structurally sound Shakespearean plays (including character names, stage directions, and poetic meter), syntactically compilable C code from the Linux kernel, and valid algebraic geometry LaTeX documents.
-    \item \textbf{High Temperature ($T > 1.2$)}: Flattens the probability distribution toward a uniform distribution ($p_c \to 1/V$). The network makes chaotic, exploratory predictions, generating misspelled words, hallucinated punctuation, and unpronounceable character noise.
-\end{itemize}
-
-\medskip
-
-By inspecting the internal cell activations $\vh_t$ of a trained LSTM as it reads character sequences, the empirical investigation in \cite{karpathy2015rnn} revealed that individual hidden units act as interpretable linguistic finite-state machines:
+Deconstructing the progression recorded in Table~\ref{tab:rnn_casing_progression} reveals how gradient descent navigates the sequential hypothesis space:
 \begin{enumerate}
-    \item \textbf{The Quote Detection Neuron}: A single scalar unit in $\vh_t$ that fires strongly positive ($+1$) the moment an opening quotation mark (\texttt{"}) is parsed, remains persistently active throughout the enclosed dialogue, and resets immediately to $-1$ when the matching closing quote mark is encountered.
-    \item \textbf{The Code Indentation / Scope Depth Neuron}: In code generation models, a specific neuron's activation ramps up linearly with every tab or whitespace indentation inside nested loops or conditionals, tracking variable scope depth and resetting when closing brackets (\texttt{\}}) appear.
-    \item \textbf{The Line Length Tracker}: A unit whose activation monotonically increases across 80 characters, anticipating when to emit the carriage return (\texttt{\textbackslash n}) character to conform to standard formatting conventions.
+    \item \textbf{Epoch 0 (Null-byte padding bias)}: The uninitialized model produces repeated null bytes (\texttt{\textbackslash x00}). In training batches where variable-length strings are aligned using zero-padding, the null character exhibits high empirical prevalence. The optimizer initially exploits this zero-order marginal distribution to achieve trivial loss reduction.
+    \item \textbf{Epoch 1 (Unigram letter frequency prior)}: As backpropagation penalizes null outputs on non-padding tokens, the network discovers the marginal unigram frequency distribution of the English language. It repeatedly predicts the character \texttt{'e'}—the most statistically frequent English character—interleaved with periodic whitespace tokens.
+    \item \textbf{Epoch 3 (Whitespace and lexical boundaries)}: The model masters word boundary segmentation. It reliably predicts space characters following character clusters, establishing basic lexical cadence even while specific character identities remain noisy.
+    \item \textbf{Epoch 5 (Identity copying and the steep loss drop)}: The loss experiences a dramatic decline from $1.72$ to $0.95$. The recurrent network discovers the global structural invariant of the task: \textit{most output characters are identical to their input counterparts}. By configuring the composite transformation $\mathbf{W}_{hy} \tanh(\mathbf{W}_{xh} \mathbf{x}_t) \approx \mathbf{x}_t$, the network implements an identity bypass, echoing the input string verbatim.
+    \item \textbf{Epoch 7 (Local syntactic rule discovery)}: The network learns fine-grained sequential rules. Having observed that opening quotation marks precede dialogue, the state $\mathbf{h}_t$ transitions to capitalize the subsequent character, transforming \texttt{"it} into \texttt{"It}. Furthermore, it learns that the character sequence \texttt{holmes} constitutes a proper noun, correctly capitalizing the \texttt{'H'} in \texttt{Holmes}.
 \end{enumerate}
 
-\medskip
+\textit{The causal horizon failure.} Despite reaching training convergence by Epoch 10, the model exhibits a persistent failure: it fails to capitalize the title \texttt{mr.}, leaving it as lowercase \texttt{mr. Holmes}. This failure exposes the fundamental theoretical limitation of strictly causal, one-to-one recurrent processing. When the network ingests the character \texttt{'m'} at time step $t=15$, its decision to output \texttt{'M'} or \texttt{'m'} must be made strictly on the basis of antecedent observations $\mathbf{x}_{\le 15} = \texttt{'"it may be so, '}$. At this point in time, the network has not yet observed the upcoming characters \texttt{'r'}, \texttt{'.'}, or \texttt{'holmes'}. In general English prose, words beginning with the letter \texttt{'m'} (such as \textit{may, much, more, my, must}) are lowercase in over $95\%$ of occurrences. Because the causal one-to-one RNN is prohibited from observing future tokens, Bayes' optimal decision rule under cross-entropy forces the network to predict lowercase \texttt{'m'}.
 
-In practical character sequence modeling, two essential takeaways emerge from the Sherlock Holmes casing demonstration:
-\begin{itemize}
-    \item \textbf{Causal Lookahead Blindness}: Why did the one-to-one RNN fail to capitalize \texttt{"mr."} into \texttt{"Mr."} even after 10 epochs? The model operates strictly causally from left to right. When processing the character \texttt{'m'}, the model only sees past history. It cannot see into the future to know whether \texttt{'m'} begins the proper title \texttt{"Mr."} or common words like \texttt{"me"}, \texttt{"my"}, or \texttt{"much"}. Without lookahead, capitalizing \texttt{'m'} would be an unsupported guess. Conversely, the model successfully capitalizes \texttt{"Holmes"} because it has already observed the preceding period and space (\texttt{". h"}), triggering capitalization.
-    \item \textbf{Overfitting vs.~Generalization Dynamics}: Extending training for hundreds of epochs on a finite corpus (such as Doyle's novel) causes the model to memorize specific character $n$-grams verbatim. While training loss continues to drop toward zero, the network loses its ability to generalize to novel sentence structures, reinforcing the necessity of early stopping and validation monitoring.
-\end{itemize}
+Resolving this structural ambiguity requires an architecture that can inspect the entire sentence—including upcoming future tokens—before committing to an output classification.
 
 \clearpage
-\section{Gated architectures: LSTM and GRU}
-\label{sec:gated_architectures}
+\section{Pathologies of vanilla RNNs and gated architectures}
+\label{sec:rnn_pathologies_gated}
 
-To solve the vanishing gradient problem and allow neural networks to retain dependencies over hundreds of time steps, researchers introduced \textbf{Gated RNNs}:
+While the Elman recurrent network resolves the dimensional and parameter-sharing limitations of feed-forward models, it suffers from severe analytical and computational pathologies that impede learning across long temporal spans.
 
-\subsection{Long short-term memory (LSTM)}
-Introduced in \cite{hochreiter1997}, the \textbf{Long Short-Term Memory (LSTM)} network partitions memory into two separate states:
+\subsection{The vanishing and exploding gradient problem}
+\label{subsec:rnn_vanishing_exploding_gradients}
+
+The primary mathematical pathology governing vanilla recurrent architectures is the vanishing and exploding gradient phenomenon \citep{bengio1994,pascanu2013difficulty}. To understand its origin, we examine the temporal Jacobian matrix connecting hidden state $\mathbf{h}_k$ to hidden state $\mathbf{h}_t$ in Equation~\ref{eq:full_bptt_whh}.
+
+Applying the multivariate chain rule across $t - k$ intermediate recurrent steps yields a continuous product of Jacobian matrices:
+\begin{equation}
+\frac{\partial \mathbf{h}_t}{\partial \mathbf{h}_k} = \prod_{j=k+1}^t \frac{\partial \mathbf{h}_j}{\partial \mathbf{h}_{j-1}}.
+\label{eq:jacobian_chain_product}
+\end{equation}
+Recalling the hidden state transition equation $\mathbf{h}_j = \tanh(\mathbf{W}_{xh} \mathbf{x}_j + \mathbf{W}_{hh} \mathbf{h}_{j-1} + \mathbf{b}_h)$, the single-step temporal Jacobian evaluates to:
+\begin{equation}
+\frac{\partial \mathbf{h}_j}{\partial \mathbf{h}_{j-1}} = \operatorname{diag}\left(1 - \mathbf{h}_j^2\right) \mathbf{W}_{hh}^\top,
+\label{eq:single_step_jacobian}
+\end{equation}
+where $\operatorname{diag}(1 - \mathbf{h}_j^2) \in \mathbb{R}^{d_h \times d_h}$ is a diagonal matrix containing the first derivatives of the element-wise hyperbolic tangent function, $\tanh'(a) = 1 - \tanh^2(a)$.
+
+Substituting Equation~\ref{eq:single_step_jacobian} back into the chain product of Equation~\ref{eq:jacobian_chain_product} produces:
+\begin{equation}
+\frac{\partial \mathbf{h}_t}{\partial \mathbf{h}_k} = \prod_{j=k+1}^t \operatorname{diag}\left(1 - \mathbf{h}_j^2\right) \mathbf{W}_{hh}^\top.
+\label{eq:expanded_jacobian_product}
+\end{equation}
+The matrix product in Equation~\ref{eq:expanded_jacobian_product} contains $t - k$ successive matrix multiplications of the transposed recurrent weight matrix $\mathbf{W}_{hh}^\top$, modulated at each step by the activation derivatives.
+
+Let $\lambda_{\max}$ denote the largest eigenvalue (spectral radius) of the recurrent weight matrix $\mathbf{W}_{hh}$. Because the derivative of hyperbolic tangent is strictly bounded such that $0 < 1 - h_{j, m}^2 \le 1$, the asymptotic magnitude of the temporal Jacobian is bounded by:
+\begin{equation}
+\left\| \frac{\partial \mathbf{h}_t}{\partial \mathbf{h}_k} \right\| \le \left( \gamma \left\| \mathbf{W}_{hh}^\top \right\| \right)^{t - k}, \quad \text{where } \gamma \le 1.
+\label{eq:jacobian_norm_bound}
+\end{equation}
+
+This analytical bound establishes two opposing failure modes:
 \begin{enumerate}
-    \item \textbf{Cell State $\vc_t \in \R^{d_h}$}: The \emph{long-term memory} highway, which runs straight down the entire chain with minimal linear interactions.
-    \item \textbf{Hidden State $\vh_t \in \R^{d_h}$}: The \emph{short-term memory}, which acts as the visible output emitted at each step.
+    \item \textbf{Vanishing gradients}: If the spectral radius satisfies $\left\| \mathbf{W}_{hh} \right\| < 1$, or if hidden activations operate in saturating regimes where $1 - h_j^2 \ll 1$, the product decays exponentially toward zero as temporal distance $t - k$ increases:
+    \begin{equation}
+    \lim_{t - k \to \infty} \left\| \frac{\partial \mathbf{h}_t}{\partial \mathbf{h}_k} \right\| = 0.
+    \end{equation}
+    To appreciate the speed of this decay, consider a sequence of moderate length where $t - k = 50$, and suppose the effective scaling factor is $0.90$. Over 50 time steps, the gradient scaling factor diminishes to:
+    \begin{equation}
+    0.90^{50} \approx 0.00515,
+    \end{equation}
+    attenuating the error signal by more than two orders of magnitude. For $t - k = 100$, the scaling factor drops to $0.90^{100} \approx 2.65 \times 10^{-5}$. Consequently, error signals computed at time step $t$ exert virtually zero influence on parameter updates at distant antecedent steps $k \ll t$. The network becomes incapable of learning long-range temporal dependencies.
+    
+    \item \textbf{Exploding gradients}: If the spectral radius satisfies $\left\| \mathbf{W}_{hh} \right\| > 1$ and activations remain in the linear regime near zero ($\gamma \approx 1$), the matrix product grows exponentially with temporal distance:
+    \begin{equation}
+    \lim_{t - k \to \infty} \left\| \frac{\partial \mathbf{h}_t}{\partial \mathbf{h}_k} \right\| = \infty.
+    \end{equation}
+    Exploding gradients cause parameter updates $\Delta \mathbf{W} = -\eta \nabla_{\mathbf{W}} \mathcal{L}$ to become astronomically large, catapulting parameters across the loss surface into regions of numerical overflow (\texttt{NaN}) and destroying previously acquired representations.
 \end{enumerate}
 
-\begin{definition}{LSTM gating equations}{lstm_equations}
-At time step $t$, given input $\vx_t \in \R^{d_{\text{in}}}$ and previous hidden state $\vh_{t-1} \in \R^{d_h}$, the LSTM evaluates three sigmoid gates and a candidate state:
-\begin{align}
-\text{Forget Gate:} \quad \mathbf{f}_t &= \sigma\left( \mW_f [\vh_{t-1}, \vx_t] + \vb_f \right) \in (0, 1)^{d_h}, \label{eq:lstm_forget} \\
-\text{Input Gate:} \quad \mathbf{i}_t &= \sigma\left( \mW_i [\vh_{t-1}, \vx_t] + \vb_i \right) \in (0, 1)^{d_h}, \label{eq:lstm_input} \\
-\text{Candidate Cell:} \quad \tilde{\vc}_t &= \tanhact\left( \mW_c [\vh_{t-1}, \vx_t] + \vb_c \right) \in (-1, 1)^{d_h}, \label{eq:lstm_candidate} \\
-\text{Cell State Update:} \quad \vc_t &= \mathbf{f}_t \odot \vc_{t-1} + \mathbf{i}_t \odot \tilde{\vc}_t \in \R^{d_h}, \label{eq:lstm_highway} \\
-\text{Output Gate:} \quad \mathbf{o}_t &= \sigma\left( \mW_o [\vh_{t-1}, \vx_t] + \vb_o \right) \in (0, 1)^{d_h}, \label{eq:lstm_output} \\
-\text{Hidden State Update:} \quad \vh_t &= \mathbf{o}_t \odot \tanhact(\vc_t) \in (-1, 1)^{d_h}, \label{eq:lstm_hidden}
-\end{align}
-where $\odot$ denotes the element-wise Hadamard product, and $[\vh_{t-1}, \vx_t] \in \R^{d_h + d_{\text{in}}}$ denotes vector concatenation.
-\end{definition}
-
-\subsubsection{Semantic roles of the gating units}
-Each gate squashes pre-activations through a sigmoid function $\sigma \in [0, 1]$, functioning as a continuous valve:
-\begin{itemize}
-    \item Multiplying by $0 \implies$ drop/forget everything.
-    \item Multiplying by $1 \implies$ preserve/pass everything.
-\end{itemize}
-\begin{itemize}
-    \item \textbf{Forget Gate ($\mathbf{f}_t$)}: Regulates what proportion of the past cell state $\vc_{t-1}$ to discard. (e.g., when a closing quote or period arrives, the forget gate purges past sentence subjects).
-    \item \textbf{Input Gate ($\mathbf{i}_t$)}: Regulates what proportion of the new candidate information $\tilde{\vc}_t$ to write into the long-term cell state.
-    \item \textbf{Output Gate ($\mathbf{o}_t$)}: Regulates which portions of the internal cell state $\vc_t$ should be revealed as visible hidden state $\vh_t$ for current output predictions.
-\end{itemize}
-
-\begin{figure}[htbp]
-\centering
-\resizebox{0.88\textwidth}{!}{%
-\begin{tikzpicture}[
-    box/.style={rectangle, rounded corners=3pt, draw=politoNavy, fill=skyBlue!20, thick, minimum width=14mm, minimum height=8mm, font=\small},
-    op/.style={circle, draw=porange, fill=examAmberBg, thick, inner sep=1pt, font=\small\bfseries},
-    arr/.style={-{Stealth[scale=1.1]}, thick, draw=bodyDark}
-]
-
-% Cell State Highway (Top)
-\node (c_prev) at (-3.0, 3.2) {$\vc_{t-1}$};
-\node[op] (c_mult) at (-0.5, 3.2) {$\odot$};
-\node[op] (c_add) at (2.2, 3.2) {$\oplus$};
-\node (c_next) at (5.0, 3.2) {$\vc_t$};
-
-\draw[arr] (c_prev) -- (c_mult);
-\draw[arr] (c_mult) -- (c_add);
-\draw[arr] (c_add) -- (c_next);
-
-% Gates (Bottom)
-\node[box] (f_gate) at (-0.5, 1.2) {$\sigma$ ($\mathbf{f}_t$)};
-\node[box] (i_gate) at (1.2, 1.2) {$\sigma$ ($\mathbf{i}_t$)};
-\node[box] (c_cand) at (2.2, 0.2) {$\tanh$ ($\tilde{\vc}_t$)};
-\node[op] (cand_mult) at (2.2, 1.8) {$\odot$};
-\node[box] (o_gate) at (3.8, 1.2) {$\sigma$ ($\mathbf{o}_t$)};
-
-% Gate Connections to Highway
-\draw[arr] (f_gate) -- node[right, font=\scriptsize] {$\mathbf{f}_t$} (c_mult);
-\draw[arr] (i_gate) |- (cand_mult);
-\draw[arr] (c_cand) -- (cand_mult);
-\draw[arr] (cand_mult) -- (c_add);
-
-% Output and Hidden State
-\node[box] (tanh_out) at (3.8, 2.4) {$\tanh$};
-\node[op] (h_mult) at (5.0, 1.8) {$\odot$};
-\node (h_next) at (5.0, 0.0) {$\vh_t$};
-\node (h_prev) at (-3.0, 0.0) {$\vh_{t-1}$};
-\node (x_curr) at (-3.0, -1.0) {$\vx_t$};
-
-\draw[arr] (c_next) |- (tanh_out);
-\draw[arr] (tanh_out) |- (h_mult);
-\draw[arr] (o_gate) |- (h_mult);
-\draw[arr] (h_mult) -- (h_next);
-
-\end{tikzpicture}%
-}
-\caption{The LSTM memory cell architecture. The top horizontal path forms the uninterrupted additive cell state highway $\vc_t$ (the Constant Error Carousel). Forget gate $\mathbf{f}_t$, input gate $\mathbf{i}_t$, and output gate $\mathbf{o}_t$ modulate information flow using multiplicative valves.}
-\label{fig:lstm_cell}
-\end{figure}
-
-\begin{theorem}{The Constant Error Carousel proof}{cec_proof}
-In an LSTM, the gradient of the loss with respect to past cell state $\vc_{t-1}$ contains an additive direct path:
+While exploding gradients can be mitigated using the heuristic engineering technique of \textit{gradient clipping by global norm} \citep{pascanu2013difficulty}:
 \begin{equation}
-\label{eq:cec_gradient}
-\frac{\partial \vc_t}{\partial \vc_{t-1}} = \mathbf{f}_t + \frac{\partial \mathbf{f}_t}{\partial \vc_{t-1}} \vc_{t-1} + \frac{\partial \mathbf{i}_t}{\partial \vc_{t-1}} \tilde{\vc}_t + \frac{\partial \tilde{\vc}_t}{\partial \vc_{t-1}} \mathbf{i}_t.
+\mathbf{g} \leftarrow \begin{cases}
+\mathbf{g} & \text{if } \|\mathbf{g}\|_2 \le v, \\
+v \frac{\mathbf{g}}{\|\mathbf{g}\|_2} & \text{if } \|\mathbf{g}\|_2 > v,
+\end{cases}
+\label{eq:gradient_clipping}
 \end{equation}
-When the network sets forget gate $\mathbf{f}_t \approx \mathbf{1}$, the leading derivative collapses to $\frac{\partial \vc_t}{\partial \vc_{t-1}} \approx \mathbf{I}$. Consequently, over any arbitrary temporal horizon $T - k$:
+where $v > 0$ defines the maximum allowable gradient norm, gradient clipping cannot resolve vanishing gradients. When error gradients vanish to machine precision zero, no simple rescaling can restore the lost directional signal.
+
+\subsection{Long-term dependency decay and computational sequentiality}
+\label{subsec:rnn_long_term_decay_sequentiality}
+
+The mathematical vanishing of gradients manifests behaviorally as the loss of long-term temporal memory. Because the hidden state $\mathbf{h}_t \in \mathbb{R}^{d_h}$ has a strictly finite coordinate dimensionality, it must compress everything observed from step $1$ to step $t$ into a fixed-size vector. At each step, Equation~\ref{eq:rnn_hidden_state} subjects the state to non-linear transformation and vector addition with incoming tokens:
 \begin{equation}
-\label{eq:cec_chain}
-\frac{\partial \vc_T}{\partial \vc_k} = \prod_{j=k+1}^T \frac{\partial \vc_j}{\partial \vc_{j-1}} \approx \prod_{j=k+1}^T \mathbf{I} = \mathbf{I}.
+\mathbf{h}_t = \tanh\left(\mathbf{W}_{xh} \mathbf{x}_t + \mathbf{W}_{hh} \mathbf{h}_{t-1} + \mathbf{b}_h\right).
 \end{equation}
-Gradients flow backward across hundreds of time steps without exponential decay. This linear additive gradient highway is the \textbf{Constant Error Carousel (CEC)}.
-\end{theorem}
 
+In practice, new observations continuously overwrite the coordinates of $\mathbf{h}_t$. Unless specific architectural constraints prevent overwriting, information concerning tokens observed dozens of steps in the past decays exponentially, leaving the hidden state dominated almost entirely by the most recent $5$ to $10$ tokens.
 
-\textit{To build physical intuition for the Constant Error Carousel, think of the cell state $\vc_t$ as a continuous factory conveyor belt running from the start of the sequence to the end.} The standard recurrent transition in a vanilla RNN continually picks up the items, squashes them with weights and $\tanhact$, and puts a degraded version back on the belt. Over 50 time steps, the original items are unrecognizable.
+To illustrate this failure mode, consider the diagnostic sequence evaluated in lecture:
+\begin{equation}
+\text{Prompt: } \quad \texttt{"The mouse was getting chased by the cat through the big house.}
+\end{equation}
+\begin{equation}
+\quad \quad \quad \quad \quad \texttt{After a long chase, the cat finally managed to catch the [ \quad ]"}
+\end{equation}
 
-In an LSTM, items on the conveyor belt are untouched by default. As the belt passes each station:
+To correctly predict the target noun \texttt{"mouse"} at the sequence terminus, a language model must retain the identity of the original grammatical patient (\texttt{"mouse"}) across an intervening clause spanning more than 20 tokens. In a standard Elman RNN, the intervening tokens (\textit{"through the big house. After a long chase, the cat finally managed to catch the"}) trigger repeated state transitions that overwrite the coordinates storing \texttt{"mouse"}. Consequently, when the model predicts the final token, its state reflects recent terms such as \textit{"catch"}, prompting the generation of semantically plausible but contextually disconnected completions, such as \texttt{"ball"} or \texttt{"tail"}, while failing to recover the true referent.
+
+Beyond memory degradation, vanilla RNNs suffer from a profound hardware inefficiency: \textit{computational sequentiality}. By definition, evaluating state $\mathbf{h}_t$ requires antecedent state $\mathbf{h}_{t-1}$ as an explicit mathematical input. Consequently, a recurrent neural network cannot compute step $t$ until step $t-1$ has fully terminated:
+\begin{equation}
+\mathbf{h}_1 \longrightarrow \mathbf{h}_2 \longrightarrow \mathbf{h}_3 \longrightarrow \dots \longrightarrow \mathbf{h}_T.
+\end{equation}
+This temporal serialization creates a strict dependency chain along the sequence dimension, precluding the parallel evaluation of sequence tokens on modern massively parallel hardware accelerators (GPUs and TPUs). While batch instances can be processed in parallel across sequences, training runtime along the sequence dimension scales strictly as $\mathcal{O}(T)$, severely limiting the feasibility of scaling vanilla RNNs to long document contexts.
+
+\subsection{Gated recurrent units: LSTM and GRU}
+\label{subsec:rnn_gated_architectures}
+
+To overcome the vanishing gradient pathology and prevent the continuous overwriting of historical context, Hochreiter and Schmidhuber introduced the \textit{Long Short-Term Memory} (LSTM) network in 1997 \citep{hochreiter1997}.
+
+The foundational architectural innovation of the LSTM is the decoupling of memory into two distinct operational streams:
 \begin{enumerate}
-    \item The forget gate $\mathbf{f}_t$ acts as a discard mechanism: if $\mathbf{f}_t \approx 1$, the past item rides past undisturbed; if $\mathbf{f}_t \approx 0$, it is swept off the belt.
-    \item The input gate $\mathbf{i}_t$ adds new relevant cargo $\tilde{\vc}_t$ onto the belt via simple vector addition ($\oplus$).
-    \item The output gate $\mathbf{o}_t$ inspects the cargo on the belt, reads off a copy, and displays it to the outside world as hidden state $\vh_t$, leaving the underlying cell state intact on the highway.
-\end{enumerate}
-Because writing is additive rather than multiplicative, information can ride the conveyor belt across hundreds of words without experiencing exponential decay.
-
-\subsection{Gated recurrent unit (GRU)}
-Introduced in \cite{cho2014}, the \textbf{Gated Recurrent Unit (GRU)} simplifies the LSTM architecture by merging the cell state and hidden state into a single recurrent state $\vh_t$ and coupling the forget and input gates into a single \emph{update gate} $\mathbf{z}_t$:
-
-\begin{definition}{GRU equations}{gru_equations}
-At time step $t$, given input $\vx_t$ and prior state $\vh_{t-1}$:
-\begin{align}
-\text{Update Gate:} \quad \mathbf{z}_t &= \sigma\left( \mW_z [\vh_{t-1}, \vx_t] + \vb_z \right), \label{eq:gru_update} \\
-\text{Reset Gate:} \quad \mathbf{r}_t &= \sigma\left( \mW_r [\vh_{t-1}, \vx_t] + \vb_r \right), \label{eq:gru_reset} \\
-\text{Candidate Hidden State:} \quad \tilde{\vh}_t &= \tanhact\left( \mW_h [\mathbf{r}_t \odot \vh_{t-1}, \vx_t] + \vb_h \right), \label{eq:gru_candidate} \\
-\text{Hidden State Interpolation:} \quad \vh_t &= (1 - \mathbf{z}_t) \odot \vh_{t-1} + \mathbf{z}_t \odot \tilde{\vh}_t. \label{eq:gru_hidden}
-\end{align}
-\end{definition}
-
-\subsubsection{Physical gate routing and memory modulation}
-The GRU cell operates through two coupled mechanisms illustrated in Figure~\ref{fig:gru_cell}:
-\begin{enumerate}
-    \item \textbf{Reset Gate Modulation ($\mathbf{r}_t$)}: The reset gate vector $\mathbf{r}_t \in (0, 1)^{d_h}$ acts as a dynamic filter applied to the previous hidden state $\vh_{t-1}$ via Hadamard multiplication ($\mathbf{r}_t \odot \vh_{t-1}$). If $\mathbf{r}_t \approx \mathbf{0}$, the candidate state $\tilde{\vh}_t$ completely ignores past memory, resetting the representation to depend exclusively on the current token $\vx_t$ (e.g., at sentence boundaries or clause resets). If $\mathbf{r}_t \approx \mathbf{1}$, the full history flows into the candidate calculation.
-    \item \textbf{Update Gate Convex Interpolation ($\mathbf{z}_t$)}: Rather than using distinct input and forget gates like the LSTM, the GRU couples memory retention and candidate addition into a single convex combination:
-    \[
-    \vh_t = (1 - \mathbf{z}_t) \odot \vh_{t-1} + \mathbf{z}_t \odot \tilde{\vh}_t.
-    \]
-    When $\mathbf{z}_t \approx \mathbf{0}$, the unit passes the previous state $\vh_{t-1}$ forward unchanged ($1 \odot \vh_{t-1} + 0 \odot \tilde{\vh}_t = \vh_{t-1}$), establishing an unobstructed linear identity shortcut similar to the LSTM Constant Error Carousel. When $\mathbf{z}_t \approx \mathbf{1}$, the unit overwrites the state entirely with the newly proposed candidate $\tilde{\vh}_t$.
+    \item \textbf{Cell state ($\mathbf{c}_t \in \mathbb{R}^{d_h}$)}: Functions as a dedicated, linear long-term memory trunk (colloquially termed the "conveyor belt").
+    \item \textbf{Hidden state ($\mathbf{h}_t \in \mathbb{R}^{d_h}$)}: Serves as the short-term, task-facing output representation used for immediate predictions and gate conditioning.
 \end{enumerate}
 
 \begin{figure}[htbp]
 \centering
-\resizebox{0.88\textwidth}{!}{%
 \begin{tikzpicture}[
-    box/.style={rectangle, rounded corners=3pt, draw=politoNavy, fill=skyBlue!20, thick, minimum width=15mm, minimum height=8mm, font=\small},
-    op/.style={circle, draw=porange, fill=examAmberBg, thick, inner sep=1.5pt, font=\small\bfseries},
-    inv/.style={rectangle, rounded corners=2pt, draw=deepdiveTeal, fill=deepdiveTealBg, thick, minimum width=12mm, minimum height=6mm, font=\scriptsize\bfseries},
-    arr/.style={-{Stealth[scale=1.1]}, thick, draw=bodyDark},
-    fork/.style={circle, fill=bodyDark, inner sep=1.2pt}
+    >=stealth,
+    node distance=1.6cm,
+    every node/.style={font=\small},
+    op/.style={draw=tfYellowBorder, fill=tfYellow, circle, minimum size=0.7cm, align=center, thick},
+    gate/.style={draw=tfOrangeBorder, fill=tfOrange, rounded corners=3pt, minimum width=0.9cm, minimum height=0.7cm, align=center, thick},
+    box/.style={draw=tfBlueBorder, fill=tfBlue, rounded corners=3pt, minimum width=0.9cm, minimum height=0.7cm, align=center, thick},
+    state/.style={draw=tfPurpleBorder, fill=tfPurple, rounded corners=2pt, minimum width=0.9cm, minimum height=0.6cm, align=center, thick},
+    io/.style={draw=tfPinkBorder, fill=tfPink, circle, minimum size=0.7cm, align=center, thick}
 ]
 
 % Inputs
-\node (h_prev) at (-3.5, 2.6) {$\vh_{t-1}$};
-\node (x_curr) at (-3.5, -0.8) {$\vx_t$};
+\node[state] (ctm1) at (-4.2, 2.0) {$\mathbf{c}_{t-1}$};
+\node[state] (htm1) at (-4.2, -1.0) {$\mathbf{h}_{t-1}$};
+\node[io] (xt) at (-4.2, -2.5) {$\mathbf{x}_t$};
 
-% Horizontal highway for h_{t-1}
-\node[fork] (h_fork1) at (-2.0, 2.6) {};
-\node[op] (h_mult_past) at (1.8, 2.6) {$\odot$};
-\node[op] (h_add) at (4.6, 2.6) {$\oplus$};
-\node (h_next) at (6.2, 2.6) {$\vh_t$};
+% Joint input node
+\coordinate (joint) at (-3.2, -1.75);
 
-\draw[arr] (h_prev) -- (h_mult_past);
-\draw[arr] (h_mult_past) -- (h_add);
-\draw[arr] (h_add) -- (h_next);
+% Gates
+\node[gate] (f) at (-2.0, 0.2) {$\sigma$};
+\node[gate] (i) at (-0.7, 0.2) {$\sigma$};
+\node[box] (c_tilde) at (0.6, 0.2) {$\tanh$};
+\node[gate] (o) at (1.9, 0.2) {$\sigma$};
 
-% Input line x_t
-\node[fork] (x_fork) at (-2.0, -0.8) {};
-\draw[arr] (x_curr) -- (x_fork);
+% Pointwise operators on cell line
+\node[op] (mul1) at (-2.0, 2.0) {$\odot$};
+\node[op] (add) at (0.6, 2.0) {$+$};
+\node[op] (tanh_c) at (2.8, 1.0) {$\tanh$};
+\node[op] (mul2) at (2.8, -0.2) {$\odot$};
 
-% Gate nodes at bottom
-\node[box] (r_gate) at (-1.0, 0.4) {$\sigma$ ($\mathbf{r}_t$)};
-\node[box] (z_gate) at (0.8, 0.4) {$\sigma$ ($\mathbf{z}_t$)};
-\node[box] (h_cand) at (3.2, 0.4) {$\tanh$ ($\tilde{\vh}_t$)};
+% Outputs
+\node[state] (ct) at (4.5, 2.0) {$\mathbf{c}_t$};
+\node[state] (ht) at (4.5, -0.2) {$\mathbf{h}_t$};
 
-% Reset multiplication
-\node[op] (r_mult) at (2.2, 1.4) {$\odot$};
+% Flow on cell trunk
+\draw[->, very thick, tfBlueBorder] (ctm1) -- (mul1);
+\draw[->, very thick, tfBlueBorder] (mul1) -- (add);
+\draw[->, very thick, tfBlueBorder] (add) -- (ct);
 
-% Routing h_{t-1} into gates and reset
-\draw[arr] (h_fork1) |- (r_gate.160);
-\draw[arr] (h_fork1) |- (z_gate.160);
-\draw[arr] (h_fork1) |- (r_mult);
+% Joint input routing
+\draw[thick] (htm1) -| (joint);
+\draw[thick] (xt) -| (joint);
 
-% Routing x_t into gates and candidate
-\draw[arr] (x_fork) |- (r_gate.200);
-\draw[arr] (x_fork) |- (z_gate.200);
-\draw[arr] (x_fork) -| ($(h_cand.south)+(2mm,0)$);
+\draw[->, thick] (joint) -| (f);
+\draw[->, thick] (joint) -| (i);
+\draw[->, thick] (joint) -| (c_tilde);
+\draw[->, thick] (joint) -| (o);
 
-% Reset gate into r_mult, then into candidate
-\draw[arr] (r_gate) |- (r_mult);
-\draw[arr] (r_mult) -| ($(h_cand.north)-(2mm,0)$);
+% Gate operations
+\draw[->, thick] (f) -- node[right, font=\footnotesize] {$\mathbf{f}_t$} (mul1);
+\draw[->, thick] (i) -- node[right, font=\footnotesize] {$\mathbf{i}_t$} ++(0, 0.8) coordinate (i_out);
+\draw[->, thick] (c_tilde) -- node[right, font=\footnotesize] {$\tilde{\mathbf{c}}_t$} (add);
+\draw[thick] (i_out) -- (add);
 
-% Update gate z_t routing
-\node[fork] (z_fork) at (0.8, 1.4) {};
-\node[inv] (inv_z) at (1.8, 1.8) {$1 - \mathbf{z}_t$};
-\node[op] (cand_mult) at (4.6, 1.4) {$\odot$};
+% Output state operations
+\draw[->, thick] (add) -| (tanh_c);
+\draw[->, thick] (tanh_c) -- (mul2);
+\draw[->, thick] (o) |- node[above, font=\footnotesize] {$\mathbf{o}_t$} (mul2);
+\draw[->, very thick, tfPurpleBorder] (mul2) -- (ht);
 
-\draw[thick, draw=bodyDark] (z_gate) -- (z_fork);
-\draw[arr] (z_fork) |- (inv_z);
-\draw[arr] (inv_z) -- (h_mult_past);
-\draw[arr] (z_fork) -- (cand_mult);
-\draw[arr] (h_cand) -| (cand_mult);
-\draw[arr] (cand_mult) -- (h_add);
+% Container border
+\draw[draw=tfGrayBorder, fill=tfGrayBg, fill opacity=0.12, dashed, rounded corners=8pt] (-3.8, -2.8) rectangle (4.0, 2.6);
+\node[font=\footnotesize\itshape, text=gray] at (0, -2.6) {Long Short-Term Memory (LSTM) recurrent cell};
 
-\end{tikzpicture}%
-}
-\caption{The Gated Recurrent Unit (GRU) cell architecture. Reset gate $\mathbf{r}_t$ dynamically filters previous hidden state $\vh_{t-1}$ before constructing candidate state $\tilde{\vh}_t$. Update gate $\mathbf{z}_t$ controls the convex interpolation $(1 - \mathbf{z}_t) \odot \vh_{t-1} + \mathbf{z}_t \odot \tilde{\vh}_t$, unifying long- and short-term memory into a single state vector $\vh_t$.}
-\label{fig:gru_cell}
+\end{tikzpicture}
+\caption{Detailed architectural schematic of the Long Short-Term Memory (LSTM) cell, illustrating the linear cell-state trunk ($\mathbf{c}_t$), the multiplicative forget gate ($\mathbf{f}_t$), input gate ($\mathbf{i}_t$), candidate state ($\tilde{\mathbf{c}}_t$), and output gate ($\mathbf{o}_t$).}
+\label{fig:rnn_lstm_cell}
 \end{figure}
 
-\subsubsection{Parameter count comparison: vanilla RNN vs.~LSTM vs.~GRU}
-Comparing the exact parameter counts of recurrent cells for hidden dimension $d$ and input dimension $m$ clarifies the architectural trade-offs across sequence models:
-\begin{itemize}
-    \item \textbf{Vanilla RNN}: Contains 1 transition set $(\mW_{hh}, \mW_{xh}, \vb_h) \implies d^2 + dm + d = d(d + m + 1)$.
-    \item \textbf{GRU}: Contains 3 gate sets $(\mathbf{z}_t, \mathbf{r}_t, \tilde{\vh}_t) \implies 3 \times d(d + m + 1)$.
-    \item \textbf{LSTM}: Contains 4 gate sets $(\mathbf{f}_t, \mathbf{i}_t, \tilde{\vc}_t, \mathbf{o}_t) \implies 4 \times d(d + m + 1)$.
-\end{itemize}
-The GRU reduces parameters by $25\%$ compared to the LSTM while exhibiting comparable empirical performance across diverse sequence modeling benchmarks.
+The interaction between cell memory and incoming data is governed by three non-linear gates, parameterized using logistic sigmoid functions $\sigma(z) = (1 + e^{-z})^{-1} \in [0, 1]$. Because the sigmoid output ranges strictly between 0 and 1, gate activations act as coordinate-wise attenuation coefficients: a value of $0$ blocks information transmission entirely, while a value of $1$ permits complete transmission.
 
-\clearpage
-\section{Sequence-to-sequence (Seq2Seq) and encoder-decoder pipelines}
-\label{sec:seq2seq}
-
-\subsection{Limitations of one-to-one sequence mapping}
-Thus far, we have considered models where each input step produces exactly one output step ($|X| = |Y|$), such as character-level case correction. However, the majority of core NLP tasks (machine translation, question answering, code generation) violate this assumption:
+The algebraic execution of the LSTM unfolds in five sequential stages:
 \begin{enumerate}
-    \item \textbf{Unequal Sequence Lengths}: In machine translation, source and target languages rarely match in word count:
-    \begin{center}
-    English (5 words): \textit{[it] [is] [indeed] [sunny] [today]} $\implies$ Italian (4 words): \textit{[effettivamente] [oggi] [\`e] [soleggiato]}.
-    \end{center}
-    A one-to-one recurrent model would process 5 tokens and be forced to produce 5 output tokens.
-    \item \textbf{Non-Monotonic Alignment and Causal Blindness}: Natural languages exhibit different word orders. In the example above, the Italian word \textit{``effettivamente''} must be emitted at step 1, but its English counterpart \textit{``indeed''} does not appear until step 3. In a standard one-to-one model, the cell cannot see the future, rendering early word generation impossible.
+    \item \textbf{Forget gate}: Determines what fraction of the antecedent cell state $\mathbf{c}_{t-1}$ should be discarded:
+    \begin{equation}
+    \mathbf{f}_t = \sigma\left(\mathbf{W}_f \left[\mathbf{h}_{t-1}, \mathbf{x}_t\right] + \mathbf{b}_f\right) \in [0, 1]^{d_h},
+    \label{eq:lstm_forget_gate}
+    \end{equation}
+    where $\left[\mathbf{h}_{t-1}, \mathbf{x}_t\right] \in \mathbb{R}^{d_h + d_x}$ denotes vector concatenation, $\mathbf{W}_f \in \mathbb{R}^{d_h \times (d_h + d_x)}$ is the forget weight matrix, and $\mathbf{b}_f \in \mathbb{R}^{d_h}$ is the forget bias.
+    
+    \item \textbf{Input gate and candidate memory}: Regulates what new information should be added to the persistent cell state:
+    \begin{align}
+    \mathbf{i}_t & = \sigma\left(\mathbf{W}_i \left[\mathbf{h}_{t-1}, \mathbf{x}_t\right] + \mathbf{b}_i\right) \in [0, 1]^{d_h}, \label{eq:lstm_input_gate} \\
+    \tilde{\mathbf{c}}_t & = \tanh\left(\mathbf{W}_c \left[\mathbf{h}_{t-1}, \mathbf{x}_t\right] + \mathbf{b}_c\right) \in (-1, 1)^{d_h}, \label{eq:lstm_candidate_cell}
+    \end{align}
+    where $\mathbf{i}_t$ controls write access, and $\tilde{\mathbf{c}}_t$ creates a new candidate vector of bounded additions.
+    
+    \item \textbf{Cell state update (The Constant Error Carousel)}: The new cell state $\mathbf{c}_t$ is computed via linear combination:
+    \begin{equation}
+    \mathbf{c}_t = \mathbf{f}_t \odot \mathbf{c}_{t-1} + \mathbf{i}_t \odot \tilde{\mathbf{c}}_t,
+    \label{eq:lstm_cell_state_update}
+    \end{equation}
+    where $\odot$ denotes element-wise (Hadamard) vector multiplication.
+    
+    \item \textbf{Output gate and hidden state}: Computes the visible output state by filtering the updated cell state:
+    \begin{align}
+    \mathbf{o}_t & = \sigma\left(\mathbf{W}_o \left[\mathbf{h}_{t-1}, \mathbf{x}_t\right] + \mathbf{b}_o\right) \in [0, 1]^{d_h}, \label{eq:lstm_output_gate} \\
+    \mathbf{h}_t & = \mathbf{o}_t \odot \tanh\left(\mathbf{c}_t\right) \in (-1, 1)^{d_h}. \label{eq:lstm_hidden_output}
+    \end{align}
 \end{enumerate}
 
-\subsection{The encoder-decoder architecture}
-To overcome these limitations, the \textbf{Encoder-Decoder (Seq2Seq)} architecture was introduced in \cite{sutskever2014} and \cite{cho2014}:
-\begin{enumerate}
-    \item \textbf{Encoder}: An LSTM processes the entire variable-length source sequence $(x_1, \dots, x_N)$ step by step, updating its internal state. The final hidden state $\vh_N$ acts as a dense, compressed summary vector encoding the semantics of the whole input sentence.
-    \item \textbf{Decoder}: A separate LSTM initialized with state $\vh_N$. The decoder autoregressively emits target tokens step by step. The initial input token is the special Beginning of Sequence symbol $\langle\text{BOS}\rangle$. At each subsequent step $t$, the input is the token emitted at step $t-1$. Generation continues until the model emits the special End of Sequence symbol $\langle\text{EOS}\rangle$.
-\end{enumerate}
-
-\begin{figure}[htbp]
-\centering
-\resizebox{0.92\textwidth}{!}{%
-\begin{tikzpicture}[
-    node distance=1.4cm and 1.8cm,
-    encnode/.style={rectangle, rounded corners=3pt, draw=politoNavy, fill=skyBlue!30, thick, minimum width=18mm, minimum height=10mm, align=center, font=\small},
-    decnode/.style={rectangle, rounded corners=3pt, draw=intuitionPurple, fill=intuitionPurpleBg, thick, minimum width=18mm, minimum height=10mm, align=center, font=\small},
-    statebox/.style={rectangle, rounded corners=4pt, draw=deepdiveTeal, fill=deepdiveTealBg, very thick, minimum width=24mm, minimum height=12mm, align=center, font=\small\bfseries},
-    toknode/.style={circle, draw=bodyGray, fill=white, thick, minimum size=8mm, font=\footnotesize},
-    arr/.style={-{Stealth[scale=1.1]}, thick, draw=bodyDark}
-]
-
-% Encoder Nodes
-\node[toknode] (x1) at (0, 0) {it};
-\node[encnode] (e1) at (0, 1.6) {$\text{LSTM}_{\text{enc}}$};
-\node[toknode] (x2) at (2.0, 0) {is};
-\node[encnode] (e2) at (2.0, 1.6) {$\text{LSTM}_{\text{enc}}$};
-\node[toknode] (x3) at (4.0, 0) {sunny};
-\node[encnode] (e3) at (4.0, 1.6) {$\text{LSTM}_{\text{enc}}$};
-
-\draw[arr] (x1) -- (e1);
-\draw[arr] (x2) -- (e2);
-\draw[arr] (x3) -- (e3);
-\draw[arr] (e1) -- (e2);
-\draw[arr] (e2) -- (e3);
-
-% Context Bottleneck Vector
-\node[statebox] (ctx) at (6.5, 1.6) {Context State\\$\vh_N \in \R^{d_h}$};
-\draw[arr] (e3) -- (ctx);
-
-% Decoder Nodes
-\node[decnode] (d1) at (9.0, 1.6) {$\text{LSTM}_{\text{dec}}$};
-\node[toknode] (bos) at (9.0, 0) {$\langle\text{BOS}\rangle$};
-\node[toknode] (y1) at (9.0, 3.2) {oggi};
-
-\node[decnode] (d2) at (11.4, 1.6) {$\text{LSTM}_{\text{dec}}$};
-\node[toknode] (y2) at (11.4, 3.2) {\`e};
-
-\node[decnode] (d3) at (13.8, 1.6) {$\text{LSTM}_{\text{dec}}$};
-\node[toknode] (y3) at (13.8, 3.2) {$\langle\text{EOS}\rangle$};
-
-\draw[arr] (ctx) -- (d1);
-\draw[arr] (bos) -- (d1);
-\draw[arr] (d1) -- (y1);
-
-\draw[arr] (d1) -- (d2);
-\draw[arr] (y1) |- (10.2, 0.8) -| ($(d2.south)-(3mm,0)$);
-\draw[arr] (d2) -- (y2);
-
-\draw[arr] (d2) -- (d3);
-\draw[arr] (y2) |- (12.6, 0.8) -| ($(d3.south)-(3mm,0)$);
-\draw[arr] (d3) -- (y3);
-
-\end{tikzpicture}%
-}
-\caption{The Sequence-to-Sequence (Seq2Seq) Encoder-Decoder architecture. The Encoder LSTM compresses the variable-length source sentence into a single context state $\vh_N$. The Decoder LSTM is initialized with $\vh_N$ and autoregressively emits target tokens from $\langle\text{BOS}\rangle$ until emitting $\langle\text{EOS}\rangle$.}
-\label{fig:seq2seq_pipeline}
-\end{figure}
-
-\subsection{Teacher forcing vs.~inference exposure bias}
-During early training, the decoder may predict an incorrect token $\hat{y}_{t-1}$. If that prediction becomes the input at step $t$, the error can affect later predictions and accumulate across the sequence.
-
-To stabilize and accelerate training, practitioners use \textbf{Teacher Forcing}:
+\textit{Proof of the Constant Error Carousel (CEC).} To understand why the LSTM eliminates the vanishing gradient pathology, we differentiate the cell state update (Equation~\ref{eq:lstm_cell_state_update}) with respect to the antecedent cell state $\mathbf{c}_{t-1}$:
 \begin{equation}
-\label{eq:teacher_forcing}
-\vx_{\text{dec}, t} = y_{t-1}^* \quad (\text{pass true ground-truth target token instead of predicted } \hat{y}_{t-1}).
+\frac{\partial \mathbf{c}_t}{\partial \mathbf{c}_{t-1}} = \operatorname{diag}\left(\mathbf{f}_t\right) + \frac{\partial \mathbf{f}_t}{\partial \mathbf{c}_{t-1}} \odot \mathbf{c}_{t-1} + \frac{\partial \mathbf{i}_t}{\partial \mathbf{c}_{t-1}} \odot \tilde{\mathbf{c}}_t + \mathbf{i}_t \odot \frac{\partial \tilde{\mathbf{c}}_t}{\partial \mathbf{c}_{t-1}}.
 \end{equation}
-\emph{Exposure Bias Warning}: While Teacher Forcing provides rapid convergence during training, it creates a discrepancy at inference time when ground-truth tokens are unavailable, causing models to be fragile when recovering from early generation mistakes.
+Along the primary diagonal path, the gradient is dominated by the direct linear transmission term:
+\begin{equation}
+\frac{\partial \mathbf{c}_t}{\partial \mathbf{c}_{t-1}} \approx \operatorname{diag}\left(\mathbf{f}_t\right).
+\end{equation}
+Across an extended temporal interval from step $k$ to step $t$, the accumulated error gradient evaluates to:
+\begin{equation}
+\frac{\partial \mathbf{c}_t}{\partial \mathbf{c}_k} = \prod_{j=k+1}^t \operatorname{diag}\left(\mathbf{f}_j\right).
+\label{eq:cec_gradient_propagation}
+\end{equation}
+Crucially, Equation~\ref{eq:cec_gradient_propagation} does not involve repeated multiplications of a weight matrix $\mathbf{W}_{hh}^\top$, nor does it involve saturating activation derivatives $\tanh'$. If the network learns to saturate the forget gates near one ($\mathbf{f}_j \approx \mathbf{1}$), the gradient product evaluates to the identity matrix:
+\begin{equation}
+\frac{\partial \mathbf{c}_t}{\partial \mathbf{c}_k} = \prod_{j=k+1}^t \mathbf{I} = \mathbf{I}.
+\end{equation}
+Under this condition, error gradients propagate backward across arbitrary temporal distances without exponential attenuation, creating a constant error highway (the Constant Error Carousel) that enables the acquisition of long-range dependencies spanning hundreds of steps.
 
-\subsection{Sherlock Holmes case correction revised: one-to-one vs.~encoder-decoder}
-\label{subsec:sherlock_seq2seq_comparison}
+\textit{The Gated Recurrent Unit (GRU).} In 2014, Cho et al. introduced the Gated Recurrent Unit \citep{cho2014}, offering a streamlined alternative to the LSTM that merges cell state and hidden state into a single representation $\mathbf{h}_t$, controlled by two gates:
+\begin{align}
+\text{Reset gate: } & \quad \mathbf{r}_t = \sigma\left(\mathbf{W}_r \left[\mathbf{h}_{t-1}, \mathbf{x}_t\right] + \mathbf{b}_r\right) \in [0, 1]^{d_h}, \label{eq:gru_reset_gate} \\
+\text{Update gate: } & \quad \mathbf{z}_t = \sigma\left(\mathbf{W}_z \left[\mathbf{h}_{t-1}, \mathbf{x}_t\right] + \mathbf{b}_z\right) \in [0, 1]^{d_h}, \label{eq:gru_update_gate} \\
+\text{Candidate state: } & \quad \tilde{\mathbf{h}}_t = \tanh\left(\mathbf{W}_h \left[\mathbf{r}_t \odot \mathbf{h}_{t-1}, \mathbf{x}_t\right] + \mathbf{b}_h\right) \in (-1, 1)^{d_h}, \label{eq:gru_candidate} \\
+\text{State interpolation: } & \quad \mathbf{h}_t = \left(1 - \mathbf{z}_t\right) \odot \mathbf{h}_{t-1} + \mathbf{z}_t \odot \tilde{\mathbf{h}}_t. \label{eq:gru_update}
+\end{align}
 
-To empirically contrast the representational power of one-to-one recurrent mapping against the Sequence-to-Sequence Encoder-Decoder architecture, we evaluate both models on an identical, challenging character casing sentence:
-\begin{center}
-\textbf{Input Test Sequence}: \texttt{"indeed i am sherlock holmes,"} \\
-\textbf{Target Test Sequence}: \texttt{"Indeed I am Sherlock Holmes,"}
-\end{center}
-
-\subsubsection{Theoretical expectations from architectural constraints}
-This evaluation sentence contains four distinct capitalization targets, each testing a specific causal and temporal capacity:
-\begin{enumerate}
-    \item \textbf{\texttt{"I"} of \texttt{"Indeed"} (beginning of quote)}: Should be capitalized because it is immediately preceded by an opening quotation mark (\texttt{"}). A one-to-one model can easily learn this local transition, as the trigger character is already present in its past recurrent state $\vh_{t-1}$.
-    \item \textbf{\texttt{"I"} of \texttt{"I"} (standalone subject pronoun)}: Must be capitalized because it functions as the first-person singular pronoun. A one-to-one model is structurally blind here: when reading \texttt{'i'}, the network only knows that a word is beginning with \texttt{'i'}. It cannot determine whether this character is an isolated pronoun or the initial letter of common words like \texttt{"in"}, \texttt{"it"}, or \texttt{"into"} until the subsequent whitespace arrives at step $t+1$. Without future lookahead, capitalizing \texttt{'i'} at step $t$ is mathematically unsupported.
-    \item \textbf{\texttt{"S"} of \texttt{"Sherlock"} (proper noun first name)}: Must be capitalized because it begins the proper noun \textit{Sherlock}. When the one-to-one cell receives \texttt{'s'}, it only observes an arbitrary lowercase word beginning with \texttt{'s'}. It cannot anticipate that the subsequent characters will form the name \texttt{"herlock"}.
-    \item \textbf{\texttt{"H"} of \texttt{"Holmes"} (proper noun last name)}: After the model parses the preceding token sequence \texttt{"sherlock "}, its recurrent state $\vh_{t-1}$ retains the memory of the detective's first name. When an \texttt{'h'} arrives, the transition matrix $\mW_{hh}$ leverages the learned bigram association $\Prob(\text{\texttt{Holmes}} \mid \text{\texttt{Sherlock}})$ to correctly capitalize the last name.
-\end{enumerate}
-
-\subsubsection{Empirical results across training epochs}
-Table~\ref{tab:sherlock_seq2seq_comparison} documents the verbatim loss trajectories and generated outputs across training checkpoints from Epoch 1 to Epoch 1070.
+The update gate $\mathbf{z}_t$ acts as an adaptive convex interpolator between past memory $\mathbf{h}_{t-1}$ and candidate update $\tilde{\mathbf{h}}_t$, performing the combined roles of the LSTM's forget and input gates while reducing parameter count by approximately $25\%$.
 
 \begin{table}[htbp]
 \centering
-\footnotesize
-\caption{Empirical comparison of character casing dynamics on the Sherlock Holmes corpus: One-to-One Recurrent Mapping vs.~Sequence-to-Sequence Encoder-Decoder across training epochs 1 to 1070.}
-\label{tab:sherlock_seq2seq_comparison}
-\begin{tabularx}{\textwidth}{@{} c c >{\raggedright\arraybackslash}X c >{\raggedright\arraybackslash}X @{}}
+\small
+\begin{tabularx}{\textwidth}{l X X X}
 \toprule
-& \multicolumn{2}{c}{\textbf{One-to-One Mapping}} & \multicolumn{2}{c}{\textbf{Encoder-Decoder Architecture}} \\
-\cmidrule(lr){2-3} \cmidrule(lr){4-5}
-\textbf{Epoch} & \textbf{Loss} & \textbf{Generated Output} & \textbf{Loss} & \textbf{Generated Output} \\
+\textbf{Architectural Property} & \textbf{Vanilla Elman RNN} & \textbf{LSTM} & \textbf{GRU} \\
 \midrule
-\textbf{0001} & 5.3212 & \texttt{XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX} & 5.4591 & \texttt{wwXXXXXXXXXXXXXXXXXXXXXXXXXXXX} \\
-\textbf{0002} & 3.7157 & \texttt{XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX} & 4.0161 & \texttt{aXXXXXXXXXXXXXXXXXXXXXXXXXXXXX} \\
-\textbf{0003} & 2.7964 & \texttt{XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX} & 2.8268 & \texttt{XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX} \\
-\textbf{0004} & 2.7981 & \texttt{XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX} & 2.7671 & \texttt{XXXXXXXXXXXXXXXXXXX} \\
-\midrule
-\textbf{0030} & 0.2264 & \texttt{"indeed i am sherlock holmes,"} & 0.2315 & \texttt{"indeed i am sherlock holmes,"} \\
-\textbf{0050} & 0.0802 & \texttt{"indeed i am sherlock holmes,"} & 0.0705 & \texttt{"indeed i am sherlock holmes,"} \\
-\midrule
-\textbf{0160} & 0.0301 & \texttt{"Indeed i am sherlock Holmes,"} & 0.0259 & \texttt{"Indeed i am sherlock Holmes,"} \\
-\textbf{0530} & 0.0224 & \texttt{"Indeed i am sherlock Holmes,"} & 0.0197 & \texttt{"Indeed I am sherlock Holmes,"} \\
-\textbf{1070} & 0.0232 & \texttt{"Indeed i am sherlock Holmes,"} & 0.0156 & \texttt{"Indeed I am Sherlock Holmes,"} \\
+Separate cell memory ($\mathbf{c}_t$) & No & Yes & No \\
+Number of gating sub-units & $0$ & $3$ ($\mathbf{f}_t, \mathbf{i}_t, \mathbf{o}_t$) & $2$ ($\mathbf{r}_t, \mathbf{z}_t$) \\
+Parameter count scaling & $\mathcal{O}\left(d_h^2 + d_h d_x\right)$ & $\mathcal{O}\left(4(d_h^2 + d_h d_x)\right)$ & $\mathcal{O}\left(3(d_h^2 + d_h d_x)\right)$ \\
+Gradient propagation highway & None (exponential decay) & Linear additive trunk & Linear convex interpolation \\
+Computational parallelizability & Strictly serialized & Strictly serialized & Strictly serialized \\
 \bottomrule
 \end{tabularx}
+\caption{Architectural comparison between the vanilla Elman RNN, the Long Short-Term Memory (LSTM) network, and the Gated Recurrent Unit (GRU).}
+\label{tab:rnn_architectures_comparison}
 \end{table}
 
-\subsubsection{Qualitative phase transitions and convergence trade-offs}
-Table~\ref{tab:sherlock_seq2seq_comparison} compares the learning trajectories of the one-to-one and encoder-decoder models:
-\begin{enumerate}
-    \item \textbf{One-to-one recurrence}: The one-to-one model's loss changes from $0.0301$ at epoch 160 to $0.0232$ at epoch 1070. It capitalizes \texttt{"Indeed"} after the opening quotation mark and \texttt{"Holmes"} after \texttt{"sherlock"}, but leaves \texttt{"i"} and \texttt{"sherlock"} lowercase. Its output at time $t$ is produced while reading $x_t$, so it cannot use later input characters to resolve capitalization decisions.
-    \item \textbf{Sequence-Level Information Integration in Seq2Seq}: The Encoder-Decoder model overcomes causal blindness by decoupling sequence ingestion from sequence emission. The encoder reads the entire string before generation begins. Consequently, the context vector $\vh_N$ encodes global contextual features: it ``remembers'' that \texttt{"i"} is bounded by whitespace on both sides (making it the isolated pronoun \texttt{"I"}) and that \texttt{"s"} begins the full proper name \texttt{"sherlock"}. By Epoch 530, the decoder resolves \texttt{"Indeed I am sherlock Holmes,"} (loss $0.0197$), and by Epoch 1070 it fully resolves all four capitalization targets: \texttt{"Indeed I am Sherlock Holmes,"} with superior loss $0.0156$.
-    \item \textbf{The Sample Complexity Trade-off ($100\times$ Training Epochs)}: Why does the Encoder-Decoder require 1070 epochs when the simple character model converged in 10 epochs? In one-to-one mapping, temporal alignment is strictly hardcoded: character $t$ at the input maps directly to character $t$ at the output. In Seq2Seq, the model is given zero alignment hints; it must simultaneously discover: (i) how to compress the entire sentence into vector $\vh_N$, (ii) how to decode variable-length autoregressive tokens, and (iii) how to align output positions with latent source semantics. Learning this unconstrained non-monotonic mapping from scratch drastically increases optimization difficulty and sample complexity.
-\end{enumerate}
+As summarized in Table~\ref{tab:rnn_architectures_comparison}, while gated architectures resolve the analytical vanishing gradient problem through additive linear memory trunks, they remain fundamentally serialized along the sequence dimension, preserving the computational bottleneck that prevents efficient parallel scaling.
 
 \clearpage
-\section{Persistent bottlenecks of gated RNNs and the road to transformers}
-\label{sec:rnn_bottlenecks}
+\section{Sequence-to-sequence modeling, encoder-decoder architectures, and the information bottleneck}
+\label{sec:rnn_seq2seq_bottleneck}
 
-LSTMs and encoder-decoder architectures were widely used for sequence modeling from 2014 to 2017. Their limitations became more significant as researchers sought to model longer sequences and train on larger corpora. Three constraints were especially relevant:
+All recurrent configurations examined thus far operate under a \textit{one-to-one mapping paradigm}, where each incoming token $\mathbf{x}_t$ immediately triggers the emission of a corresponding prediction $\hat{\mathbf{y}}_t$. While suitable for synchronous sequence tagging, this formulation fails when applied to general sequence-to-sequence transformations.
 
-\medskip
+\subsection{Limitations of one-to-one sequence mapping}
+\label{subsec:rnn_limitations_one_to_one}
 
-In the canonical Seq2Seq framework, an input sequence $(x_1, \dots, x_{T_x})$ of arbitrary length and linguistic entropy is forced to compress into a single continuous vector of fixed dimensionality:
-\begin{equation}
-\vh_{T_x} = \operatorname{Encoder}(x_1, \dots, x_{T_x}) \in \R^{d_h}.
-\end{equation}
-By source-coding and rate-distortion arguments, a finite-dimensional vector with finite-precision components has bounded information capacity. As the input grows beyond roughly $T_x \ge 30$ tokens, the final recurrent state may preserve less information about earlier tokens, including syntactic subjects and other conditioning context, because each new input updates the same state.
-
-\medskip
-
-Modern accelerators, including GPUs and TPUs, achieve high throughput by parallelizing tensor operations. A recurrent network instead imposes a dependency across time steps:
-\begin{equation}
-\vh_t = f(\vh_{t-1}, \vx_t).
-\end{equation}
-Computing hidden state $\vh_t$ requires the preceding state $\vh_{t-1}$. Training therefore cannot parallelize recurrent computation across the temporal dimension $T$. Convolutional and attention layers can apply batched operations across positions, whereas a recurrent layer requires $\mathcal{O}(T)$ sequential steps. This dependency limits throughput when training on very large text corpora.
-
-\medskip
-
-In an unrolled recurrent graph, the shortest path between token $x_1$ and prediction $y_T$ scales linearly with sequence length: $\mathcal{O}(T)$. Every additional step introduces an intermediate Jacobian multiplication $\frac{\partial \vh_j}{\partial \vh_{j-1}}$. Even with the additive Constant Error Carousel of LSTMs, error signals become noisy and diffuse over horizons exceeding $100$ to $200$ tokens.
-
-\subsubsection{The historical progression toward self-attention}
-These limitations motivated two successive architectural developments:
+Synchronous one-to-one sequence processing exhibits two fatal structural failure modes when applied to complex linguistic tasks such as machine translation, summarization, or dialogue:
 \begin{enumerate}
-    \item \textbf{Stage 1: Soft Alignment \cite{bahdanau2014}}: Additive attention reduced the fixed-vector bottleneck by giving the decoder access to all encoder annotations $\{\vh_1, \dots, \vh_{T_x}\}$. The recurrent backbone, however, retained its sequential computation.
-    \item \textbf{Stage 2: Attention Is All You Need \cite{vaswani2017}}: The Transformer replaced recurrent cells with self-attention, which gives each token a direct path to other positions in the sequence. This design supports parallel computation across positions and allows representations to depend on the surrounding tokens.
+    \item \textbf{Sequence length disparity ($T_x \neq T_y$)}: In natural language translation, source and target sentences rarely contain the same number of words. Consider translating an English utterance into Italian:
+    \begin{align}
+    \text{English source: } & \quad \texttt{[It] [is] [indeed] [sunny] [today]} \quad (T_x = 5 \text{ tokens}), \\
+    \text{Italian target: } & \quad \texttt{[Effettivamente] [oggi] [è] [soleggiato]} \quad (T_y = 4 \text{ tokens}).
+    \end{align}
+    Under a one-to-one mapping architecture, emitting 4 Italian words requires ingesting exactly 4 English tokens, leaving the 5th token unaligned. If the target sequence is longer than the source ($T_y > T_x$), the recurrent unit exhausts its input tokens and has no valid data to ingest for subsequent steps.
+    
+    \item \textbf{Non-monotonic alignment and lack of future context}: Even if sequence lengths happen to match, the semantic alignment between languages is non-monotonic and structurally inverted. In the example above, the initial Italian word \texttt{"Effettivamente"} translates the English adverb \texttt{"indeed"}, which occupies the \textit{third} position in the source sentence. Under causal one-to-one processing, the network must generate the first output token after observing only \texttt{"It"}, long before the conditioning token \texttt{"indeed"} has entered the model.
 \end{enumerate}
 
-\subsection{Breaking the vector bottleneck: Bahdanau additive attention}
-\label{sec:bahdanau_attention}
+Table~\ref{tab:rnn_translation_alignment} illustrates this structural misalignment, demonstrating why causal synchronous emission cannot resolve cross-lingual translation.
 
-In the standard Seq2Seq architecture (Section~\ref{sec:seq2seq}), the encoder represents a source sentence of length $T_x$ with one final state $\vh_{T_x} \in \R^{d_h}$. This state must summarize the sentence's grammatical, lexical, and structural information. As sentence length increases, a fixed-size representation has more information to retain, and translation performance can decline.
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{c l l X c}
+\toprule
+\textbf{Step $t$} & \textbf{Source Token $\mathbf{x}_t$} & \textbf{Target Token $y_t^*$} & \textbf{Semantic Alignment} & \textbf{Causal Feasibility} \\
+\midrule
+1 & \texttt{It} & \texttt{Effettivamente} & Maps to $\mathbf{x}_3$ (\texttt{indeed}) & \textbf{No} (future context required) \\
+2 & \texttt{is} & \texttt{oggi} & Maps to $\mathbf{x}_5$ (\texttt{today}) & \textbf{No} (future context required) \\
+3 & \texttt{indeed} & \texttt{è} & Maps to $\mathbf{x}_2$ (\texttt{is}) & \textbf{No} (inverted syntax) \\
+4 & \texttt{sunny} & \texttt{soleggiato} & Maps to $\mathbf{x}_4$ (\texttt{sunny}) & Partially (local match) \\
+5 & \texttt{today} & $\varnothing$ & No target token & \textbf{No} (length mismatch) \\
+\bottomrule
+\end{tabularx}
+\caption{Cross-lingual sequence alignment between English source and Italian target sentences, illustrating the failure of causal one-to-one recurrent mapping due to non-monotonic word order and length disparity.}
+\label{tab:rnn_translation_alignment}
+\end{table}
 
-\textbf{Additive (Soft) Attention}, introduced in \cite{bahdanau2014}, gives the decoder access to all encoder hidden states at each generation step. It computes a context-dependent weighted combination of those states instead of relying only on $\vh_{T_x}$.
+\subsection{The encoder-decoder paradigm}
+\label{subsec:rnn_encoder_decoder_paradigm}
 
-\subsubsection{Mathematical formulation with explicit tensor dimensions}
-Let the source sequence $(x_1, \dots, x_{T_x})$ be encoded by a Bidirectional RNN, producing a sequence of source annotation vectors:
-\begin{equation}
-\vh_j = \begin{bmatrix} \overrightarrow{\vh}_j \\ \overleftarrow{\vh}_j \end{bmatrix} \in \R^{2d_h}, \quad \forall j \in \{1, 2, \dots, T_x\}.
-\end{equation}
-At decoder generation step $i$, let $\vs_{i-1} \in \R^{d_{\text{dec}}}$ denote the previous decoder hidden state.
-\begin{enumerate}
-    \item \textbf{Alignment Energy Score}: The relevance of source token $j$ to target emission $i$ is evaluated by a small feed-forward network parameterized by $\mW_a \in \R^{d_a \times d_{\text{dec}}}$, $\mU_a \in \R^{d_a \times 2d_h}$, and $\vv_a \in \R^{d_a}$:
-    \begin{equation}
-    \label{eq:rnn_bahdanau_score}
-    e_{ij} = \vv_a^\top \tanhact\left( \mW_a \vs_{i-1} + \mU_a \vh_j \right) \in \R.
-    \end{equation}
-    \item \textbf{Softmax Attention Weights}: Exponentiating and normalizing across all $T_x$ source positions yields a valid categorical distribution over input tokens:
-    \begin{equation}
-    \label{eq:rnn_bahdanau_weights}
-    \alpha_{ij} = \frac{\exp(e_{ij})}{\sum_{k=1}^{T_x} \exp(e_{ik})}, \quad \text{where } \alpha_{ij} \in (0, 1) \text{ and } \sum_{j=1}^{T_x} \alpha_{ij} = 1.
-    \end{equation}
-    The scalar $\alpha_{ij}$ represents the degree to which the decoder should attend to source word $x_j$ when generating target word $y_i$.
-    \item \textbf{Dynamic Context Vector}: The context vector $\vc_i$ is computed as the expected annotation under distribution $\boldsymbol{\alpha}_i$:
-    \begin{equation}
-    \label{eq:rnn_bahdanau_context}
-    \vc_i = \sum_{j=1}^{T_x} \alpha_{ij} \vh_j \in \R^{2d_h}.
-    \end{equation}
-    Unlike standard Seq2Seq where context $\vh_{T_x}$ is static, $\vc_i$ is dynamically recomputed at every decoder step $i$, steering the model's focus to the relevant source phrase.
-    \item \textbf{Decoder State and Emission Update}: The decoder hidden state updates by conditioning on the previous token $y_{i-1}$ and dynamic context $\vc_i$:
-    \begin{equation}
-    \label{eq:rnn_bahdanau_decoder_update}
-    \vs_i = \operatorname{RNN}_{\text{dec}}\left( \vs_{i-1}, \; [\vy_{i-1}, \vc_i] \right),
-    \end{equation}
-    and target token probabilities are emitted via $\hat{\vy}_i = \softmax(\mW_s [\vs_i, \vy_{i-1}, \vc_i] + \vb_s)$.
-\end{enumerate}
-
-Figure~\ref{fig:bahdanau_attention} illustrates the Bahdanau Additive Attention architecture.
+To resolve the constraints of one-to-one mapping, Sutskever et al. \citep{sutskever2014} and Cho et al. \citep{cho2014} decoupled sequence processing into two specialized recurrent networks: an \textit{Encoder} and a \textit{Decoder}.
 
 \begin{figure}[htbp]
 \centering
-\resizebox{0.88\textwidth}{!}{%
 \begin{tikzpicture}[
-    node distance=1.4cm and 1.8cm,
-    enc/.style={rectangle, rounded corners=3pt, draw=politoNavy, fill=skyBlue!25, thick, minimum width=18mm, minimum height=10mm, align=center, font=\small},
-    dec/.style={rectangle, rounded corners=3pt, draw=intuitionPurple, fill=intuitionPurpleBg, thick, minimum width=18mm, minimum height=10mm, align=center, font=\small},
-    att/.style={circle, draw=porange, fill=examAmberBg, thick, minimum size=10mm, font=\small\bfseries},
-    ctx/.style={rectangle, rounded corners=3pt, draw=deepdiveTeal, fill=deepdiveTealBg, thick, minimum width=20mm, minimum height=8mm, font=\small\bfseries},
-    tok/.style={circle, draw=bodyGray, fill=white, thick, minimum size=8mm, font=\footnotesize},
-    arr/.style={-{Stealth[scale=1.1]}, thick, draw=bodyDark}
+    >=stealth,
+    node distance=1.6cm,
+    every node/.style={font=\small},
+    enc/.style={draw=tfBlueBorder, fill=tfBlue, rounded corners=3pt, minimum width=1.1cm, minimum height=0.8cm, align=center, thick},
+    dec/.style={draw=tfOrangeBorder, fill=tfOrange, rounded corners=3pt, minimum width=1.1cm, minimum height=0.8cm, align=center, thick},
+    state/.style={draw=tfPurpleBorder, fill=tfPurple, rounded corners=2pt, minimum width=1.2cm, minimum height=0.7cm, align=center, thick},
+    token/.style={draw=tfPinkBorder, fill=tfPink, rounded corners=2pt, minimum width=1.1cm, minimum height=0.6cm, align=center, thick},
+    outnode/.style={draw=tfGreenBorder, fill=tfGreen, rounded corners=2pt, minimum width=1.1cm, minimum height=0.6cm, align=center, thick}
 ]
 
-% Encoder States
-\node[enc] (h1) at (0, 0) {$\vh_1$};
-\node[enc] (h2) at (3.0, 0) {$\vh_2$};
-\node[enc] (h3) at (6.0, 0) {$\vh_3$};
+% Encoder units
+\node[token] (x1) at (0, -1.3) {$\mathbf{x}_1$};
+\node[token] (x2) at (1.5, -1.3) {$\mathbf{x}_2$};
+\node[token] (x3) at (3.0, -1.3) {$\mathbf{x}_{T_x}$};
 
-\node[tok] (x1) [below=0.8cm of h1] {$x_1$};
-\node[tok] (x2) [below=0.8cm of h2] {$x_2$};
-\node[tok] (x3) [below=0.8cm of h3] {$x_3$};
+\node[enc] (e1) at (0, 0) {$\text{Enc}_1$};
+\node[enc] (e2) at (1.5, 0) {$\text{Enc}_2$};
+\node[enc] (e3) at (3.0, 0) {$\text{Enc}_{T_x}$};
 
-\draw[arr] (x1) -- (h1);
-\draw[arr] (x2) -- (h2);
-\draw[arr] (x3) -- (h3);
-\draw[arr] (h1) -- (h2);
-\draw[arr] (h2) -- (h3);
+\draw[->, thick] (x1) -- (e1);
+\draw[->, thick] (x2) -- (e2);
+\draw[->, thick] (x3) -- (e3);
 
-% Alignment / Attention Weights
-\node[att] (a1) at (0, 2.0) {$\alpha_{i, 1}$};
-\node[att] (a2) at (3.0, 2.0) {$\alpha_{i, 2}$};
-\node[att] (a3) at (6.0, 2.0) {$\alpha_{i, 3}$};
+\draw[->, thick] (e1) -- (e2);
+\draw[->, dashed, thick] (e2) -- (e3);
 
-\draw[arr] (h1) -- (a1);
-\draw[arr] (h2) -- (a2);
-\draw[arr] (h3) -- (a3);
+% Context vector bottleneck
+\node[state] (v) at (4.8, 0) {$\mathbf{v} = \mathbf{h}_{T_x}^{\text{enc}}$};
+\draw[->, very thick, purple!80!black] (e3) -- (v);
 
-% Dynamic Context Vector
-\node[ctx] (ci) at (3.0, 3.6) {$\vc_i = \sum \alpha_{ij} \vh_j$};
-\draw[arr] (a1) -- (ci);
-\draw[arr] (a2) -- (ci);
-\draw[arr] (a3) -- (ci);
+% Decoder units
+\node[dec] (d1) at (6.6, 0) {$\text{Dec}_1$};
+\node[dec] (d2) at (8.1, 0) {$\text{Dec}_2$};
+\node[dec] (d3) at (9.6, 0) {$\text{Dec}_{T_y}$};
 
-% Decoder State
-\node[dec] (si_prev) at (7.5, 3.6) {$\vs_{i-1}$};
-\node[dec] (si) at (10.5, 3.6) {$\vs_i$};
-\node[tok] (yi) [above=0.8cm of si] {$y_i$};
+\draw[->, very thick, purple!80!black] (v) -- node[above, font=\footnotesize] {$\mathbf{s}_0$} (d1);
+\draw[->, thick] (d1) -- (d2);
+\draw[->, dashed, thick] (d2) -- (d3);
 
-% Connections into Decoder
-\draw[arr] (si_prev) -- (si);
-\draw[arr] (ci) -- (si);
-\draw[arr] (si) -- (yi);
+% Decoder inputs (autoregressive feedback)
+\node[token] (bos) at (6.6, -1.3) {\texttt{<BOS>}};
+\node[outnode] (y1) at (6.6, 1.3) {$\hat{y}_1$};
+\node[outnode] (y2) at (8.1, 1.3) {$\hat{y}_2$};
+\node[outnode] (y3) at (9.6, 1.3) {\texttt{<EOS>}};
 
-% Previous decoder state into attention
-\draw[arr, dashed, intuitionPurple!80] (si_prev) |- (7.0, 2.0) -- (a3);
-\draw[arr, dashed, intuitionPurple!80] (7.0, 2.0) -- (a2);
-\draw[arr, dashed, intuitionPurple!80] (7.0, 2.0) -| (1.5, 2.0) -- (a1);
+\draw[->, thick] (bos) -- (d1);
+\draw[->, thick] (d1) -- (y1);
+\draw[->, thick] (d2) -- (y2);
+\draw[->, thick] (d3) -- (y3);
 
-\end{tikzpicture}%
-}
-\caption{The Bahdanau Additive Attention mechanism. At decoder step $i$, previous decoder state $\vs_{i-1}$ is compared against all encoder annotations $\vh_j$ via Equation~\eqref{eq:rnn_bahdanau_score}, producing attention distribution $\alpha_{ij}$. The weighted sum synthesizes dynamic context vector $\vc_i \in \R^{2d_h}$, directly feeding relevant source features into decoder state $\vs_i$.}
-\label{fig:bahdanau_attention}
+\draw[->, thick, tfOrangeBorder] (y1.east) -- ++(0.3,0) -- ++(0,-2.0) -| (d2.south);
+\draw[->, thick, tfOrangeBorder] (y2.east) -- ++(0.3,0) -- ++(0,-2.0) -| (d3.south);
+
+% Delimiters
+\node[font=\footnotesize\bfseries, text=tfBlueBorder] at (1.5, -2.0) {Encoder (Consumes input)};
+\node[font=\footnotesize\bfseries, text=purple!80!black] at (4.8, -0.7) {Context vector};
+\node[font=\footnotesize\bfseries, text=tfOrangeBorder] at (8.1, -2.0) {Decoder (Autoregressive)};
+
+\end{tikzpicture}
+\caption{The Sequence-to-Sequence (Seq2Seq) Encoder-Decoder architecture. The Encoder ingests the full source sequence of length $T_x$, compressing it into a single context vector $\mathbf{v}$. The Decoder is initialized with $\mathbf{v}$ and generates target tokens autoregressively until emitting the end-of-sequence delimiter \texttt{<EOS>}.}
+\label{fig:rnn_seq2seq_pipeline}
 \end{figure}
 
-
-\textit{The lineage of sequence modeling represents one of the most intellectually cohesive arcs in artificial intelligence:}
-\begin{itemize}
-    \item In 1997, the milestone paper \textit{``Long Short-Term Memory''} \cite{hochreiter1997} solved the vanishing gradient problem via the Constant Error Carousel, proving that additive highways preserve error signals indefinitely.
-    \item In 2014, the Gated Recurrent Unit (GRU) and RNN encoder-decoder architectures were formulated in \cite{cho2014} for statistical machine translation.
-    \item Simultaneously in 2014, the landmark study \textit{``Sequence to Sequence Learning with Neural Networks''} \cite{sutskever2014} demonstrated that multi-layer deep LSTMs could map sentences across languages end-to-end. Crucially, it was discovered that reversing the source sentence (\textit{``A B C $\to$ C B A''}) dramatically improved performance by shortening the initial temporal gradient distance between source and target tokens.
-\end{itemize}
-
-\subsection{Causal bridge to Chapter 4: the representation problem and continuous word embeddings}
-\label{subsec:bridge_to_chapter_4}
-
-Throughout this chapter, we have traced the linear evolutionary arc of sequential neural architectures:
+The operational workflow of the Seq2Seq architecture (Figure~\ref{fig:rnn_seq2seq_pipeline}) decouples sequence encoding from generation through three distinct phases:
 \begin{enumerate}
-    \item \textbf{Vanilla RNNs} introduced temporal recurrence and weight sharing to eliminate the fixed-dimensional constraints of feedforward networks, processing elastic sequences via an evolving hidden state $\vh_t \in \R^{d_h}$.
-    \item \textbf{LSTMs and GRUs} resolved exponential vanishing gradients along the temporal chain via the Constant Error Carousel ($\frac{\partial \vc_t}{\partial \vc_{t-1}} \approx \mathbf{I}$) and multiplicative gating highways, enabling gradient propagation across extended sequences.
-    \item \textbf{Seq2Seq Encoder-Decoder Pipelines} overcame the causal lookahead blindness of one-to-one recurrent cells by mapping variable-length input sequences into dynamic variable-length output sequences.
-    \item \textbf{Bahdanau Additive Attention} removed the single-vector bottleneck ($\vh_N \in \R^{d_h}$) by granting the decoder dynamic soft addressing across all encoder annotations ($\vc_i = \sum_j \alpha_{ij} \vh_j$).
+    \item \textbf{Sequence encoding}: The Encoder RNN sequentially ingests the entire source sequence $\mathbf{x}_1, \dots, \mathbf{x}_{T_x}$ without generating any output tokens. At the final source token $T_x$, the encoder's terminal hidden state is extracted to serve as the \textit{context vector}:
+    \begin{equation}
+    \mathbf{v} = \mathbf{h}_{T_x}^{\text{enc}} \in \mathbb{R}^{d_h}.
+    \label{eq:context_vector}
+    \end{equation}
+    The vector $\mathbf{v}$ represents a compressed semantic summary of the entire source utterance.
+    
+    \item \textbf{Decoder state initialization}: The Decoder RNN initializes its internal state using the context vector:
+    \begin{equation}
+    \mathbf{s}_0 = \mathbf{v},
+    \end{equation}
+    thereby conditioning all subsequent generation steps on the global context of the input.
+    
+    \item \textbf{Autoregressive generation}: Generation commences by feeding a synthetic start-of-sequence token, denoted \texttt{<BOS>} (Beginning of Sequence), into the decoder:
+    \begin{equation}
+    \mathbf{s}_1 = \operatorname{DecoderRNN}\left(\mathbf{s}_0, \mathbf{e}_{\texttt{<BOS>}}\right).
+    \end{equation}
+    The decoder projects state $\mathbf{s}_1$ to emit a categorical probability distribution over target vocabulary $\mathcal{V}_y$, sampling or greedily selecting token $\hat{y}_1$. In the subsequent step, the previously generated token $\hat{y}_1$ is fed back as the input token to compute $\mathbf{s}_2$:
+    \begin{equation}
+    \mathbf{s}_t = \operatorname{DecoderRNN}\left(\mathbf{s}_{t-1}, \mathbf{e}_{\hat{y}_{t-1}}\right).
+    \label{eq:decoder_autoregression}
+    \end{equation}
+    Generation terminates when the decoder emits a dedicated end-of-sequence token, denoted \texttt{<EOS>} (End of Sequence), allowing target length $T_y$ to be determined dynamically by the model.
 \end{enumerate}
 
-Despite these mathematical triumphs in temporal modeling, every recurrent transition $\vh_t = \tanhact(\mW_{hh} \vh_{t-1} + \mW_{xh} \vx_t + \vb_h)$ rests upon a fundamental, unaddressed prerequisite: \emph{the input $\vx_t$ must be a numeric vector in $\R^{d_{\text{in}}}$}. In our pedagogical character casing example, we used a toy ASCII one-hot vector $\vx_t \in \{0, 1\}^{256}$. However, scaling sequence models to real-world natural language or software engineering source code reveals three substantial failure modes of local one-hot representations:
+Mathematically, the encoder-decoder framework models the conditional probability of target sequence $Y = (y_1, \dots, y_{T_y})$ given source sequence $X = (\mathbf{x}_1, \dots, \mathbf{x}_{T_x})$ via the exact probability chain rule:
+\begin{equation}
+P(Y \mid X) = \prod_{t=1}^{T_y} P\left(y_t \mid y_1, \dots, y_{t-1}, \mathbf{v}\right).
+\label{eq:seq2seq_probability_factorization}
+\end{equation}
+
+\subsection{Empirical validation: revised Sherlock Holmes casing}
+\label{subsec:rnn_seq2seq_casing_validation}
+
+To evaluate how the encoder-decoder paradigm resolves the causal horizon failure identified in Section~\ref{subsec:rnn_sherlock_holmes_casing}, we revisit the character casing benchmark on the ambiguous test utterance:
+\begin{align}
+\text{Input text: } & \quad \texttt{"indeed iam sherlock holmes,"} \\
+\text{Target text: } & \quad \texttt{"Indeed I am Sherlock Holmes,"}
+\end{align}
+
+Under the one-to-one causal RNN evaluated in Section~\ref{subsec:rnn_sherlock_holmes_casing}, the model committed four distinct capitalization errors:
 \begin{enumerate}
-    \item \textbf{Dimensionality Explosion}: Realistic vocabularies contain $V = |\vocab| \ge 50{,}000$ to $1{,}000{,}000$ unique words. Representing tokens as one-hot vectors $\ve_i \in \{0, 1\}^V$ forces the recurrent input projection matrix $\mW_{xh} \in \R^{d_h \times V}$ to balloon into millions of parameters, causing severe memory bloat and extreme sample inefficiency.
-    \item \textbf{Orthogonal Metric Collapse}: Standard basis vectors are strictly mutually orthogonal ($\ve_i^\top \ve_j = 0$ for all $i \ne j$) and uniformly equidistant ($d_E(\ve_i, \ve_j) = \sqrt{2}$). The recurrent cell receives zero geometric signal that \textit{"dog"} and \textit{"puppy"}, or keywords \texttt{"while"} and \texttt{"for"}, share syntactic or semantic roles.
-    \item \textbf{Zero Gradient Parameter Sharing}: During backpropagation through time (BPTT), updating weights for one-hot vector $\ve_i$ provides absolutely zero learning transfer to semantically similar words $\ve_j$, requiring very large training data to observe every word in every temporal context.
+    \item \textbf{The initial token \texttt{'i'} in \texttt{indeed}}: Capitalized correctly only because it immediately followed an opening quote.
+    \item \textbf{The isolated pronoun \texttt{'i'} in \texttt{iam}}: Remained lowercase (\texttt{'i'}) because the causal model, seeing only antecedent tokens \texttt{"indeed "}, could not determine whether \texttt{'i'} represented the personal pronoun \textit{I} or the initial letter of common words such as \textit{in, is, it, if}.
+    \item \textbf{The initial \texttt{'s'} in \texttt{sherlock}}: Remained lowercase because \texttt{"iam "} is followed by lowercase words in over $90\%$ of training contexts.
+    \item \textbf{The initial \texttt{'h'} in \texttt{holmes}}: Capitalized correctly only through local bigram memorization following \texttt{sherlock}.
 \end{enumerate}
 
-While recurrent networks solved the \emph{temporal dynamics} problem across sequences, they are limited without a dense, low-dimensional, continuous metric space $\phi: \vocab \to \R^d$ ($d \ll V$) where geometric proximity directly encodes syntactic and semantic similarity.
+When the exact same sequence is evaluated using a Sequence-to-Sequence Encoder-Decoder architecture, the model resolves all four tokens without ambiguity:
+\begin{equation}
+\text{Seq2Seq Output: } \quad \texttt{"Indeed I am Sherlock Holmes,"}
+\end{equation}
 
-This fundamental representational challenge leads directly to Chapter~\ref{ch:word_embeddings}: \emph{Distributed Word Representations and Word2Vec}.
+The conceptual basis for this success resides in the timing of representation formation. In the Seq2Seq paradigm, the Encoder ingests the entire sentence \texttt{"indeed iam sherlock holmes,"} before the Decoder generates a single character. When the Decoder initiates generation from $\mathbf{s}_0 = \mathbf{v}$, the context vector $\mathbf{v}$ already encodes the presence of the proper noun \texttt{sherlock holmes} and the pronoun \texttt{i}. With full bidirectional information synthesized into the context vector, the decoder generates correctly capitalized characters from the very first token, resolving ambiguities that are mathematically unsolvable under causal one-to-one processing.
 
-\clearpage
-\thispagestyle{empty}
-\null
-\clearpage
+\subsection{The information bottleneck and the prelude to attention}
+\label{subsec:rnn_information_bottleneck}
 
+Despite the empirical triumph of the Encoder-Decoder paradigm on short sentences, the architecture encounters an inescapable theoretical barrier: the \textit{fixed-vector information bottleneck} \citep{bahdanau2014}.
+
+In the standard Seq2Seq formulation, the Encoder must compress all semantic, syntactic, stylistic, and relational information present in a source sequence of arbitrary length $T_x$ into a single, fixed-dimensional Euclidean vector $\mathbf{v} \in \mathbb{R}^{d_h}$. Mathematically, this transformation represents a severe dimensionality reduction mapping:
+\begin{equation}
+f_{\text{enc}}: \mathbb{R}^{T_x \times d_x} \longrightarrow \mathbb{R}^{d_h}.
+\end{equation}
+For a short sentence of 5 words, compressing the input into $d_h = 512$ dimensions preserves sufficient fidelity for accurate reconstruction. However, as sequence length increases to $20, 50,$ or $100$ words, the amount of information in the source sequence grows linearly with $T_x$, while the capacity of the context vector $\mathbf{v}$ remains strictly constant at $d_h$.
+
+Consequently, the context vector becomes saturated. As the encoder processes later words in a long document, earlier clauses are progressively overwritten and attenuated by the recurrent transition operator. When the decoder begins generating target tokens, the context vector $\mathbf{v}$ retains vivid representations of the final few source tokens, but retains only degraded, blurred traces of earlier tokens.
+
+Empirical evaluations by Cho et al. \citep{cho2014} and Bahdanau et al. \citep{bahdanau2014} demonstrated that the translation performance of standard RNN encoder-decoder models plummets catastrophically when sentence length exceeds 15 to 20 words. Even when employing multi-layer LSTMs with thousands of hidden units, compressing an arbitrary-length document into a single static vector remains an insurmountable information-theoretic bottleneck.
+
+We are therefore confronted with the dual architectural crises of recurrent sequence modeling:
+\begin{enumerate}
+    \item \textbf{The computational crisis}: The strict sequential recurrence $\mathbf{h}_t = f(\mathbf{h}_{t-1}, \mathbf{x}_t)$ serializes training along the sequence dimension, precluding GPU hardware parallelization and enforcing an $\mathcal{O}(T)$ training wall-clock runtime.
+    \item \textbf{The representational crisis}: Compressing variable-length context into a single static state vector $\mathbf{v} \in \mathbb{R}^{d_h}$ destroys long-range dependencies and forces decoders to reconstruct sentences from lossy, blurred summaries.
+\end{enumerate}
+
+Resolving these dual crises requires a fundamental paradigm shift: replacing static vector compression with dynamic, query-conditioned associative retrieval. Rather than forcing a single vector to summarize an entire sequence, the model should maintain a collection of all intermediate encoder states and allow the decoder to dynamically "attend" to the most relevant source positions at each step of generation. This foundational breakthrough—the Attention Mechanism—forms the conceptual bridge that dismantles the recurrent paradigm and underpins the modern Transformer architecture.
+
+\clearpage\thispagestyle{empty}\null\clearpage
 \end{document}
