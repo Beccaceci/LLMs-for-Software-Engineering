@@ -811,207 +811,411 @@ While metrics provide the mathematical scoring instruments, they cannot exist in
 \clearpage
 
 % ==============================================================================
-% SECTION 7.2: CORE EVALUATION TASKS
+% SECTION 8.2: EVALUATION TASKS AND PROBLEM FORMULATIONS
 % ==============================================================================
 \section{Evaluation Tasks and Problem Formulations}
 \label{sec:evaluation_tasks}
 
-Evaluating foundation models requires probing a wide spectrum of linguistic, semantic, and reasoning capabilities. In early NLP literature, models were trained and evaluated on isolated, specialized tasks using task-specific heads. In modern foundation model engineering, diverse tasks are unified under the shared autoregressive interface: every problem is formulated as a text prompt conditioning the generation of target tokens.
+Evaluating foundation models requires probing a wide spectrum of linguistic, semantic, and reasoning capabilities. In early natural language processing literature, models were trained and evaluated on isolated, specialized tasks using task-specific neural heads. In modern foundation model engineering, diverse tasks are unified under the shared autoregressive interface: every problem is formulated as a text prompt conditioning the generation of target tokens. However, presenting downstream tasks as an arbitrary collection of disparate datasets conceals the underlying principles of model assessment. To establish a rigorous foundation, tasks must be systematically classified along two orthogonal taxonomic axes: operational output structure and cognitive reasoning depth.
 
-This section systematically reviews the primary task paradigms covered in the course, analyzing their structural formulation, canonical datasets, and evaluation metrics.
+\subsection{A Two-Dimensional Taxonomy of Language Model Tasks}
+\label{subsec:task_taxonomy}
 
-\subsection{Autoregressive text completion and story cloze tasks}
-\label{subsec:text_completion_cloze}
+Downstream evaluation tasks can be systematically partitioned along two complementary axes that define the operational mechanics of the evaluation protocol and the intrinsic cognitive complexity required to solve the task.
 
-The most direct evaluation of an autoregressive language model is \textbf{text completion}: given an initial prompt or narrative passage, the model must predict a plausible, grammatically coherent, and logically consistent continuation. This can be evaluated in two operational modes:
+\subsubsection{Axis 1: Operational output structure and target space}
+The first taxonomic axis classifies tasks according to the mathematical structure of the model's output space:
 \begin{enumerate}
-    \item \textbf{Generative mode}: The model autoregressively generates text, which is scored via perplexity or human qualitative inspection.
-    \item \textbf{Discriminative choice mode}: The model is presented with a context prefix and a discrete set of competing candidate continuations, evaluating the conditional log-likelihood assigned to each continuation:
+    \item \textbf{Discriminative and categorical choice}: The output space is constrained to a finite, discrete set of classes $\mathcal{Y} = \{y_1, y_2, \dots, y_K\}$ or a discrete pool of candidate text completions $\mathcal{C} = \{c_1, \dots, c_K\}$. In closed-ended classification (e.g., sentiment analysis or grammatical acceptability), the model maps input $\vx$ to a categorical distribution $P(y \mid \vx)$. In discriminative choice mode (e.g., story cloze or multiple-choice QA), the model computes the length-normalized conditional log-likelihood across competing sequence candidates:
     \begin{equation}
     \label{eq:discriminative_choice}
     \hat{c} = \argmax_{c \in \mathcal{C}} \frac{1}{|c|} \sum_{i=1}^{|c|} \ln P(w_i^{(c)} \mid \text{Context}, w_{<i}^{(c)}).
     \end{equation}
+    This paradigm is scored using standard classification metrics (Accuracy, Precision, Recall, Macro-$F_1$, and Matthews Correlation Coefficient).
+    \item \textbf{Extractive span identification}: The output space is constrained to a contiguous substring (span) existing verbatim within the conditioning prompt context $\vx = (x_1, \dots, x_N)$. The model predicts the starting index $s_{\text{start}} \in \{1, \dots, N\}$ and ending index $s_{\text{end}} \ge s_{\text{start}}$ defining the target snippet $\vx_{s_{\text{start}}:s_{\text{end}}}$. If the question is unanswerable from the context, the model must output an explicit abstention token $\langle\text{no-answer}\rangle$. Evaluated primarily via Exact Match ($\EM$) and token-level overlap $F_1$.
+    \item \textbf{Unbounded autoregressive sequence generation}: The output space is the open-ended set of all possible variable-length sequences $\vy = (y_1, y_2, \dots, y_T)$ drawn from the vocabulary $\vocab^*$. The model samples tokens iteratively according to its learned conditional distribution $P(y_t \mid \vx, y_{<t})$ until an end-of-sequence delimiter $\langle\text{eos}\rangle$ is emitted. This operational mode governs machine translation, abstractive summarization, open-domain dialogue, and formal mathematical derivations. Evaluated via reference-based overlap metrics ($\BLEU$, $\text{ROUGE}$, $\text{METEOR}$), contextual vector metrics ($\text{BERTScore}$), and model-based judges.
 \end{enumerate}
 
-\subsubsection{Canonical QA benchmark datasets}
-\begin{itemize}
-    \item \textbf{LAMBADA (Language Modeling Broadened to Account for Discourse-Level Analysis)}~\cite{paperno2016lambada}: A corpus of narrative passages specifically constructed such that human readers can guess the final target word accurately when reading the entire paragraph, but cannot guess it if exposed only to the final sentence. This benchmark directly measures the model's ability to retain long-range discourse context across dozens of tokens without succumbing to recency bias. Evaluated via Accuracy (Exact Match on the final target word) and Perplexity.
-    \item \textbf{ROCStories and StoryCloze}~\cite{mostafazadeh2016rocstories}: A benchmark composed of 5-sentence commonsense stories capturing everyday events. The StoryCloze test presents the first four sentences as context and provides two candidate endings (one logical, one absurd or contradictory). Models are evaluated on their accuracy in assigning higher likelihood to the correct narrative resolution.
-    \item \textbf{HellaSwag}~\cite{zellers2019hellaswag}: A continuation benchmark designed to counter statistical shortcut learning. Early models easily achieved high scores on story completion by exploiting shallow surface heuristics (e.g., matching length or common idioms). Zellers et al. introduced \textbf{Adversarial Filtering (AF)}, iteratively generating negative endings from a generator model that trick baseline discriminators while remaining obviously incorrect to humans.
-\end{itemize}
+\subsubsection{Axis 2: The cognitive capability and reasoning hierarchy}
+The second taxonomic axis organizes evaluation tasks into an ascending four-tier cognitive hierarchy. Rather than treating natural language understanding as a monolithic capability, this hierarchy reflects the progressive computational demands placed upon the model's latent representations:
+\begin{enumerate}
+    \item \textbf{Tier 1: Surface Syntax, Lexical Semantics, and Document Classification}: Probes foundational grammatical competence, phrase structure, and coarse document-level semantic categorization without requiring multi-step deduction.
+    \item \textbf{Tier 2: Autoregressive Sequence Generation and Narrative Discourse}: Probes local transition fluency, long-range discourse tracking across multi-sentence paragraphs, and conditioned sequence-to-sequence rewriting.
+    \item \textbf{Tier 3: Information Retrieval, Parametric Memory, and Reading Comprehension}: Probes factual knowledge retention encoded within pre-trained model weights (closed-book memory) versus contextual comprehension of dynamically injected evidence documents (open-book reading).
+    \item \textbf{Tier 4: Deep Semantic, Multi-Step, and Symbolic Reasoning}: Probes formal logical entailment, physical and causal commonsense intuition, multi-step algorithmic calculation, and programmatic probe resilience against web memorization.
+\end{enumerate}
 
-\subsection{Question answering architectures: Open-book versus closed-book}
-\label{subsec:question_answering}
+We now systematically analyze the core evaluation tasks ordered according to this four-tier cognitive hierarchy.
 
-Question Answering ($\QA$) evaluates a model's ability to comprehend queries, retrieve knowledge, and synthesize truthful, accurate answers. As categorized in lecture, $\QA$ problem settings differ across two foundational axes: \textbf{access to external knowledge} and \textbf{answer formulation format}.
+% ------------------------------------------------------------------------------
+% TIER 1
+% ------------------------------------------------------------------------------
+\subsection{Tier 1: Surface Syntax, Lexical Semantics, and Document Classification}
+\label{subsec:tier1_syntax_classification}
 
-\subsubsection{Axis 1: Access to knowledge (Closed-book vs. open-book)}
-\begin{itemize}
-    \item \textbf{Closed-Book QA}: The model is given only the question prompt in its context window ($x = \text{``What year was the University of Turin founded?''}$). The model must retrieve the factual answer entirely from its internal \textbf{parametric memory}---the weights optimized during pre-training. This evaluates factual retention and internal world models.
-    \item \textbf{Open-Book QA}: The model is provided with external reference documents in its context window alongside the question. In modern systems, this is realized via \textbf{Retrieval-Augmented Generation (RAG)}, where an external retriever queries a document store or vector database (e.g., Wikipedia) and injects relevant context chunks into the prompt. This evaluates reading comprehension and contextual synthesis.
-\end{itemize}
+The foundation of language model evaluation begins at the level of syntactic well-formedness and surface lexical categorization. Before a model can be trusted to execute complex logical deductions or follow nuanced user instructions, it must demonstrate mastery over the grammatical morphology and lexical semantics of natural language.
 
-\subsubsection{Axis 2: Answer format}
-\begin{itemize}
-    \item \textbf{Extractive QA}: The answer is guaranteed to exist as a contiguous substring (span) within the provided context passage. The model predicts the starting and ending token indices.
-    \item \textbf{Abstractive QA}: The model must generate a free-form natural language response, paraphrasing and synthesizing information across multiple sentences.
-    \item \textbf{Multiple-Choice QA}: The model chooses among discrete candidate options (e.g., A, B, C, D).
-\end{itemize}
-
-\subsubsection{Overview of canonical QA benchmarks}
-\begin{itemize}
-    \item \textbf{SQuAD (Stanford Question Answering Dataset)}~\cite{rajpurkar2016squad}: Contains over 100,000 question-answer pairs curated by crowd-workers on Wikipedia articles. Answers are exact extractive text spans. SQuAD~2.0~\cite{rajpurkar2018know} introduced over 50,000 \textit{unanswerable questions} that look syntactically plausible but cannot be answered from the text, penalizing models that hallucinate answers instead of outputting an abstention signal. Evaluated via Exact Match ($\EM$) and token-level $F_1$.
-    \item \textbf{TriviaQA}~\cite{joshi2017triviaqa}: Over 650,000 question-answer pairs compiled from trivia websites paired with independently retrieved web and Wikipedia evidence documents, introducing natural linguistic noise and distant supervision.
-    \item \textbf{Natural Questions (NQ)}~\cite{kwiatkowski2019natural}: A dataset released by Google comprising real, uncurated user queries entered into the Google search engine, paired with full Wikipedia pages. Annotators identified both a ``long answer'' (an entire paragraph containing the explanation) and a ``short answer'' (a concise entity or span).
-    \item \textbf{WebQuestions}~\cite{berant2013webquestions}: Contains 6,642 question-answer pairs generated by querying the Google Suggest API and annotating answers via Amazon Mechanical Turk over Freebase knowledge graph entities.
-\end{itemize}
-
-\subsection{Conditional sequence generation: Translation and summarization}
-\label{subsec:translation_summarization}
-
-Conditional sequence generation tasks require mapping an input source text into an output text with different surface syntax or different length, while preserving invariant core semantics.
-
-\subsubsection{Machine translation tasks}
-Machine translation maps a source sequence $\vx = (x_1, \dots, x_S)$ in language $\mathcal{L}_S$ to a target sequence $\vy = (y_1, \dots, y_T)$ in language $\mathcal{L}_T$. The premier competitive venue is the annual \textbf{WMT (Workshop on Machine Translation)} benchmarks, which provide standardized training corpora, validation splits, and human reference sets across dozens of high-resource and low-resource language pairs (e.g., English-German, English-Czech). Evaluation relies on BLEU, METEOR, and neural metrics like COMET.
-
-\subsubsection{Text summarization tasks}
-Text summarization condenses an input document $\vx$ into a concise summary $\vy$ ($|\vy| \ll |\vx|$). It is divided into:
-\begin{itemize}
-    \item \textbf{Extractive summarization}: Ranking and selecting the most salient verbatim sentences from the source document.
-    \item \textbf{Abstractive summarization}: Rewriting and paraphrasing key ideas into novel, fluid sentences. Foundation models excel at abstractive summarization.
-\end{itemize}
-Standard benchmarks include:
-\begin{itemize}
-    \item \textbf{CNN/Daily Mail}~\cite{lin2004rouge}: Over 300,000 news articles paired with multi-sentence bullet-point story highlights.
-    \item \textbf{PubMed Diabetes}: Long-form scientific and biomedical research articles paired with author abstracts, requiring technical jargon retention and factual rigor.
-\end{itemize}
-Evaluated via ROUGE-1, ROUGE-2, and ROUGE-L.
-
-\subsection{Natural language inference and grammatical acceptability}
+\subsubsection{Grammatical acceptability and linguistic competence (CoLA)}
 \label{subsec:nli_grammatical_acceptability}
+To assess whether a neural model has internalized syntax independent of semantic plausibility, evaluation protocols draw upon theoretical linguistics. In his seminal work \textit{Syntactic Structures} (1957), Noam Chomsky formulated the famous sentence \textit{``Colorless green ideas sleep furiously''} to demonstrate that a sentence can be completely devoid of meaningful semantics while adhering perfectly to English grammatical syntax. Conversely, a sentence may convey transparent meaning while violating fundamental grammatical rules (e.g., \textit{``*Sleep green ideas colorless furiously''}).
+
+The premier benchmark for isolating syntactic acceptability is the \textbf{Corpus of Linguistic Acceptability (CoLA)}~\cite{warstadt2019cola}. CoLA consists of 10,657 English sentences extracted from published linguistics textbooks and articles, covering a comprehensive catalog of morphological, syntactic, and semantic phenomena (including auxiliary inversion, island constraints, verb subcategorization, and wh-movement). Each sentence is annotated with a binary label indicating whether it is grammatically acceptable ($y = 1$) or unacceptable ($y = 0$).
+
+Because grammatical acceptability datasets exhibit substantial class imbalance (acceptable sentences naturally outnumber unacceptable instances), evaluating raw accuracy yields misleading results. Instead, CoLA is formally evaluated using the \textbf{Matthews Correlation Coefficient (MCC)}:
+\begin{equation}
+\label{eq:mcc_def}
+\text{MCC} = \frac{\TP \cdot \TN - \FP \cdot \FN}{\sqrt{(\TP + \FP)(\TP + \FN)(\TN + \FP)(\TN + \FN)}} \in [-1, +1],
+\end{equation}
+where $+1.0$ represents perfect grammatical discrimination, $0.0$ corresponds to random chance, and $-1.0$ denotes complete inverse prediction.
+
+\begin{center}
+\begin{minipage}{0.95\textwidth}
+\begin{tcolorbox}[colback=cardBg,colframe=cardLine,arc=2pt,boxrule=0.5pt,title=\textbf{Task Example: Grammatical Acceptability (CoLA)}]
+\small\sffamily
+\textbf{Acceptable Sentence ($y = 1$)}: \textit{``The book that I read yesterday was fascinating.''} \\
+\textbf{Unacceptable Sentence ($y = 0$)}: \textit{``*The book that I read it yesterday was fascinating.''} \\
+\textit{Linguistic Analysis}: The unacceptable sentence contains an ungrammatical resumptive pronoun (``it'') in an object relative clause, which violates standard English syntactic constraints. While human listeners easily decipher the intended meaning, an evaluated language model must assign strictly higher likelihood to the syntactically valid parse tree.
+\end{tcolorbox}
+\end{minipage}
+\end{center}
+
+\subsubsection{Text and sentiment classification}
+\label{subsec:text_classification}
+Text classification evaluates a model's capacity to categorize unstructured documents into discrete semantic classes based on overall content, sentiment polarity, or author intent. In classical machine learning, this was achieved by training specialized classifiers (such as support vector machines or linear networks over bag-of-words vectors). In modern foundation model paradigms, classification is conducted either by fine-tuning a linear classification head atop an encoder's pooling representation (e.g., the $\mathbf{h}_{[\text{CLS}]}$ token in BERT) or by prompting an autoregressive decoder to generate the target label token directly.
+
+Canonical classification benchmarks span two primary modalities:
+\begin{itemize}
+    \item \textbf{Sentiment analysis}:
+    \begin{itemize}
+        \item \textbf{SST-2 (Stanford Sentiment Treebank)}~\cite{socher2013sst}: A dataset of 9,613 movie review sentences extracted from Rotten Tomatoes, equipped with fine-grained syntactic parse trees. SST-2 evaluates binary sentiment classification (positive vs. negative), frequently testing concessive and adversarial clauses.
+        \item \textbf{IMDb Movie Reviews}~\cite{maas2011imdb}: 50,000 long-form movie reviews partitioned equally into 25,000 training and 25,000 testing documents, labeled with binary polarity. Unlike short sentences, IMDb requires aggregating sentiment signals across hundreds of words of meandering prose.
+        \item \textbf{Yelp Review Dataset}: Approximately 7 million commercial customer reviews annotated on a 1-to-5 star rating scale, testing graded ordinal regression and multi-class classification.
+    \end{itemize}
+    \item \textbf{Topical news classification}:
+    \begin{itemize}
+        \item \textbf{AG News}: 120,000 news articles partitioned uniformly across four topical categories: \textit{World}, \textit{Sports}, \textit{Business}, and \textit{Sci/Tech}.
+        \item \textbf{20 Newsgroups}: A classic collection of approximately 20,000 Usenet discussion forum postings distributed across 20 distinct technical, religious, and political newsgroups.
+    \end{itemize}
+\end{itemize}
+Performance on text classification is measured using Accuracy and Macro-$F_1$ (to guarantee equitable error penalization across minority classes).
+
+\begin{center}
+\begin{minipage}{0.95\textwidth}
+\begin{tcolorbox}[colback=cardBg,colframe=cardLine,arc=2pt,boxrule=0.5pt,title=\textbf{Task Example: Sentiment Classification (SST-2)}]
+\small\sffamily
+\textbf{Input Review}: \textit{``It's not that the movie is poorly made, but it is utterly devoid of soul or charm.''} \\
+\textbf{Ground-Truth Label}: \textbf{Negative} ($y = 0$). \\
+\textit{Linguistic Analysis}: The sentence features a concessive contrastive structure. Surface keyword spotters are easily tricked by local negated phrases (``not poorly made''). A robust language model must resolve the syntactic coordination introduced by ``but'' and recognize that the overarching predicate (``utterly devoid of soul or charm'') dictates the negative global polarity.
+\end{tcolorbox}
+\end{minipage}
+\end{center}
+
+% ------------------------------------------------------------------------------
+% TIER 2
+% ------------------------------------------------------------------------------
+\subsection{Tier 2: Autoregressive Sequence Generation and Narrative Discourse}
+\label{subsec:tier2_generation_discourse}
+
+Moving beyond categorical classification, Tier 2 evaluates the language model's primary functional design: autoregressive sequence generation. This tier probes whether a model can generate syntactically coherent, contextually grounded text across both narrative continuations and constrained conditional transformations.
+
+\subsubsection{Autoregressive text completion and narrative cloze tasks}
+\label{subsec:text_completion_cloze}
+The purest evaluation of an autoregressive model evaluates its probability assignment over subsequent text. Given an initial conditioning passage $W_{<N} = (w_1, \dots, w_{N-1})$, the model must assign high probability to plausible continuations while rejecting absurd or ungrammatical endings. This can be evaluated in open-ended generative mode (measuring perplexity) or discriminative choice mode via Equation~\eqref{eq:discriminative_choice}.
+
+Early cloze benchmarks presented short sentences where the missing word could be easily guessed from immediate local context (e.g., predicting ``bark'' following ``The dog began to''). Such tasks failed to evaluate whether models maintained long-range memory or simply acted as localized $n$-gram smoothers. To overcome this limitation, researchers developed specialized discourse-level benchmarks:
+\begin{itemize}
+    \item \textbf{LAMBADA (Language Modeling Broadened to Account for Discourse-Level Analysis)}~\cite{paperno2016lambada}: A corpus of narrative passages specifically curated such that human readers can guess the final target word accurately when reading the full paragraph, but cannot guess it if exposed only to the final target sentence. LAMBADA directly tests whether a model retains discourse context across dozens of tokens without succumbing to recency bias or catastrophic forgetting. Evaluated via Accuracy (Exact Match on the target token) and Perplexity.
+    \item \textbf{ROCStories and StoryCloze}~\cite{mostafazadeh2016rocstories}: A benchmark of 5-sentence commonsense narratives capturing everyday human experiences. The StoryCloze test presents the first four sentences as narrative context and provides two candidate concluding sentences: one logical narrative resolution and one contradictory or nonsensical ending.
+    \item \textbf{HellaSwag}~\cite{zellers2019hellaswag}: A continuation benchmark constructed to prevent statistical shortcut learning. Zellers et al. demonstrated that models easily scored over 80\% on earlier story completion datasets by exploiting shallow lexical artifacts (such as matching length or common verbs). HellaSwag introduced \textbf{Adversarial Filtering (AF)}, iteratively employing generator models to synthesize distractor endings that easily deceive neural discriminators while remaining trivially distinguishable to human evaluators.
+\end{itemize}
+
+\begin{center}
+\begin{minipage}{0.95\textwidth}
+\begin{tcolorbox}[colback=cardBg,colframe=cardLine,arc=2pt,boxrule=0.5pt,title=\textbf{Task Example: Long-Range Narrative Text Completion (LAMBADA)}]
+\small\sffamily
+\textbf{Context Passage}: \textit{``Yes, I thought I was going to lose her. She was unconscious for days, and the doctors were grave. I stayed beside her bed every night until she finally opened her eyes. I held her hand and whispered, 'Alice, I thought you were going to...' ''} \\
+\textbf{Target Continuation}: \textbf{die} (Single-word target). \\
+\textit{Discourse Requirement}: Evaluating the final sentence in isolation (``Alice, I thought you were going to...'') provides no constraint on the missing word; valid grammatical completions include ``leave'', ``cry'', ``faint'', or ``sleep''. Only by conditioning on the preceding 60 tokens (``unconscious for days'', ``doctors were grave'') can the model deduce that ``die'' is the intended narrative resolution.
+\end{tcolorbox}
+\end{minipage}
+\end{center}
+
+\subsubsection{Conditional sequence generation: Translation and summarization}
+\label{subsec:translation_summarization}
+Conditional sequence generation requires mapping an input text into an output sequence with different surface vocabulary or compressed length, while preserving invariant semantic content.
+\begin{itemize}
+    \item \textbf{Machine translation}: Maps a source sequence $\vx$ in language $\mathcal{L}_S$ to a target sequence $\vy$ in language $\mathcal{L}_T$. The premier competitive standard is established by the annual \textbf{WMT (Workshop on Machine Translation)} benchmarks, which provide curated parallel training and test corpora across high-resource pairs (English-German, English-French) and low-resource pairs. Evaluation relies on BLEU, METEOR, and neural semantic similarity measures.
+    \item \textbf{Text summarization}: Compresses an input document $\vx$ into a concise summary $\vy$ ($|\vy| \ll |\vx|$). As highlighted in lecture, summarization is divided into:
+    \begin{itemize}
+        \item \textbf{Extractive summarization}: Identifying and extracting the most salient verbatim sentences directly from the source document.
+        \item \textbf{Abstractive summarization}: Synthesizing key information and generating novel, fluent sentences that may contain words absent from the source text.
+    \end{itemize}
+    Canonical summarization datasets include \textbf{CNN/Daily Mail}~\cite{lin2004rouge} (over 300,000 news articles paired with human-written bullet-point story highlights) and \textbf{PubMed Diabetes} (long-form biomedical research papers paired with technical abstracts). Evaluation relies on ROUGE-1, ROUGE-2, and ROUGE-L.
+\end{itemize}
+
+\begin{center}
+\begin{minipage}{0.95\textwidth}
+\begin{tcolorbox}[colback=cardBg,colframe=cardLine,arc=2pt,boxrule=0.5pt,title=\textbf{Task Example: Conditional Sequence Generation (Translation \& Summarization)}]
+\small\sffamily
+\textbf{Machine Translation (WMT English $\to$ French)}:
+\begin{itemize}[leftmargin=1.5em,itemsep=1pt]
+    \item \textit{Source}: ``Pre-trained language models capture deep statistical regularities of natural language.''
+    \item \textit{Reference}: ``Les modèles de langue pré-entraînés capturent des régularités statistiques profondes du langage naturel.''
+\end{itemize}
+\textbf{Abstractive Summarization (CNN/Daily Mail)}:
+\begin{itemize}[leftmargin=1.5em,itemsep=1pt]
+    \item \textit{Lead Passage}: ``A rare snowstorm struck the Mediterranean coastline on Monday, disrupting morning flights at regional airports and dusting historic olive groves with over four inches of snow. Meteorological authorities reported the heaviest coastal accumulation in over thirty years...''
+    \item \textit{Target Highlight Summary}: ``-- Rare snowstorm strikes Mediterranean coast with four inches of snow. \\ -- Heaviest coastal snowfall recorded in over 30 years disrupts regional transport.''
+\end{itemize}
+\end{tcolorbox}
+\end{minipage}
+\end{center}
+
+% ------------------------------------------------------------------------------
+% TIER 3
+% ------------------------------------------------------------------------------
+\subsection{Tier 3: Information Retrieval, Parametric Memory, and Reading Comprehension}
+\label{subsec:tier3_qa_memory}
+
+Tier 3 evaluates the model's capacity to store, retrieve, and synthesize factual world knowledge. Rather than assessing whether text sounds fluent, Tier 3 benchmarks test whether the factual claims made by the model are true.
+
+\subsubsection{Question answering architectures: Open-book versus closed-book}
+\label{subsec:question_answering}
+Question Answering ($\QA$) problem formulations are partitioned along two foundational axes: \textbf{knowledge access} and \textbf{answer formulation format}.
+
+\textit{Axis 1: Access to knowledge (Closed-book vs. open-book).}
+\begin{itemize}
+    \item \textbf{Closed-Book QA}: The model receives only the question prompt in its context window ($x = \text{``In what year was the University of Turin founded?''}$). The model must retrieve the factual answer entirely from its internal \textbf{parametric memory}---the billions of connection weights optimized during pre-training. This paradigm directly measures what the model ``knows'' without external assistance.
+    \item \textbf{Open-Book QA}: The model is supplied with external reference documents in its context window alongside the question prompt. In modern production systems, this is realized via \textbf{Retrieval-Augmented Generation (RAG)}, where an external retriever queries a dense vector database (e.g., Wikipedia) and injects the top-$k$ relevant passages into the prompt. This evaluates reading comprehension, contextual reasoning, and synthesis fidelity.
+\end{itemize}
+
+\textit{Axis 2: Answer formulation format.}
+\begin{itemize}
+    \item \textbf{Extractive QA}: The answer is guaranteed to exist as a contiguous text span within the provided passage. The model predicts boundary pointer indices $[s_{\text{start}}, s_{\text{end}}]$.
+    \item \textbf{Abstractive QA}: The model generates a free-form natural language response, synthesizing facts across multiple paragraphs.
+    \item \textbf{Multiple-Choice QA}: The model selects among discrete candidate options (e.g., A, B, C, D).
+\end{itemize}
+
+\subsubsection{Canonical QA benchmarks}
+\begin{itemize}
+    \item \textbf{SQuAD (Stanford Question Answering Dataset)}~\cite{rajpurkar2016squad}: Contains over 100,000 extractive question-answer pairs curated by crowd-workers over Wikipedia articles. SQuAD~2.0~\cite{rajpurkar2018know} introduced over 50,000 adversarial \textit{unanswerable questions} that look syntactically plausible but cannot be answered from the provided passage, requiring models to emit an abstention token $\langle\text{no-answer}\rangle$. Evaluated via Exact Match ($\EM$) and token-level $F_1$.
+    \item \textbf{TriviaQA}~\cite{joshi2017triviaqa}: Over 650,000 question-answer pairs gathered from trivia enthusiasts, paired with independently retrieved web documents and Wikipedia articles, introducing realistic noise and distant supervision.
+    \item \textbf{Natural Questions (NQ)}~\cite{kwiatkowski2019natural}: A dataset released by Google containing real, anonymized user search queries entered into the Google search engine. Annotators paired queries with full Wikipedia pages, annotating both a ``long answer'' (an entire paragraph containing the explanation) and a concise ``short answer'' (a specific entity or numerical span).
+    \item \textbf{WebQuestions}~\cite{berant2013webquestions}: 6,642 question-answer pairs generated by querying the Google Suggest API and annotated over Freebase knowledge graph entities via Amazon Mechanical Turk.
+\end{itemize}
+
+\begin{center}
+\begin{minipage}{0.95\textwidth}
+\begin{tcolorbox}[colback=cardBg,colframe=cardLine,arc=2pt,boxrule=0.5pt,title=\textbf{Task Example: Extractive Question Answering \& Abstention (SQuAD 2.0)}]
+\small\sffamily
+\textbf{Context Passage}: \textit{``The Normans were the people who in the 10th and 11th centuries gave their name to Normandy, a region in France. They were descended from Norse raiders and pirates from Denmark, Iceland and Norway who, under their leader Rollo, agreed to swear fealty to King Charles III of West Francia in 911...''} \\
+\textbf{Answerable Question}: \textit{``Who was the leader of the Norse raiders that swore fealty in 911?''} \\
+$\implies$ \textbf{Extractive Answer Span}: \textbf{``Rollo''} ($\EM = 1.0$, $F_1 = 1.0$). \\
+\textbf{Adversarial Unanswerable Question}: \textit{``What was the name of Rollo's flagship vessel?''} \\
+$\implies$ \textbf{Target Ground Truth}: \textbf{$\langle\text{no-answer}\rangle$} (Abstention). \\
+\textit{Evaluation Insight}: Models unable to verify negative evidence will hallucinate an arbitrary noun phrase from the context, incurring an exact match penalty.
+\end{tcolorbox}
+\end{minipage}
+\end{center}
+
+% ------------------------------------------------------------------------------
+% TIER 4
+% ------------------------------------------------------------------------------
+\subsection{Tier 4: Deep Semantic, Multi-Step, and Symbolic Reasoning}
+\label{subsec:tier4_deep_reasoning}
+
+At the pinnacle of the cognitive hierarchy lies deep semantic and symbolic reasoning. Tasks in Tier 4 require the model to perform formal deductive inference, navigate physical and social commonsense constraints, execute multi-step mathematical calculations, and solve synthetic algorithmic probes designed to resist pre-training web memorization.
 
 \subsubsection{Natural language inference (NLI)}
-$\NLI$ (also termed \textit{recognizing textual entailment}) is the foundational benchmark for formal semantic reasoning. Given two sentences---a \textbf{Premise} ($P$) and a \textbf{Hypothesis} ($H$)---the model must determine whether the hypothesis is:
+\label{subsec:nli_reasoning}
+Natural Language Inference ($\NLI$, also known as recognizing textual entailment) is the foundational benchmark for formal semantic reasoning. Given two sentences---a \textbf{Premise} ($P$) and a \textbf{Hypothesis} ($H$)---the model must determine whether the hypothesis is logically entailed, contradicted, or undetermined:
 \begin{equation}
 \label{eq:nli_labels}
 \text{Relationship}(P, H) \in \{\textbf{Entailment}, \, \textbf{Contradiction}, \, \textbf{Neutral}\}.
 \end{equation}
 \begin{itemize}
-    \item \textit{Entailment}: If $P$ is true, $H$ is necessarily true ($P = \text{``A dog is chasing a tennis ball''}, H = \text{``An animal is running''}$).
-    \item \textit{Contradiction}: If $P$ is true, $H$ is definitely false ($P = \text{``A man is sleeping on a couch''}, H = \text{``A man is running a marathon''}$).
-    \item \textit{Neutral}: $H$ might or might not be true; $P$ provides insufficient evidence ($P = \text{``Two people are eating pizza''}, H = \text{``The pizza has mushrooms''}$).
+    \item \textbf{Entailment}: If $P$ is true, $H$ is necessarily true ($P = \text{``A dog is chasing a ball''}, H = \text{``An animal is moving''}$).
+    \item \textbf{Contradiction}: If $P$ is true, $H$ is necessarily false ($P = \text{``A man is asleep in bed''}, H = \text{``A man is running a marathon''}$).
+    \item \textbf{Neutral}: $H$ might or might not be true; $P$ provides insufficient evidence ($P = \text{``Two people are eating lunch''}, H = \text{``The lunch was prepared at home''}$).
 \end{itemize}
-Canonical benchmarks include \textbf{SNLI (Stanford NLI)}~\cite{bowman2015snli} (570,000 sentence pairs derived from image captions) and \textbf{MultiNLI (Multi-Genre NLI)}~\cite{williams2018multinli} (433,000 sentence pairs spanning 10 diverse spoken and written genres).
+Canonical benchmarks include \textbf{SNLI (Stanford NLI)}~\cite{bowman2015snli} (570,000 crowd-sourced sentence pairs derived from Flickr image captions) and \textbf{MultiNLI (Multi-Genre NLI)}~\cite{williams2018multinli} (433,000 sentence pairs spanning 10 diverse spoken and written genres).
 
-\subsubsection{Grammatical acceptability and linguistic competence}
-To assess whether a model has internalized syntax independent of semantic plausibility (exemplified by Noam Chomsky's famous formulation \textit{``Colorless green ideas sleep furiously''}), researchers utilize the \textbf{Corpus of Linguistic Acceptability (CoLA)}~\cite{warstadt2019cola}. CoLA contains 10,657 English sentences drawn from theoretical linguistics publications, annotated as grammatically acceptable ($1$) or unacceptable ($0$). Because grammatical errors are subtle (e.g., auxiliary inversion, island constraints), CoLA is evaluated using the \textbf{Matthews Correlation Coefficient (MCC)}, a balanced measure for binary classification robust to class imbalance.
+\begin{center}
+\begin{minipage}{0.95\textwidth}
+\begin{tcolorbox}[colback=cardBg,colframe=cardLine,arc=2pt,boxrule=0.5pt,title=\textbf{Task Example: Natural Language Inference (MultiNLI)}]
+\small\sffamily
+\textbf{Premise}: \textit{``At the base of the canyon, a lone hiker rested beside a rapid stream.''}
+\begin{itemize}[leftmargin=1.5em,itemsep=2pt]
+    \item \textbf{Hypothesis 1 (Entailment)}: \textit{``An outdoor enthusiast was taking a break near water.''} \hfill \textit{[Supported]}
+    \item \textbf{Hypothesis 2 (Contradiction)}: \textit{``A crowded tour bus drove down the paved city street.''} \hfill \textit{[Impossible]}
+    \item \textbf{Hypothesis 3 (Neutral)}: \textit{``The hiker had been walking for six hours without food.''} \hfill \textit{[Undetermined]}
+\end{itemize}
+\textit{Semantic Insight}: Entailment requires hypernym abstraction (``hiker'' $\to$ ``outdoor enthusiast'', ``rapid stream'' $\to$ ``water''); the neutral hypothesis introduces plausible narrative details that cannot be formally deduced from the premise.
+\end{tcolorbox}
+\end{minipage}
+\end{center}
 
-\subsection{Text and sentiment classification}
-\label{subsec:text_classification}
+\subsubsection{Commonsense and causal reasoning}
+\label{subsec:commonsense_causal_reasoning}
+Commonsense reasoning encompasses the vast repository of unstated physical, social, temporal, and causal knowledge that humans use effortlessly every day. Because foundation models have no physical embodiment or direct sensory experience of the real world, probing commonsense reasoning exposes whether models have formed genuine world models or merely superficial word associations.
 
-Text classification evaluates a model's capacity to categorize documents into discrete semantic classes based on overall content, style, or author intent.
+\textit{Pronoun ambiguity resolution: The Winograd schema challenge.}
+Pronoun coreference resolution tests whether a model understands physical and situational constraints. The foundational benchmark is the \textbf{Winograd Schema Challenge (WSC)}~\cite{levesque2012winograd}, based on paired sentences called \textit{twin sentences} that differ by only one or two words:
+
+\begin{center}
+\begin{minipage}{0.95\textwidth}
+\begin{tcolorbox}[colback=cardBg,colframe=cardLine,arc=2pt,boxrule=0.5pt,title=\textbf{Task Example: Pronoun Coreference Ambiguity (WSC Twin Sentences)}]
+\small\sffamily
+\textbf{Sentence 1}: \textit{The trophy didn't fit in the suitcase because \textbf{it} was too \textbf{big}.} $\implies$ What was too big? $\implies$ \textbf{The trophy}. \\
+\textbf{Sentence 2}: \textit{The trophy didn't fit in the suitcase because \textbf{it} was too \textbf{small}.} $\implies$ What was too small? $\implies$ \textbf{The suitcase}. \\
+\textit{Physical Reasoning}: Syntactic dependency parsing alone cannot resolve ``it''; the model must understand that containers are constrained by spatial volume and that an item must be smaller than a container to fit inside it.
+\end{tcolorbox}
+\end{minipage}
+\end{center}
+
+\textbf{WinoGrande}~\cite{sakaguchi2020winogrande} scaled this paradigm to 44,000 adversarially filtered problems, systematically eliminating lexical selection biases to expose models relying on associative correlations rather than physical reasoning.
+
+\textit{Causal and if-then reasoning: COPA and ATOMIC.}
 \begin{itemize}
-    \item \textbf{Sentiment analysis}:
-    \begin{itemize}
-        \item \textbf{IMDb Movie Reviews}~\cite{maas2011imdb}: 50,000 long-form movie reviews labeled with binary polarity (positive versus negative).
-        \item \textbf{Yelp Review Dataset}: ~7 million customer reviews annotated on a 1-to-5 star rating scale.
-        \item \textbf{SST-2 (Stanford Sentiment Treebank)}~\cite{socher2013sst}: Binary sentiment sentences derived from movie reviews, equipped with compositional syntactic parse trees.
-    \end{itemize}
-    \item \textbf{Topic classification}:
-    \begin{itemize}
-        \item \textbf{AG News}: 120,000 news articles categorized into four topical classes: \textit{World}, \textit{Sports}, \textit{Business}, and \textit{Sci/Tech}.
-        \item \textbf{20 Newsgroups}: Classic benchmark of 20,000 Usenet discussion forum messages partitioned across 20 distinct technical and social newsgroups.
-    \end{itemize}
+    \item \textbf{COPA (Choice of Plausible Alternatives)}~\cite{roemmele2011copa}: 1,000 problems composed of a premise and two alternative hypotheses. The prompt explicitly queries either the \textbf{cause} or the \textbf{effect}.
+    \item \textbf{ATOMIC (An Atlas of Machine Commonsense for If-Then Reasoning)}~\cite{sap2019atomic}: An atlas containing 877,000 everyday if-then relations organized into 9 semantic dimensions spanning agent intent (\textit{xIntent}), emotional reaction (\textit{xReact}), and consequences for others (\textit{oEffect}).
 \end{itemize}
-Evaluated via Accuracy and Macro-$F_1$.
 
-\subsection{Mathematical and formal reasoning}
+\begin{center}
+\begin{minipage}{0.95\textwidth}
+\begin{tcolorbox}[colback=cardBg,colframe=cardLine,arc=2pt,boxrule=0.5pt,title=\textbf{Task Example: Causal Reasoning (COPA)}]
+\small\sffamily
+\textbf{Premise}: \textit{The man broke his toe.} \\
+\textbf{Question}: What was the \textbf{cause} of this event? \\
+\textbf{Alternative 1}: \textit{He dropped a hammer on his foot.} \hfill \textit{[Correct]} \\
+\textbf{Alternative 2}: \textit{He tied his shoelaces too tightly.} \\
+\textit{Causal Insight}: The model must evaluate the mechanical plausibility of physical impacts causing bone fractures versus minor discomfort from tight shoelaces.
+\end{tcolorbox}
+\end{minipage}
+\end{center}
+
+\subsubsection{Mathematical and formal reasoning}
 \label{subsec:mathematical_reasoning}
-
-Autoregressive models trained exclusively on next-token prediction frequently struggle with rigorous multi-step deductive reasoning. Small models memorize common arithmetic tables (e.g., $2 + 2 = 4$) but fail when required to execute multi-step symbolic manipulations.
+Autoregressive models trained purely on next-token prediction frequently struggle with rigorous multi-step deductive calculation. While models memorize common arithmetic facts (e.g., $2 + 2 = 4$), they easily lose track of intermediate states when executing multi-step word problems.
 
 To benchmark quantitative reasoning, researchers established two premier datasets:
 \begin{itemize}
     \item \textbf{GSM8K (Grade School Math 8K)}~\cite{cobbe2021gsm8k}: 8,500 linguistically diverse grade-school math word problems requiring 2 to 8 steps of arithmetic operations. Each problem includes a detailed chain-of-thought solution with intermediate calculation annotations (delimited by \texttt{<<...>>}). Foundation models are prompted using few-shot Chain-of-Thought ($\CoT$)~\cite{wei2022chain}, and evaluated on \textbf{Exact Match} of the final numerical answer.
-    \item \textbf{MATH Dataset}~\cite{hendrycks2021math}: 12,500 challenging problems gathered from high-school American Mathematics Competitions (AMC 10, AMC 12, AIME), formatted entirely in \LaTeX. Spans seven mathematical subfields: \textit{Prealgebra}, \textit{Algebra}, \textit{Number Theory}, \textit{Counting \& Probability}, \textit{Geometry}, \textit{Intermediate Algebra}, and \textit{Precalculus}, stratified across 5 difficulty levels.
+    \item \textbf{MATH Dataset}~\cite{hendrycks2021math}: 12,500 challenging competition mathematics problems gathered from the AMC 10, AMC 12, and AIME, formatted entirely in \LaTeX. Spans seven mathematical subfields: \textit{Prealgebra}, \textit{Algebra}, \textit{Number Theory}, \textit{Counting \& Probability}, \textit{Geometry}, \textit{Intermediate Algebra}, and \textit{Precalculus}, stratified across 5 difficulty tiers.
 \end{itemize}
 
-\subsection{Commonsense and causal reasoning}
-\label{subsec:commonsense_causal_reasoning}
-
-Commonsense reasoning represents the broad repository of unstated physical, social, temporal, and causal knowledge that humans utilize to navigate daily interactions.
-
-\subsubsection{Ambiguity resolution: The Winograd schema challenge}
-Pronoun ambiguity resolution tests whether a model understands the physical and situational constraints of entities. The foundational benchmark is the \textbf{Winograd Schema Challenge (WSC)}~\cite{levesque2012winograd}, based on paired sentences called \textit{twin sentences} that differ by only one or two words:
 \begin{center}
-\begin{minipage}{0.92\textwidth}
-\begin{tcolorbox}[colback=cardBg,colframe=cardLine,arc=2pt,boxrule=0.5pt]
+\begin{minipage}{0.95\textwidth}
+\begin{tcolorbox}[colback=cardBg,colframe=cardLine,arc=2pt,boxrule=0.5pt,title=\textbf{Task Example: Multi-Step Mathematical Reasoning (GSM8K)}]
 \small\sffamily
-\textbf{Sentence 1}: \textit{The trophy didn't fit in the suitcase because \textbf{it} was too \textbf{big}.} $\implies$ What was too big? $\implies$ \textbf{The trophy}. \\
-\textbf{Sentence 2}: \textit{The trophy didn't fit in the suitcase because \textbf{it} was too \textbf{small}.} $\implies$ What was too small? $\implies$ \textbf{The suitcase}.
+\textbf{Problem}: Janet’s ducks lay 16 eggs per day. She eats three for breakfast every morning and bakes muffins with another four. She sells the remainder at the farmers' market daily for \$2 per egg. How much in dollars does she make every day at the farmers' market? \\
+\textbf{Annotated Chain-of-Thought Solution}:
+\begin{quote}
+Janet consumes $3 + 4 = 7$ eggs each day. \texttt{<<3+4=7>>} \\
+She has $16 - 7 = 9$ eggs left to sell at the market. \texttt{<<16-7=9>>} \\
+Selling 9 eggs at \$2 each yields $9 \times 2 = 18$ dollars. \texttt{<<9*2=18>>} \\
+\#\#\#\# 18
+\end{quote}
+\textbf{Evaluation Metric}: \textbf{Exact Match} on final integer (\texttt{18}). \\
+\textit{Reasoning Insight}: The model must execute linear intermediate deduction. The \texttt{<<...>>} calculator delimiters illustrate tool-calling: delegating deterministic arithmetic to an execution engine prevents accumulated calculation drift.
 \end{tcolorbox}
 \end{minipage}
 \end{center}
-A model cannot resolve ``it'' through grammatical parsing alone; it must understand that containers are constrained by volume and that objects must be smaller than containers to fit inside them.
 
-\textbf{WinoGrande}~\cite{sakaguchi2020winogrande} scaled this paradigm to 44,000 adversarially filtered problems, systematically eliminating lexical selection biases to expose models relying on associative correlations rather than physical reasoning.
-
-\subsubsection{Causal reasoning: COPA and ATOMIC}
-\begin{itemize}
-    \item \textbf{COPA (Choice of Plausible Alternatives)}~\cite{roemmele2011copa}: 1,000 questions composed of a premise and two alternative hypotheses. The prompt explicitly asks for either the \textbf{cause} or the \textbf{effect}:
-    \begin{quote}
-    \textit{Premise}: The man broke his toe. What was the \textbf{cause}? \\
-    \textit{Alternative 1}: He dropped a hammer on his foot. [Correct] \\
-    \textit{Alternative 2}: He tied his shoelaces too tightly.
-    \end{quote}
-    \item \textbf{ATOMIC (An Atlas of Machine Commonsense for If-Then Reasoning)}~\cite{sap2019atomic}: A knowledge graph containing 877,000 everyday if-then relations organized into 9 semantic dimensions spanning agent intent (\textit{xIntent}), emotional effect (\textit{xReact}), and consequences for others (\textit{oEffect}).
-\end{itemize}
-
-\subsection{Synthetic probe tasks: Isolating capabilities from memorization}
+\subsubsection{Synthetic diagnostic probes: Isolating capabilities from memorization}
 \label{subsec:synthetic_probe_tasks}
-
-A persistent difficulty in evaluating foundation models on standard public datasets is determining whether a model solved a problem through general reasoning or simply reproduced text memorized during web-scale pre-training.
+A persistent challenge in evaluating foundation models on standard public datasets is determining whether a model solved a problem through general reasoning or simply reproduced text memorized during web-scale pre-training.
 
 To address this, researchers design \textbf{synthetic probe tasks}: algorithmically generated problems that are easy to construct programmatically, yet non-trivial for autoregressive models to solve:
 \begin{itemize}
     \item \textbf{Arbitrary multi-digit arithmetic}: Generating random large-integer operations (e.g., $4123 + 9421 = 13544$) guarantees that the specific numerical pair was never observed in pre-training corpora.
-    \item \textbf{String perturbation and character scrubbing}: Requesting a model to strip a specific punctuation symbol from an arbitrary sentence (e.g., \textit{``Remove the \$ from the sentence `th\$s is a\$sentenc\$e'' '}). Because subword tokenizers merge characters into subword units, manipulating raw characters requires navigating token boundaries.
+    \item \textbf{String perturbation and character scrubbing}: Requesting a model to strip a specific punctuation symbol from an arbitrary sentence (e.g., \textit{``Remove the \$ from the sentence `th\$s is a\$sentenc\$e'''}). Because subword tokenizers merge characters into subword units, manipulating raw characters requires navigating token boundaries.
     \item \textbf{Anagram unscrambling}: Asking the model to unscramble randomly permuted words (e.g., \textit{``aplpe''} $\to$ \textit{``apple''}).
 \end{itemize}
-Synthetic tasks ensure that test data is guaranteed to be unseen, providing an untainted diagnostic probe into the model's computational capabilities.
 
-\textit{While evaluating models on individual tasks (such as SQuAD for QA, or CoLA for grammar) reveals localized strengths and weaknesses, reporting dozens of separate accuracies is unwieldy. The research community requires holistic, standardized evaluation suites that aggregate performance across diverse tasks into unified benchmarks.}
+\begin{center}
+\begin{minipage}{0.95\textwidth}
+\begin{tcolorbox}[colback=cardBg,colframe=cardLine,arc=2pt,boxrule=0.5pt,title=\textbf{Task Example: Synthetic Diagnostic Probes}]
+\small\sffamily
+\textbf{Probe 1: Out-of-Distribution Multi-Digit Addition}:
+\begin{itemize}[leftmargin=1.5em,itemsep=1pt]
+    \item \textit{Prompt}: ``What is $4123 + 9421$?'' $\implies$ \textit{Target}: \textbf{$13544$}.
+    \item \textit{Diagnostic}: Tests multi-token carry propagation without web memorization.
+\end{itemize}
+\textbf{Probe 2: Subword Token Boundary Navigation (Character Scrubbing)}:
+\begin{itemize}[leftmargin=1.5em,itemsep=1pt]
+    \item \textit{Prompt}: ``Remove the \$ symbol from the string: `th\$s is a\$sentenc\$e'.''
+    \item \textit{Target}: \textbf{``this is a sentence''}.
+    \item \textit{Failure Mode}: Subword tokenizers fuse `th' and `\$' into distinct BPE tokens, causing models to erroneously restore vowels (e.g., turning `\$' into `i') or introduce unwanted whitespaces.
+\end{itemize}
+\textbf{Probe 3: Permutation Inversion (Anagram Unscrambling)}:
+\begin{itemize}[leftmargin=1.5em,itemsep=1pt]
+    \item \textit{Prompt}: ``Unscramble the word: `aplpe'.'' $\implies$ \textit{Target}: \textbf{``apple''}.
+\end{itemize}
+\end{tcolorbox}
+\end{minipage}
+\end{center}
 
 \clearpage
 
 % ==============================================================================
-% SECTION 7.3: STANDARDIZED BENCHMARKS & CONTAMINATION
+% SECTION 8.3: STANDARDIZED BENCHMARKS & CONTAMINATION
 % ==============================================================================
 \section{Standardized Benchmark Suites}
 \label{sec:benchmarks_contamination}
 
-Foundation models are designed as general-purpose reasoners. Evaluating a model on a single task provides an incomplete picture: a model could excel at text classification while failing substantially at arithmetic or causal reasoning. To establish reproducible comparisons between competing architectures and training paradigms, the NLP community introduced \textbf{standardized multi-task benchmark suites}.
+While evaluating models on individual tasks reveals localized strengths and weaknesses, reporting dozens of separate accuracies across disjoint datasets is unwieldy. The research community requires holistic, standardized evaluation suites that aggregate performance across diverse tasks into unified benchmark leaderboards.
 
-However, the widespread reliance on fixed, public benchmarks has triggered an epistemological crisis in AI evaluation: \textbf{benchmark data contamination}. This section examines the canonical evaluation suites and formalizes the contamination phenomenon that threatens the validity of modern LLM leaderboards.
+However, standardized benchmarks did not emerge as a random collection of test sets; they evolved through an evolutionary progression where each new generation was conceived directly to address the rapid saturation and methodological failure modes of its predecessor.
 
-\subsection{Holistic multi-task benchmarking: GLUE and SuperGLUE}
-\label{subsec:glue_superglue}
+\subsection{An Evolutionary Taxonomy of Benchmark Suites}
+\label{subsec:benchmark_evolutionary_taxonomy}
 
-\subsubsection{The GLUE benchmark suite}
-In 2018, Wang et al.~\cite{wang2018glue} introduced \textbf{GLUE} (\textit{General Language Understanding Evaluation}), an integrated benchmark suite designed to evaluate general-purpose sentence representations. GLUE combined nine diverse natural language understanding tasks spanning three broad families:
+The history of foundation model benchmarking can be understood through four distinct evolutionary generations, illustrated in the progression from single-sentence heuristics to multimodal frontier reasoning:
+\begin{enumerate}
+    \item \textbf{Generation 1: Sentence-Level Linguistic Understanding (GLUE, 2018)}: Focused on evaluating pre-trained sentence representations across nine diverse classification and inference tasks, aggregated into a single scalar leaderboard score. Saturated within eighteen months by BERT and RoBERTa.
+    \item \textbf{Generation 2: Multi-Sentence Discourse and Coreference (SuperGLUE, 2019)}: Replaced saturated GLUE tasks with substantially harder challenges requiring multi-sentence reading comprehension, causal reasoning, and pronoun coreference resolution. Saturated by T5 and DeBERTa.
+    \item \textbf{Generation 3: Massive Multi-Domain Academic Knowledge (MMLU, 2020)}: Shifted evaluation from linguistic competence to broad, encyclopedic academic and professional domain knowledge spanning 57 subjects, evaluated under zero-shot and few-shot prompting.
+    \item \textbf{Generation 4: Multimodal Frontier Reasoning and Contamination-Proof Testing (Humanity's Last Exam, 2024/2025)}: Advanced to expert-level multimodal reasoning across hundreds of disciplines, intentionally utilizing private evaluation splits to withstand web memorization.
+\end{enumerate}
+
+\subsection{Generation 1: Sentence-Level Linguistic Understanding (GLUE)}
+\label{subsec:glue_benchmark}
+
+In 2018, Wang et al.~\cite{wang2018glue} introduced \textbf{GLUE} (\textit{General Language Understanding Evaluation}), an integrated benchmark suite designed to evaluate general-purpose sentence representations. Prior to GLUE, models were evaluated on isolated datasets using disparate metrics, preventing direct comparisons. GLUE unified evaluation by assembling nine natural language understanding tasks spanning three broad families:
 \begin{enumerate}
     \item \textbf{Single-sentence tasks}: Linguistic acceptability on CoLA~\cite{warstadt2019cola} and binary sentiment analysis on SST-2~\cite{socher2013sst}.
     \item \textbf{Similarity and paraphrase tasks}: Sentence pair equivalence on MRPC (Microsoft Research Paraphrase Corpus), QQP (Quora Question Pairs), and semantic similarity scoring on STS-B (Semantic Textual Similarity Benchmark).
     \item \textbf{Inference tasks}: Natural language inference on MNLI (MultiNLI)~\cite{williams2018multinli}, QNLI (Question NLI, derived from SQuAD), RTE (Recognizing Textual Entailment), and WNLI (Winograd NLI).
 \end{enumerate}
-GLUE established a public leaderboard evaluated on hidden private test sets, aggregating performance across all nine tasks into a \textbf{single summary score} (the unweighted average of task accuracies and correlation coefficients).
+GLUE established a public competitive leaderboard evaluated on hidden private test sets, aggregating performance across all nine tasks into a \textbf{single summary score} (the unweighted average of task accuracies and correlation coefficients).
 
-\subsubsection{Benchmark saturation and the advent of SuperGLUE}
-When GLUE was introduced, state-of-the-art models scored substantially below human performance ($87.1$). However, with the advent of the Transformer pre-training revolution (BERT~\cite{devlin2019}, RoBERTa, and T5~\cite{raffel2020t5}), models rapidly saturated the benchmark, exceeding non-expert human performance within eighteen months. Analysis revealed that models were exploiting spurious statistical cues and shallow lexical overlaps in GLUE's test sets rather than exercising deep comprehension.
+\begin{center}
+\begin{minipage}{0.95\textwidth}
+\begin{tcolorbox}[colback=cardBg,colframe=cardLine,arc=2pt,boxrule=0.5pt,title=\textbf{GLUE Benchmark Example: Multi-Genre Natural Language Inference (MNLI)}]
+\small\sffamily
+\textbf{Task Genre}: Slate Magazine (Journalistic Essay) \\
+\textbf{Premise}: \textit{``The new rights are nice, but they don't solve the underlying problem.''} \\
+\textbf{Hypothesis}: \textit{``The problem remains unresolved despite the new rights.''} \\
+\textbf{Candidate Options}:
+\begin{itemize}[leftmargin=1.5em,itemsep=1pt]
+    \item[\textbf{(A)}] Entailment \hfill \textit{[Correct]}
+    \item[\textbf{(B)}] Contradiction
+    \item[\textbf{(C)}] Neutral
+\end{itemize}
+\textit{Benchmark Analysis}: GLUE mapped all classification, similarity, and inference tasks into a single aggregate summary score. Models easily saturated MNLI by exploiting lexical overlap heuristics between premise and hypothesis.
+\end{tcolorbox}
+\end{minipage}
+\end{center}
 
-In response, Wang et al.~\cite{wang2019superglue} introduced \textbf{SuperGLUE} in 2019. Retaining GLUE's single-metric aggregate format, SuperGLUE replaced saturated tasks with substantially harder challenges requiring multi-sentence reasoning, coreference resolution, and open-ended QA:
+\subsection{Generation 2: Multi-Sentence Discourse and Coreference (SuperGLUE)}
+\label{subsec:glue_superglue}
+
+When GLUE was introduced, state-of-the-art models scored substantially below human baseline performance ($87.1$). However, with the advent of the Transformer pre-training revolution (BERT~\cite{devlin2019}, RoBERTa, and T5~\cite{raffel2020t5}), models rapidly saturated the benchmark, exceeding non-expert human performance within eighteen months. Error analysis revealed that models were exploiting shallow statistical cues and lexical overlaps in GLUE's test sets rather than exercising deep comprehension.
+
+In response, Wang et al.~\cite{wang2019superglue} introduced \textbf{SuperGLUE} in 2019. Retaining GLUE's single-metric aggregate format, SuperGLUE replaced saturated tasks with substantially harder challenges requiring multi-sentence discourse comprehension, coreference resolution, and open-ended QA:
 \begin{itemize}
-    \item \textbf{BoolQ}: Boolean (yes/no) question answering over complex passages.
+    \item \textbf{BoolQ}: Boolean (yes/no) question answering over complex multi-sentence passages.
     \item \textbf{CB (CommitmentBank)}: Three-way discourse clause inference.
     \item \textbf{COPA}: Commonsense causal reasoning~\cite{roemmele2011copa}.
     \item \textbf{MultiRC}: Multi-sentence reading comprehension where questions have multiple correct answers.
@@ -1021,12 +1225,39 @@ In response, Wang et al.~\cite{wang2019superglue} introduced \textbf{SuperGLUE} 
     \item \textbf{WSC}: The Winograd Schema Challenge pronoun coreference task~\cite{levesque2012winograd}.
 \end{itemize}
 
-\subsection{Massive multitask language understanding (MMLU)}
+\begin{center}
+\begin{minipage}{0.95\textwidth}
+\begin{tcolorbox}[colback=cardBg,colframe=cardLine,arc=2pt,boxrule=0.5pt,title=\textbf{SuperGLUE Benchmark Example: Boolean Question Answering (BoolQ)}]
+\small\sffamily
+\textbf{Passage}: \textit{``The Persian Gulf is a Mediterranean sea in Western Asia. The body of water is an extension of the Indian Ocean through the Strait of Hormuz and lies between Iran to the northeast and the Arabian Peninsula to the southwest... The Persian Gulf was a battlefield of the 1980--1988 Iran-Iraq War, in which each side attacked the other's oil tankers.''} \\
+\textbf{Question}: \textit{``Is the Persian Gulf connected to the Indian Ocean?''} \\
+\textbf{Candidate Choices}: \textbf{True} / \textbf{False} \\
+\textbf{Gold Label}: \textbf{True} \\
+\textit{Reasoning Requirement}: Unlike GLUE's single-sentence tasks, SuperGLUE demands synthesizing complex multi-sentence passages. The model must recognize that being an ``extension of the Indian Ocean through the Strait of Hormuz'' implies geographic connectivity.
+\end{tcolorbox}
+\end{minipage}
+\end{center}
+
+\begin{center}
+\begin{minipage}{0.95\textwidth}
+\begin{tcolorbox}[colback=cardBg,colframe=cardLine,arc=2pt,boxrule=0.5pt,title=\textbf{SuperGLUE Benchmark Example: Words in Context (WiC)}]
+\small\sffamily
+\textbf{Target Word}: \textbf{bank} \\
+\textbf{Context 1}: \textit{``He sat on the muddy \textbf{bank} of the river and watched the barges pass.''} \\
+\textbf{Context 2}: \textit{``She deposited her paycheck at the local \textbf{bank} before noon.''} \\
+\textbf{Question}: Does the target word have the same meaning in both sentences? \\
+\textbf{Gold Label}: \textbf{False} (Geographic shore vs. financial institution). \\
+\textit{Cognitive Probe}: Tests polysemous semantic disambiguation across diverse sentence syntaxes.
+\end{tcolorbox}
+\end{minipage}
+\end{center}
+
+\subsection{Generation 3: Massive Multitask Language Understanding (MMLU)}
 \label{subsec:mmlu}
 
 As foundation models scaled past tens of billions of parameters, evaluation expanded beyond basic linguistic understanding toward broad, multi-domain academic and professional knowledge.
 
-In 2020, Hendrycks et al.~\cite{hendrycks2020mmlu} introduced \textbf{MMLU} (\textit{Massive Multitask Language Understanding}), which has become the de facto gold standard for reporting foundation model capabilities (utilized to benchmark GPT-3, PaLM, LLaMA, GPT-4, and Claude).
+In 2020, Hendrycks et al.~\cite{hendrycks2020mmlu} introduced \textbf{MMLU} (\textit{Massive Multitask Language Understanding}), which has become the de facto gold standard for reporting foundation model capabilities (utilized to benchmark GPT-3, PaLM, LLaMA, GPT-4, and Gemini).
 
 \subsubsection{Architecture and scope of MMLU}
 \begin{itemize}
@@ -1047,10 +1278,7 @@ Models are evaluated on MMLU under \textbf{zero-shot} or \textbf{5-shot in-conte
 \label{eq:mmlu_scoring}
 \hat{y} = \argmax_{k \in \{\text{'A'}, \text{'B'}, \text{'C'}, \text{'D'}\}} P(w_k \mid \text{Prompt}).
 \end{equation}
-The overall MMLU score is the unweighted percentage of questions answered correctly across all 57 subjects. A random baseline achieves $25.0\%$; modern frontier models (such as GPT-4 and Gemini~1.5) exceed $85\%$, outperforming human domain experts on the majority of specialized subjects.
-
-\subsubsection{Worked benchmark question examples}
-To illustrate the depth and format of MMLU across diverse disciplines, consider the representative questions highlighted in the lecture:
+The overall MMLU score is the unweighted percentage of questions answered correctly across all 57 subjects. A random baseline achieves $25.0\%$; modern frontier models exceed $85\%$, outperforming human domain experts on the majority of specialized subjects.
 
 \begin{center}
 \begin{minipage}{0.95\textwidth}
@@ -1086,7 +1314,34 @@ To illustrate the depth and format of MMLU across diverse disciplines, consider 
 \end{minipage}
 \end{center}
 
-\subsection{The benchmark contamination crisis}
+\subsection{Generation 4: Multimodal Frontier Reasoning and Private Splits (HLE)}
+\label{subsec:hle_benchmark}
+
+As frontier models achieved near-human scores on MMLU ($>85\%$), the AI community recognized that static, multiple-choice academic benchmarks were succumbing to both benchmark saturation and widespread pre-training memorization. In response, recent efforts have introduced \textbf{Humanity's Last Exam (HLE)} (2024/2025), designed to serve as the definitive evaluation benchmark for artificial general intelligence.
+
+\subsubsection{Design philosophy and multimodal scope}
+Constructed in collaboration with hundreds of subject matter experts worldwide, HLE comprises approximately 2,500 questions across mathematics, theoretical physics, computer science, biology, and philosophy. HLE differs from previous benchmarks in three crucial dimensions:
+\begin{enumerate}
+    \item \textbf{Multimodal integration}: Questions incorporate diagrams, scientific charts, and visual figures, requiring joint perceptual and abstract reasoning.
+    \item \textbf{Extreme expert difficulty}: Problems are curated to reflect frontier doctoral research questions rather than standardized undergraduate multiple-choice questions.
+    \item \textbf{Confidential private test split}: Crucially, the authors maintain a substantial portion of the benchmark strictly private and unreleased on public web repositories. Evaluation is conducted through closed scoring servers, guaranteeing that the questions cannot be crawled by commercial web scrapers.
+\end{enumerate}
+
+When evaluated on HLE, the performance of state-of-the-art models collapses dramatically: while models boast $>85\%$ on public MMLU, their accuracy on HLE ranges between $10\%$ and $30\%$, demonstrating that much of the apparent progress on public benchmarks stems from data exposure rather than genuine reasoning.
+
+\begin{center}
+\begin{minipage}{0.95\textwidth}
+\begin{tcolorbox}[colback=cardBg,colframe=cardLine,arc=2pt,boxrule=0.5pt,title=\textbf{Humanity's Last Exam (HLE) Example: Multimodal Expert Reasoning}]
+\small\sffamily
+\textbf{Subject Domain}: Theoretical Chemistry \& Molecular Spectroscopy \\
+\textbf{Problem Setup}: Given the high-resolution vibrational-rotational Raman spectrum of a linear triatomic molecule showing nuclear spin statistical weights and alternating intensity ratios of $1:2$ for even and odd rotational quantum states $J$, identify the ground-state electronic symmetry and nuclear spin $I$ of the identical terminal nuclei. \\
+\textbf{Evaluation Protocol}: Free-response symbolic derivation verified against confidential closed-form evaluation scripts. \\
+\textit{Why Frontier Models Struggle}: Unlike public web-crawled benchmarks where questions appear on Chegg or Wikipedia, HLE questions require multi-step, expert-level academic deduction. While models claim $>85\%$ on public MMLU, they achieve only $\sim 10\%$ to $30\%$ accuracy on HLE's private split, demonstrating the acute vulnerability of public leaderboards to benchmark data contamination.
+\end{tcolorbox}
+\end{minipage}
+\end{center}
+
+\subsection{The Benchmark Contamination Crisis}
 \label{subsec:contamination_crisis}
 
 The very large performance gains reported on public benchmarks have brought to light an existential vulnerability in modern AI evaluation: \textbf{data contamination}.
@@ -1095,7 +1350,7 @@ The very large performance gains reported on public benchmarks have brought to l
 \textbf{Data contamination} refers to the inadvertent or deliberate inclusion of evaluation benchmark test data (questions, passages, or gold-standard target labels) in the training corpus of a language model.
 \end{definition}
 
-As highlighted in the lecture, Foundation models are pre-trained on multi-terabyte web crawls (such as Common Crawl, GitHub, Wikipedia, and academic preprint servers) containing hundreds of billions of web pages. Because popular benchmarks (GLUE, SQuAD, MMLU, GSM8K) are hosted on public GitHub repositories, open-access papers, and web forums, their test sets are routinely ingested by automated web scrapers during pre-training.
+As highlighted in lecture, foundation models are pre-trained on multi-terabyte web crawls (such as Common Crawl, GitHub, Wikipedia, and academic preprint servers) containing hundreds of billions of web pages. Because popular benchmarks (GLUE, SQuAD, MMLU, GSM8K) are hosted on public GitHub repositories, open-access papers, and web forums, their test sets are routinely ingested by automated web scrapers during pre-training.
 
 \subsubsection{Taxonomy and levels of benchmark contamination}
 Contamination can occur across multiple distinct stages of the model lifecycle:
@@ -1126,7 +1381,6 @@ To safeguard evaluation integrity, modern foundation model research employs rigo
 \end{itemize}
 
 \clearpage
-
 % ==============================================================================
 % SECTION 7.4: SYNTHESIS & COMPARATIVE LANDSCAPE
 % ==============================================================================
