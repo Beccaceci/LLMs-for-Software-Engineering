@@ -1,699 +1,537 @@
 \documentclass[../../main.tex]{subfiles}
+
 \begin{document}
 
-\chapter{Language Models}
-\label{ch:intro_lms}
+\chapter{Language models}
+\label{ch:language_models}
+\label{ch:language_models_intro}
 
-Human language and software engineering source code represent discrete symbolic systems governed by intricate, multi-level structural constraints spanning phonology, syntax, semantics, and pragmatics. For decades, computational linguistics attempted to capture these phenomena through hand-crafted rule bases and formal context-free grammars. However, natural language is inherently ambiguous, productive, and elastic: speakers continuously coin new expressions, tolerate grammatical ellipses, and convey contextual connotations that elude rigid deterministic parsers.
+The preceding chapters established the computational foundations of deep learning and analyzed recurrent neural networks as dynamical systems capable of processing variable-length sequences. However, before deploying neural architectures to process or generate human text, a foundational theoretical question must be resolved: what does it mean, in formal mathematical terms, to model a natural language? Rather than treating text as arbitrary strings of alphanumeric characters or hand-crafted symbolic parse trees, modern computational linguistics conceptualizes language as a discrete stochastic process governed by an underlying, non-uniform probability distribution over sequential utterances.
 
-To construct computational systems capable of understanding, completing, and generating coherent text, modern computer science reframes language processing from deterministic rule parsing into a discrete stochastic process. By treating words or subword tokens as discrete random variables, language modeling formalizes the quantification of joint probability distributions over arbitrary token sequences. Through the unconditional factorization of the chain rule of probability, this joint estimation problem collapses into sequential conditional next-token prediction. This formulation—estimating the conditional distribution over a vocabulary given preceding context—constitutes the foundational principle uniting early statistical Markov models with modern deep neural foundation architectures. In this chapter, we establish the mathematical foundations of probabilistic language modeling, formalize the trade-offs of classical $n$-gram representations, analyze the breakdown of discrete frequency counting on unseen data, derive statistical smoothing algorithms, and establish information-theoretic metrics for sequence evaluation.
+The goal of language modeling is to formulate computational mechanisms capable of distinguishing between probable, semantically coherent utterances and implausible, grammatically corrupted sequences. Historically, this objective originated in the pioneering work of Claude Shannon and the engineering impasses of early speech recognition, where deterministic grammars proved fundamentally inadequate to capture the pervasive ambiguity and continuous variability of natural human expression. Early statistical approaches addressed this challenge through Markovian assumptions and discrete frequency estimation over local $n$-gram tuples, establishing the foundational paradigms of maximum likelihood training, likelihood evaluation, and autoregressive generation.
 
-\clearpage
-\section{The Language Modeling Task}
-\label{sec:prob_lm}
-
-At its core, a language model formalizes the mechanism by which computational systems evaluate the fluency, plausibility, and likelihood of word sequences. In natural language processing and modern AI-assisted software engineering, we model language and source code not through brittle deterministic rules, but as a discrete stochastic process governed by formal probability distributions.
-
-Let $\vocab = \{w_1, w_2, \dots, w_V\}$ denote a finite vocabulary of $V = |\vocab|$ discrete tokens, such as words, subwords, or punctuation symbols. An arbitrary natural language sentence, code snippet, or document of length $N$ is represented as an ordered sequence of discrete random variables $W = (w_1, w_2, \dots, w_N) \in \vocab^N$.
-
-\begin{definition}{Statistical language model}{statistical_lm}
-A \emph{statistical language model} is a formal probability distribution $\Prob$ defined over the set of all possible discrete sequences $\mathcal{S} = \bigcup_{N=1}^\infty \vocab^N$. For any specific sequence $W = (w_1, \dots, w_N)$, the language model assigns a scalar probability $\Prob(W) \in [0, 1]$ satisfying the Kolmogorov probability axioms:
-\begin{equation}
-\label{eq:total_prob}
-\Prob(W) \ge 0 \quad \forall W \in \mathcal{S}, \quad \text{and} \quad \sum_{S \in \mathcal{S}} \Prob(S) = 1.
-\end{equation}
-\end{definition}
-
-The model maps the syntactic and semantic conventions of human language into real values on the unit interval. Under a well-calibrated distribution, fluent and grammatically coherent sentences receive significant probability mass, as in:
-\[
-\Prob(\text{``this'', ``is'', ``a'', ``reasonable'', ``sentence''}) = 0.1.
-\]
-In contrast, syntactically valid but semantically unusual or rare utterances receive noticeably lower values:
-\[
-\Prob(\text{``this'', ``is'', ``a'', ``purple'', ``sentence''}) = 0.01,
-\]
-while ungrammatical, corrupted, or disjoint sequences receive negligible probabilities:
-\[
-\Prob(\text{``this'', ``are'', ``a'', ``reasonable'', ``sentence''}) = 0.001.
-\]
-
-Evaluating the joint probability $\Prob(w_1, \dots, w_N)$ directly over the combinatorial space $\vocab^N$ is computationally intractable: observing every conceivable multi-word sequence in a training corpus is impossible. To structure this estimation problem, we invoke the fundamental chain rule of probability.
-
-\begin{definition}{Chain rule decomposition of language models}{chain_rule_lm}
-For any sequence of random variables $(w_1, w_2, \dots, w_N)$, the joint probability factors identically and unconditionally into an ordered product of conditional next-token probabilities:
-\begin{align}
-\Prob(w_1, w_2, \dots, w_N) &= \Prob(w_1) \cdot \Prob(w_2 \mid w_1) \cdot \Prob(w_3 \mid w_1, w_2) \cdots \Prob(w_N \mid w_1, \dots, w_{N-1}) \notag \\
-&= \prod_{t=1}^N \Prob(w_t \mid w_1, \dots, w_{t-1}) = \prod_{t=1}^N \Prob(w_t \mid w_{<t}), \label{eq:chain_rule_exact}
-\end{align}
-where $w_{<t} = (w_1, \dots, w_{t-1})$ represents the prefix history preceding timestep $t$. For the initial token $t=1$, the conditioning prefix is the empty sequence $\emptyset$, yielding $\Prob(w_1 \mid w_{<1}) = \Prob(w_1)$.
-\end{definition}
-
-Applying Equation~\eqref{eq:chain_rule_exact} to our running example yields the sequential factorization:
-\begin{align*}
-\Prob(\text{this, is, a, reasonable, sentence}) &= \Prob(\text{this}) \\
-&\quad \cdot \Prob(\text{is} \mid \text{this}) \\
-&\quad \cdot \Prob(\text{a} \mid \text{this, is}) \\
-&\quad \cdot \Prob(\text{reasonable} \mid \text{this, is, a}) \\
-&\quad \cdot \Prob(\text{sentence} \mid \text{this, is, a, reasonable}).
-\end{align*}
-
-This mathematical decomposition marks a fundamental conceptual shift in computational linguistics. Instead of attempting to score complete, static documents simultaneously, the modeling objective collapses entirely into sequential conditional next-word estimation: given history $w_{<t}$, the model estimates the categorical probability distribution $\Prob(w_t = w \mid w_{<t})$ over all tokens $w \in \vocab$. This formulation corresponds directly to the psychological \emph{cloze test} (fill-in-the-blank evaluation), where an observer completes an incomplete prefix:
-\begin{center}
-\textit{``This is a reasonable \rule{2.5cm}{0.4pt}''} $\implies \Prob(\text{sentence} \mid \text{This is a reasonable}) = {?}$
-\end{center}
-
-Crucially, this equivalence demonstrates that estimating local conditional probabilities across a vocabulary is mathematically sufficient to compute the global probability $\Prob(W)$ of any arbitrary document via Equation~\eqref{eq:chain_rule_exact}. Furthermore, text generation reduces to iteratively sampling from this local conditional distribution and appending each emitted token to the conditioning history. Consequently, solving conditional next-token prediction provides a complete framework for generative modeling.
-
-\begin{figure}[htbp]
-\centering
-\begin{tikzpicture}[
-    level 1/.style={sibling distance=40mm, level distance=18mm},
-    level 2/.style={sibling distance=18mm, level distance=18mm},
-    node/.style={circle, draw=politoNavy, fill=skyBlue!40, thick, minimum size=8mm, font=\small},
-    leaf/.style={rectangle, rounded corners=2pt, draw=deepdiveTeal, fill=deepdiveTealBg, semithick, font=\footnotesize, inner sep=3pt},
-    edge from parent/.style={draw=bodyGray, thick, -{Stealth[scale=0.9]}},
-    edge label/.style={font=\tiny\bfseries, fill=white, inner sep=1pt}
-]
-\node[node] (root) {$\langle s \rangle$}
-    child {
-        node[node] (the) {the}
-        child {
-            node[leaf] (cat) {cat}
-            edge from parent node[edge label, left] {0.25}
-        }
-        child {
-            node[leaf] (mouse) {mouse}
-            edge from parent node[edge label, right] {0.50}
-        }
-        child {
-            node[leaf] (cheese) {cheese}
-            edge from parent node[edge label, right] {0.25}
-        }
-        edge from parent node[edge label, left] {$\Prob(\text{the})=1.0$}
-    }
-    child {
-        node[node] (a) {a}
-        child {
-            node[leaf] (dog) {dog}
-            edge from parent node[edge label, left] {0.70}
-        }
-        child {
-            node[leaf] (fox) {fox}
-            edge from parent node[edge label, right] {0.30}
-        }
-        edge from parent node[edge label, right] {$\Prob(\text{a})=0.0$}
-    };
-\end{tikzpicture}
-\caption{Visualizing autoregressive sequence generation as path traversal across a probability branching tree. At the root symbol $\langle s \rangle$, outgoing edges partition total probability mass across vocabulary tokens. At each node $w_{<t}$, children represent the conditional distribution $\Prob(w_t \mid w_{<t})$. The law of total probability guarantees that branch probabilities sum to unity at each decision point.}
-\label{fig:prob_tree}
-\end{figure}
-
-Geometrically, sequence generation can be interpreted as path traversal down a directed probability tree, as depicted in Figure~\ref{fig:prob_tree}. At the root node $\langle s \rangle$, outgoing edges partition the total probability mass across the vocabulary $\vocab$. Selecting a token $w_1$ traverses an edge with probability $\Prob(w_1)$ to reach a new conditioning state, from which a new set of branches opens with conditional probabilities $\Prob(w_2 \mid w_1)$. The joint probability of an entire sentence equals the product of edge weights along that unique trajectory, and text generation corresponds to sampling a directed path from the root to a designated sequence-termination token $\langle /s \rangle$.
+This chapter develops the theoretical, statistical, and algorithmic principles of language modeling. We begin by examining the historical imperatives that motivated probabilistic language modeling and formalize the joint distribution over word sequences via the probability chain rule. We then formulate the Markov assumption and $n$-gram models, trace parameter estimation via Maximum Likelihood Estimation on a concrete corpus, and systematically analyze the dual inference modes: sequence likelihood evaluation and autoregressive sequence generation. Finally, we dissect the fundamental limitations of statistical counting models—specifically combinatorial data sparsity, the zero-frequency collapse, and orthogonal symbolic representations—examine smoothing and discounting remedies, derive information-theoretic evaluation metrics including cross-entropy and perplexity, and establish the structural necessity of transitioning to continuous distributed word embeddings.
 
 \clearpage
-\section{Markov Assumptions and $n$-gram Models}
-\label{sec:markov_ngram}
+\section{Introduction to language models and the modeling task}
+\label{sec:lm_intro_task}
 
-Although Equation~\eqref{eq:chain_rule_exact} is mathematically exact and preserves all syntactic and semantic dependencies, estimating $\Prob(w_t \mid w_{<t})$ directly from empirical frequencies presents an exponential combinatorial obstacle. As the sequence index $t$ grows, the conditioning history $w_{<t} = (w_1, \dots, w_{t-1})$ expands monotonically. Because each constituent token is drawn from a vocabulary $\vocab$ of size $V = |\vocab|$, the space of potential prefix histories preceding token $t$ is the Cartesian product space $\vocab^{t-1}$, whose cardinality is:
-\begin{equation}
-\label{eq:state_space_unconstrained}
-|\mathcal{H}_t| = |\vocab|^{t-1} = V^{t-1}.
-\end{equation}
-Even for a modest vocabulary of $V = 10{,}000$ words, tracking histories of length $t = 4$ requires estimating probabilities across $10{,}000^3 = 10^{12}$ distinct conditioning states. In any finite training corpus, almost every sequence of length greater than three occurs zero times.
+Understanding modern foundation architectures requires first examining how natural language was formalized as a statistical object. The formulation of language modeling emerged not from abstract linguistic taxonomy, but from concrete engineering challenges in telecommunications and signal processing that required machines to quantify the plausibility of textual hypotheses.
 
-To make estimation mathematically tractable, the principle of conditional independence posits that future tokens depend primarily on a bounded historical window. In his foundational 1948 treatise on information theory \cite{shannon1948}, Claude Shannon demonstrated that modeling natural language as a discrete Markov process produces increasingly coherent synthetic English as the conditioning order increases. Modern statistical treatments \cite{jurafsky2024} formalize this simplification as the core of classical $n$-gram language modeling.
+\subsection{Historical motivation: the urge to model natural language}
+\label{subsec:lm_historical_motivation}
 
-\begin{definition}{Markov assumption of order $n-1$}{markov_assumption}
-An $n$-gram language model assumes that the conditional probability of the current word $w_t$ depends exclusively on the immediately preceding $n-1$ words, rendering it conditionally independent of earlier discourse history:
-\begin{equation}
-\label{eq:markov_approx}
-\Prob(w_t \mid w_1, w_2, \dots, w_{t-1}) \approx \Prob(w_t \mid w_{t-n+1}, \dots, w_{t-1}).
-\end{equation}
-The integer $n \ge 1$ dictates the order of the model:
-\begin{itemize}
-    \item \textbf{Unigram Model ($n=1$, Order 0)}: Completely memoryless. Each word is treated as statistically independent of past and future tokens:
-    \[
-    \Prob(w_1, \dots, w_N) \approx \prod_{t=1}^N \Prob(w_t).
-    \]
-    \item \textbf{Bigram Model ($n=2$, Order 1)}: First-order Markov chain. Conditioning depends exclusively on the single preceding token $w_{t-1}$:
-    \[
-    \Prob(w_1, \dots, w_N) \approx \prod_{t=1}^N \Prob(w_t \mid w_{t-1}).
-    \]
-    \item \textbf{Trigram Model ($n=3$, Order 2)}: Second-order Markov chain. Conditioning depends on the preceding pair of tokens $(w_{t-2}, w_{t-1})$:
-    \[
-    \Prob(w_1, \dots, w_N) \approx \prod_{t=1}^N \Prob(w_t \mid w_{t-2}, w_{t-1}).
-    \]
-\end{itemize}
-\end{definition}
+The mathematical formalization of language modeling originated in Claude Shannon's landmark 1948 treatise, \textit{A Mathematical Theory of Communication} \citep{shannon1948}. Shannon sought to quantify the fundamental limits of data compression and transmission across noisy telecommunication channels. Rather than viewing text as static philosophical prose, Shannon conceptualized natural language as a stochastic process generating discrete sequences of symbols chosen from a finite alphabet according to stationary statistical probabilities. By measuring the entropy of printed English through letter-level and word-level approximation experiments, Shannon demonstrated that natural text possesses substantial statistical redundancy, implying that preceding context exerts powerful probabilistic constraints on upcoming symbols.
 
-\subsection{Combinatorial state-space reduction}
-The primary mathematical virtue of the Markov assumption is that it truncates an exponentially expanding state space into a fixed, stationary cardinality. Under an $n$-gram model, the conditioning context is always restricted to $n-1$ words, regardless of the absolute sequence position $t$:
-\begin{equation}
-\label{eq:state_space_markov}
-|\mathcal{H}^{(n)}| = |\vocab|^{n-1} = V^{n-1}.
-\end{equation}
-Consequently, specifying the complete transition probability distribution across the entire vocabulary requires an $(n-1)$-dimensional conditioning tensor containing:
-\begin{equation}
-\label{eq:parameters_ngram}
-P_{\text{params}} = V^{n-1} \times (V - 1) \approx V^n,
-\end{equation}
-free parameters. Table~\ref{tab:state_space_reduction} contrasts the unconstrained historical state space with fixed $n$-gram models for realistic vocabulary sizes.
-
-\begin{table}[htbp]
-\centering
-\small
-\caption{State-space cardinality $|\mathcal{H}|$ as a function of sequence position $t$ versus fixed $n$-gram Markov orders for vocabularies $V = 10{,}000$ and $V = 50{,}000$.}
-\label{tab:state_space_reduction}
-\begin{tabularx}{\textwidth}{l l c >{\raggedleft\arraybackslash}X >{\raggedleft\arraybackslash}X}
-\toprule
-\textbf{Model / Order} & \textbf{Effective Context} & \textbf{Formula} & \textbf{States ($V = 10^4$)} & \textbf{States ($V = 5 \times 10^4$)} \\
-\midrule
-Unconstrained ($t=2$)  & 1 previous token   & $V^1$       & $1.0 \times 10^4$    & $5.0 \times 10^4$    \\
-Unconstrained ($t=3$)  & 2 previous tokens  & $V^2$       & $1.0 \times 10^8$    & $2.5 \times 10^9$    \\
-Unconstrained ($t=5$)  & 4 previous tokens  & $V^4$       & $1.0 \times 10^{16}$ & $6.25 \times 10^{18}$ \\
-Unconstrained ($t=10$) & 9 previous tokens  & $V^9$       & $1.0 \times 10^{36}$ & $1.95 \times 10^{42}$ \\
-Unconstrained ($t=20$) & 19 previous tokens & $V^{19}$     & $1.0 \times 10^{76}$ & $1.90 \times 10^{89}$ \\
-\midrule
-\textbf{Unigram ($n=1$)} & 0 tokens (memoryless) & $V^0 = 1$   & $1$                  & $1$                  \\
-\textbf{Bigram ($n=2$)}  & 1 previous token      & $V^1$       & $1.0 \times 10^4$    & $5.0 \times 10^4$    \\
-\textbf{Trigram ($n=3$)} & 2 previous tokens     & $V^2$       & $1.0 \times 10^8$    & $2.5 \times 10^9$    \\
-\textbf{4-gram ($n=4$)}  & 3 previous tokens     & $V^3$       & $1.0 \times 10^{12}$ & $1.25 \times 10^{14}$ \\
-\bottomrule
-\end{tabularx}
-\end{table}
-
-While the unconstrained state space exceeds $10^{76}$ states by step $t=20$ (surpassing the order of magnitude of atoms in the observable universe), a bigram model maintains a fixed state space of $50{,}000$ rows. However, this dimensional reduction introduces a severe theoretical trade-off: the model is conditionally blind to any token appearing outside the immediate $n-1$ window.
-
-\subsection{Maximum likelihood estimation (MLE)}
-Under Maximum Likelihood Estimation, we estimate the conditional transition probabilities directly by counting occurrences of exact token sequences in a training corpus \cite{jurafsky2024}. For a generic $n$-gram:
-\begin{equation}
-\label{eq:mle_general}
-\Prob_{\text{MLE}}(w_t \mid w_{t-n+1}, \dots, w_{t-1}) = \frac{C(w_{t-n+1}, \dots, w_{t-1}, w_t)}{C(w_{t-n+1}, \dots, w_{t-1})},
-\end{equation}
-where $C(\cdot)$ denotes the raw frequency of that exact sequence in the training text. For a bigram model ($n=2$), Equation~\eqref{eq:mle_general} specializes to:
-\begin{equation}
-\label{eq:mle_bigram}
-\Prob_{\text{MLE}}(w_t \mid w_{t-1}) = \frac{C(w_{t-1}, w_t)}{C(w_{t-1})} = \frac{C(w_{t-1}, w_t)}{\sum_{w \in \vocab} C(w_{t-1}, w)}.
-\end{equation}
-Normalizing each row by the unigram count of the conditioning prefix ensures that $\sum_{w \in \vocab} \Prob_{\text{MLE}}(w \mid w_{t-1}) = 1$.
-
-\clearpage
-\section{Transition Matrix Walkthrough}
-\label{sec:count_matrix}
-
-To observe the concrete mechanics of statistical $n$-gram estimation, we trace the extraction of bigram frequencies and transition probabilities from a controlled corpus comprising two sentences:
+In the decades that followed, the imperative to build automated language models transitioned from theoretical information theory to critical real-world signal processing domains:
 \begin{enumerate}
-    \item Sentence 1: \textit{``The cat chased the mouse happily''}
-    \item Sentence 2: \textit{``The mouse ate the cheese''}
+    \item \textbf{Acoustic speech recognition (ASR)}: In automated speech transcription, an input acoustic waveform must be mapped to a written sequence of words. However, human phonetics exhibits pervasive phonetic ambiguity: homophones and continuous connected speech yield acoustic signals that correspond equally well to multiple disparate word sequences. For example, the acoustic sequence corresponding to the phonetic sequence \texttt{/rek-uhg-nyze-beech/} can be transcribed as either \textit{``recognize speech''} or \textit{``wreck a nice beach''}. An acoustic sensor analyzing frequency spectra alone cannot reliably resolve this ambiguity. To achieve human-level accuracy, an ASR pipeline must factorize the problem into two complementary components:
+    \begin{equation}
+    W^* = \arg\max_W P(W \mid A) = \arg\max_W \frac{P(A \mid W) P(W)}{P(A)} = \arg\max_W P(A \mid W) P(W),
+    \label{eq:noisy_channel_asr}
+    \end{equation}
+    where $P(A \mid W)$ denotes the acoustic likelihood model (how likely the sound $A$ is given words $W$), and $P(W)$ represents the language model prior. Because the phrase \textit{``recognize speech''} occurs frequently in technical discourse while \textit{``wreck a nice beach''} is exceptionally rare, the prior enforces $P(\text{``recognize speech''}) \gg P(\text{``wreck a nice beach''})$, allowing the system to effortlessly resolve phonetic noise.
+    
+    \item \textbf{Machine translation (MT) and optical character recognition (OCR)}: In machine translation, transferring syntactic structures between disparate languages rarely proceeds via word-for-word substitution. An automated translator generating candidate lexical mappings requires a statistical prior over the target language to select phrase orderings that sound natural and grammatically fluent. Similarly, in optical character recognition, noisy visual scans that render ambiguous characters (such as distinguishing \texttt{'l'}, \texttt{'1'}, and \texttt{'I'}) are disambiguated by evaluating which lexical candidate forms a coherent word sequence within the sentence.
 \end{enumerate}
-Extracting all unique tokens (case-normalized with standard initial capitalization for clarity) yields a vocabulary of size $|\vocab| = 7$:
-\[
-\vocab = \{\text{Ate, Cat, Chased, Cheese, Happily, Mouse, The}\}.
-\]
 
-We construct the transition counts by scanning both sentences sequentially token by token. In Sentence~1, the observed transitions are $(\text{The} \to \text{Cat})$, $(\text{Cat} \to \text{Chased})$, $(\text{Chased} \to \text{The})$, $(\text{The} \to \text{Mouse})$, and $(\text{Mouse} \to \text{Happily})$, each initialized with an empirical count of 1. In Sentence~2, we observe $(\text{The} \to \text{Mouse})$ for a second time (incrementing $C(\text{The}, \text{Mouse})$ to 2), followed by $(\text{Mouse} \to \text{Ate})$, $(\text{Ate} \to \text{The})$, and $(\text{The} \to \text{Cheese})$, each with count 1.
+These engineering requirements triggered a philosophical pivot in computational linguistics. Early artificial intelligence research, guided by Chomskyan generative grammars \citep{manning1999}, attempted to model natural language through deterministic, handcrafted formal rule sets that partitioned sentences strictly into grammatically valid or invalid categories. However, human language constantly breaks rigid grammatical rules through idioms, colloquialisms, poetry, and colloquial speech while remaining completely intelligible. Statistical language modeling replaced this binary grammaticality dichotomy with a continuous, probabilistic spectrum of plausibility.
 
-The row totals provide the unigram conditioning marginals $C(w_{t-1}) = \sum_{w} C(w_{t-1}, w)$. Here, the word \textit{``The''} appears 4 times as a conditioning prefix (followed by \textit{Cat} once, \textit{Mouse} twice, and \textit{Cheese} once), \textit{``Mouse''} appears 2 times (followed by \textit{Happily} and \textit{Ate}), while \textit{``Ate''}, \textit{``Cat''}, and \textit{``Chased''} each appear once. The words \textit{``Cheese''} and \textit{``Happily''} appear exclusively at the ends of sentences, yielding row marginals of zero since no subsequent tokens were observed in this corpus.
+\subsection{The language model task: formal probability distribution}
+\label{subsec:lm_formal_distribution}
 
-Applying Equation~\eqref{eq:mle_bigram} yields the empirical transition probability matrix $\mat{M} \in \R^{7 \times 7}$ where row $i$ represents condition $w_{t-1}$ and column $j$ represents next token $w_t$. Table~\ref{tab:transition_matrix} presents both raw counts and normalized MLE probabilities. The corresponding state transition graph is visualized in Figure~\ref{fig:cat_mouse_markov}.
+Formally, let $\mathcal{V}$ denote a finite vocabulary comprising all discrete token primitives recognized by the system, with cardinality $|\mathcal{V}|$. An arbitrary natural language utterance $W$ is defined as an ordered tuple of $T$ tokens:
+\begin{equation}
+W = \left(w_1, w_2, \dots, w_T\right), \quad w_t \in \mathcal{V}, \quad T \in \mathbb{N}^+.
+\end{equation}
+The set of all possible finite sequences formed from vocabulary $\mathcal{V}$ is given by the Kleene closure $\mathcal{V}^* = \bigcup_{k=1}^\infty \mathcal{V}^k$.
+
+A \textit{Language Model} (LM) is a mathematical function that assigns a joint probability $P(W)$ to every possible sequence $W \in \mathcal{V}^*$, satisfying the standard Kolmogorov probability axioms:
+\begin{equation}
+P(W) \ge 0 \quad \forall W \in \mathcal{V}^*, \quad \text{and} \quad \sum_{W \in \mathcal{V}^*} P(W) = 1.
+\label{eq:kolmogorov_lm}
+\end{equation}
+
+The probability distribution $P(W)$ can be conceptualized as defining a continuous density landscape across the discrete space of possible word combinations. In this space:
+\begin{itemize}
+    \item \textbf{High-probability regions}: Encompass plausible, fluent, and syntactically well-formed sentences that frequently occur in human communication:
+    \begin{equation}
+    P\left(\texttt{"This is a reasonable sentence"}\right) \approx 10^{-1}.
+    \end{equation}
+    \item \textbf{Low-probability regions}: Encompass syntactically well-formed but semantically anomalous or bizarre sequences that violate common semantic expectations:
+    \begin{equation}
+    P\left(\texttt{"This is a purple sentence"}\right) \approx 10^{-3}.
+    \end{equation}
+    \item \textbf{Near-zero probability regions}: Encompass ungrammatical, disjoint, or corrupted strings of symbols that violate the structural syntax of the language:
+    \begin{equation}
+    P\left(\texttt{"This are a reasonable sentence"}\right) \approx 10^{-5}.
+    \end{equation}
+\end{itemize}
+
+Because the combinatorial space of arbitrary symbol permutations is astronomically large, the overwhelming majority of sequences in $\mathcal{V}^*$ are ungrammatical noise. Consequently, natural human language occupies an extremely narrow, low-dimensional probability manifold within $\mathcal{V}^*$. The fundamental objective of language modeling is to accurately estimate this non-uniform probability distribution from finite empirical observations.
+
+\subsection{Factoring joint probabilities via the chain rule}
+\label{subsec:lm_chain_rule}
+
+Directly estimating the joint probability $P(w_1, w_2, \dots, w_T)$ over an entire sentence simultaneously is computationally intractable because the number of possible complete sentences grows exponentially with sequence length $T$. To render this estimation feasible, we apply the general \textit{chain rule of probability} (or Kolmogorov multiplication law), which factors any joint distribution into a product of conditional distributions:
+\begin{align}
+P(W) &= P\left(w_1, w_2, \dots, w_T\right) \notag \\
+&= P\left(w_1\right) P\left(w_2 \mid w_1\right) P\left(w_3 \mid w_1, w_2\right) \cdots P\left(w_T \mid w_1, \dots, w_{T-1}\right) \notag \\
+&= \prod_{t=1}^T P\left(w_t \mid w_1, \dots, w_{t-1}\right) = \prod_{t=1}^T P\left(w_t \mid w_{<t}\right),
+\label{eq:exact_chain_rule}
+\end{align}
+where $w_{<t} = (w_1, \dots, w_{t-1})$ denotes the sequence prefix comprising all tokens preceding step $t$, with the base case defined as $P(w_1 \mid w_{<1}) = P(w_1)$.
+
+Equation~\eqref{eq:exact_chain_rule} provides a profound conceptual and operational shift. It demonstrates that the problem of assigning a joint probability to an entire sentence is mathematically identical to the sequential task of predicting the conditional probability distribution of the single next word $w_t$ given the observed historical context $w_{<t}$.
+
+This formulation directly aligns language modeling with the classical \textit{Cloze} (fill-in-the-blank) evaluation methodology in cognitive linguistics:
+\begin{align}
+\text{Prompt 1: } & \quad \texttt{"This is a reasonable [\quad]"} \quad \Longrightarrow \quad P\left(w_t = \texttt{"sentence"} \mid w_{<t}\right), \\
+\text{Prompt 2: } & \quad \texttt{"The black cat sat on the [\quad]"} \quad \Longrightarrow \quad P\left(w_t = \texttt{"mat"} \mid w_{<t}\right).
+\end{align}
+By framing language modeling as sequential next-token prediction, we can construct models that process text incrementally from left to right, evaluating sentence plausibility and generating synthetic continuations through successive conditional probability evaluations.
+
+\clearpage
+\section{The Markov assumption, $n$-gram models, and operational inference}
+\label{sec:markov_ngrams_inference}
+
+While Equation~\eqref{eq:exact_chain_rule} is mathematically exact, it cannot be implemented directly in practice using raw frequency tables. As sequence length $t$ increases, the conditioning prefix $w_{<t}$ grows linearly, meaning that the historical context becomes unique. To construct practical statistical models, we must introduce simplifying independence assumptions that truncate the conditioning horizon.
+
+\subsection{The Markov assumption and combinatorial reduction}
+\label{subsec:markov_assumption}
+
+Consider estimating the conditional probability $P(w_t \mid w_1, \dots, w_{t-1})$ using empirical counting over a text corpus. For a vocabulary of size $|\mathcal{V}| = 50{,}000$, a prefix of length $t-1 = 10$ admits $|\mathcal{V}|^{10} \approx 9.76 \times 10^{46}$ distinct possible histories. Because no realistic training corpus contains more than $10^{10}$ to $10^{12}$ total words, the probability of encountering any specific 10-word prefix multiple times approaches zero, rendering empirical frequency ratios completely undefined.
+
+To overcome this combinatorial barrier, statistical language modeling applies the \textit{Markov assumption} \citep{jurafsky2024}. Formally, an $(n-1)$-th order Markov chain posits that the conditional probability of the current state depends exclusively on the immediately preceding $n-1$ states, remaining conditionally independent of all earlier history:
+\begin{equation}
+P\left(w_t \mid w_1, w_2, \dots, w_{t-1}\right) \approx P\left(w_t \mid w_{t-n+1}, \dots, w_{t-1}\right).
+\label{eq:markov_assumption}
+\end{equation}
+
+Under the $(n-1)$-th order Markov assumption, an $n$-gram language model approximates the true joint probability of a sequence as:
+\begin{equation}
+P\left(w_1, \dots, w_T\right) \approx \prod_{t=1}^T P\left(w_t \mid w_{t-n+1}, \dots, w_{t-1}\right).
+\label{eq:ngram_joint_approximation}
+\end{equation}
+
+The choice of parameter $n$ defines the context horizon of the statistical model:
+\begin{enumerate}
+    \item \textbf{Unigram model ($n=1$)}: Assumes complete zeroth-order independence. The probability of each word is evaluated in total isolation from its context:
+    \begin{equation}
+    P\left(w_1, \dots, w_T\right) \approx \prod_{t=1}^T P\left(w_t\right).
+    \end{equation}
+    A unigram model ignores all syntactic structure and word order, treating sentences as an unordered ``bag of words''.
+    \item \textbf{Bigram model ($n=2$)}: Imposes a first-order Markov assumption. The probability of the next word depends strictly and exclusively on the single immediately preceding word:
+    \begin{equation}
+    P\left(w_1, \dots, w_T\right) \approx P\left(w_1\right) \prod_{t=2}^T P\left(w_t \mid w_{t-1}\right).
+    \end{equation}
+    \item \textbf{Trigram model ($n=3$)}: Imposes a second-order Markov assumption, conditioning each word on the preceding two-word prefix:
+    \begin{equation}
+    P\left(w_1, \dots, w_T\right) \approx P\left(w_1\right) P\left(w_2 \mid w_1\right) \prod_{t=3}^T P\left(w_t \mid w_{t-2}, w_{t-1}\right).
+    \end{equation}
+\end{enumerate}
+
+\subsection{The worked transition matrix and parameter estimation}
+\label{subsec:worked_transition_matrix}
+
+By truncating the conditioning horizon to a small constant $n$, the parameters of an $n$-gram model can be estimated directly from a reference corpus using \textit{Maximum Likelihood Estimation} (MLE). Under MLE, the parameter values are chosen to maximize the likelihood of the observed training text, which equates to computing empirical frequency ratios.
+
+For a bigram model ($n=2$), the conditional probability of token $w_t$ given predecessor $w_{t-1}$ is evaluated by counting the joint occurrences of the bigram $(w_{t-1}, w_t)$ and dividing by the unigram frequency of the prefix $w_{t-1}$:
+\begin{equation}
+P_{\text{MLE}}\left(w_t \mid w_{t-1}\right) = \frac{C\left(w_{t-1}, w_t\right)}{\sum_{w \in \mathcal{V}} C\left(w_{t-1}, w\right)} = \frac{C\left(w_{t-1}, w_t\right)}{C\left(w_{t-1}\right)},
+\label{eq:mle_bigram}
+\end{equation}
+where $C(\cdot)$ denotes the count of exact occurrences in the training corpus.
+
+\textit{Worked pedagogical example.} To ground this formulation in concrete numbers, we analyze the exact toy corpus evaluated during course lectures. Consider a tiny reference corpus $\mathcal{C}$ consisting of two sentences:
+\begin{align}
+\text{Sentence 1: } & \quad \texttt{"The cat chased the mouse happily."} \\
+\text{Sentence 2: } & \quad \texttt{"The mouse ate the cheese."}
+\end{align}
+
+Extracting all unique lexical tokens yields a vocabulary of cardinality $|\mathcal{V}| = 7$:
+\begin{equation}
+\mathcal{V} = \left\{\texttt{ate}, \texttt{cat}, \texttt{chased}, \texttt{cheese}, \texttt{happily}, \texttt{mouse}, \texttt{the}\right\}.
+\end{equation}
+
+We construct the empirical transition matrix by scanning all adjacent bigram pairs across the corpus. Scanning Sentence 1 yields the bigram sequence:
+\begin{equation}
+(\texttt{the}, \texttt{cat}), \; (\texttt{cat}, \texttt{chased}), \; (\texttt{chased}, \texttt{the}), \; (\texttt{the}, \texttt{mouse}), \; (\texttt{mouse}, \texttt{happily}).
+\end{equation}
+Scanning Sentence 2 yields:
+\begin{equation}
+(\texttt{the}, \texttt{mouse}), \; (\texttt{mouse}, \texttt{ate}), \; (\texttt{ate}, \texttt{the}), \; (\texttt{the}, \texttt{cheese}).
+\end{equation}
+
+Summing these occurrences yields the absolute frequency matrix $C(w_{t-1}, w_t)$. Normalizing each row by the unigram count of the conditioning prefix ensures that $\sum_{w_t \in \mathcal{V}} P(w_t \mid w_{t-1}) = 1.0$ for all non-terminal rows, resulting in the complete bigram transition matrix presented in Table~\ref{tab:bigram_transition_matrix}.
 
 \begin{table}[htbp]
 \centering
 \small
-\caption{Empirical transition count matrix and normalized bigram conditional probabilities $\Prob(w_t \mid w_{t-1})$ for vocabulary $\vocab = \{\text{Ate, Cat, Chased, Cheese, Happily, Mouse, The}\}$.}
-\label{tab:transition_matrix}
-\begin{tabularx}{\textwidth}{l *{7}{>{\centering\arraybackslash}X} c}
+\begin{tabularx}{\textwidth}{l *{7}{>{\centering\arraybackslash}X}}
 \toprule
-\textbf{Condition ($w_{t-1}$)} & \textbf{Ate} & \textbf{Cat} & \textbf{Chased} & \textbf{Cheese} & \textbf{Happily} & \textbf{Mouse} & \textbf{The} & \textbf{Row Total} \\
+$w_{t-1} \setminus w_t$ & \textbf{ate} & \textbf{cat} & \textbf{chased} & \textbf{cheese} & \textbf{happily} & \textbf{mouse} & \textbf{the} \\
 \midrule
-\textbf{Ate}      & 0 (0.0)  & 0 (0.0)  & 0 (0.0)  & 0 (0.0)  & 0 (0.0)  & 0 (0.0)  & 1 (1.00) & 1 \\
-\textbf{Cat}      & 0 (0.0)  & 0 (0.0)  & 1 (1.00) & 0 (0.0)  & 0 (0.0)  & 0 (0.0)  & 0 (0.0)  & 1 \\
-\textbf{Chased}   & 0 (0.0)  & 0 (0.0)  & 0 (0.0)  & 0 (0.0)  & 0 (0.0)  & 0 (0.0)  & 1 (1.00) & 1 \\
-\textbf{Cheese}   & 0 (0.0)  & 0 (0.0)  & 0 (0.0)  & 0 (0.0)  & 0 (0.0)  & 0 (0.0)  & 0 (0.0)  & 0 \\
-\textbf{Happily}  & 0 (0.0)  & 0 (0.0)  & 0 (0.0)  & 0 (0.0)  & 0 (0.0)  & 0 (0.0)  & 0 (0.0)  & 0 \\
-\textbf{Mouse}    & 1 (0.50) & 0 (0.0)  & 0 (0.0)  & 0 (0.0)  & 1 (0.50) & 0 (0.0)  & 0 (0.0)  & 2 \\
-\textbf{The}      & 0 (0.0)  & 1 (0.25) & 0 (0.0)  & 1 (0.25) & 0 (0.0)  & 2 (0.50) & 0 (0.0)  & 4 \\
+\textbf{ate}     & 0 & 0 & 0 & 0 & 0 & 0 & $1.00$ ($1/1$) \\
+\textbf{cat}     & 0 & 0 & $1.00$ ($1/1$) & 0 & 0 & 0 & 0 \\
+\textbf{chased}  & 0 & 0 & 0 & 0 & 0 & 0 & $1.00$ ($1/1$) \\
+\textbf{cheese}  & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+\textbf{happily} & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+\textbf{mouse}   & $0.50$ ($1/2$) & 0 & 0 & 0 & $0.50$ ($1/2$) & 0 & 0 \\
+\textbf{the}     & 0 & $0.25$ ($1/4$) & 0 & $0.25$ ($1/4$) & 0 & $0.50$ ($2/4$) & 0 \\
 \bottomrule
 \end{tabularx}
+\caption{Empirical Maximum Likelihood Estimation (MLE) bigram transition probability matrix computed from the lecture reference corpus. Each entry $(i, j)$ represents the conditional probability $P(w_j \mid w_i) = C(w_i, w_j) / C(w_i)$. Rows for terminal words (\texttt{cheese}, \texttt{happily}) sum to zero in the absence of explicit sentence boundary delimiters.}
+\label{tab:bigram_transition_matrix}
 \end{table}
 
-\begin{figure}[htbp]
-\centering
-\begin{tikzpicture}[
-    scale=0.92, transform shape,
-    state/.style={circle, draw=politoNavy, fill=skyBlue!35, thick, minimum size=1.35cm, font=\small\ttfamily\bfseries, align=center},
-    term/.style={circle, draw=thmGreenLine, fill=thmGreenBg, thick, minimum size=1.35cm, font=\small\ttfamily\bfseries, align=center},
-    edgeLabel/.style={font=\scriptsize\sffamily\bfseries, fill=white, inner sep=1.5pt, rounded corners=2pt},
-    arr/.style={-{Stealth[scale=1.0]}, line width=1.1pt, draw=politoNavy}
-]
-
-% Nodes
-\node[state] (the) at (0, 0) {The};
-\node[state] (cat) at (-3.4, 1.8) {Cat};
-\node[state] (chased) at (-3.4, -1.8) {Chased};
-\node[state] (mouse) at (3.4, 1.0) {Mouse};
-\node[state] (ate) at (3.4, -1.8) {Ate};
-\node[term] (cheese) at (0, 2.6) {Cheese};
-\node[term] (happily) at (6.6, 1.0) {Happily};
-
-% Edges from 'The'
-\draw[arr] (the) -- node[edgeLabel, above left] {0.25} (cat);
-\draw[arr] (the) -- node[edgeLabel, above right] {0.50} (mouse);
-\draw[arr] (the) -- node[edgeLabel, left] {0.25} (cheese);
-
-% Edge from 'Cat'
-\draw[arr] (cat) -- node[edgeLabel, left] {1.00} (chased);
-
-% Edge from 'Chased' back to 'The'
-\draw[arr] (chased) -- node[edgeLabel, below left] {1.00} (the);
-
-% Edges from 'Mouse'
-\draw[arr] (mouse) -- node[edgeLabel, right] {0.50} (ate);
-\draw[arr] (mouse) -- node[edgeLabel, above] {0.50} (happily);
-
-% Edge from 'Ate' back to 'The'
-\draw[arr] (ate) -- node[edgeLabel, below right] {1.00} (the);
-
-\end{tikzpicture}
-\caption{Markov state transition graph for the 7-token cat/mouse corpus. Directed edges indicate bigram transition probabilities $\Prob(w_t \mid w_{t-1})$. States \texttt{Cheese} and \texttt{Happily} (green) are terminal absorbing states with zero outgoing probability mass.}
-\label{fig:cat_mouse_markov}
-\end{figure}
-
-\clearpage
-\section{Autoregressive estimation and generation}
-\label{sec:estimation_generation}
-
-With the transition matrix $\mat{M}$ constructed (Table~\ref{tab:transition_matrix}) and its state graph established (Figure~\ref{fig:cat_mouse_markov}), the language model can execute two primary operational tasks: evaluating the likelihood of an arbitrary sequence of tokens, and generating synthetic text autoregressively.
-
-\subsection{Worked sentence probability calculation}
-Consider evaluating the joint probability of the sentence:
-\begin{center}
-\textit{``the cat chased the cheese''}
-\end{center}
-Under the first-order Markov assumption, the joint probability factors as:
-\begin{equation}
-\label{eq:joint_calc_formula}
-\Prob(\text{the, cat, chased, the, cheese}) = \Prob(\text{the}) \cdot \Prob(\text{cat} \mid \text{the}) \cdot \Prob(\text{chased} \mid \text{cat}) \cdot \Prob(\text{the} \mid \text{chased}) \cdot \Prob(\text{cheese} \mid \text{the}).
-\end{equation}
-Assuming generation begins deterministically with the initial token $\Prob(\text{the}) = 1.0$, we substitute the corresponding conditional probabilities from Table~\ref{tab:transition_matrix}:
-\begin{align}
-\Prob(\text{cat} \mid \text{the}) &= \frac{1}{4} = 0.25 \notag \\
-\Prob(\text{chased} \mid \text{cat}) &= 1.0 \notag \\
-\Prob(\text{the} \mid \text{chased}) &= 1.0 \notag \\
-\Prob(\text{cheese} \mid \text{the}) &= \frac{1}{4} = 0.25 \notag
-\end{align}
-Multiplying these values sequentially:
-\begin{equation}
-\label{eq:joint_exact_result}
-\Prob(\text{the, cat, chased, the, cheese}) = 1.0 \times \frac{1}{4} \times 1 \times 1 \times \frac{1}{4} = \frac{1}{16} = 0.0625.
-\end{equation}
-Despite the sequence \textit{``the cat chased the cheese''} never occurring as an entire sentence in the training corpus, the bigram model assigns it a strictly positive probability of $6.25\%$. By decomposing text into local constituent pairs, $n$-gram models exhibit rudimentary compositional generalization.
-
-\subsection{Autoregressive sequence generation and decoding dynamics}
-Autoregressive generation begins with an initial seed conditioning token, samples the next token from the resulting conditional categorical distribution, appends the sampled token to the history, and repeats the process sequentially. 
-
-To trace this mechanism concretely, consider initializing generation from the seed token \textit{``the''} at step $t=1$, where the conditioning history is $\text{history} = (\text{``the''})$. The active row from Table~\ref{tab:transition_matrix} yields the candidate distribution $\Prob(\text{cat}\mid\text{the}) = 0.25$, $\Prob(\text{cheese}\mid\text{the}) = 0.25$, and $\Prob(\text{mouse}\mid\text{the}) = 0.50$. Assuming stochastic sampling selects \textbf{``mouse''}, the generated sequence expands to \textit{``the mouse''}.
-
-At step $t=2$, conditioning on the updated state $w_1 = \text{``mouse''}$ activates the conditional probabilities $\Prob(\text{ate}\mid\text{mouse}) = 0.50$ and $\Prob(\text{happily}\mid\text{mouse}) = 0.50$. When sampling selects \textbf{``ate''}, the prefix extends to \textit{``the mouse ate''}. Subsequently, at step $t=3$, the conditioning token \textit{``ate''} exhibits only a single outgoing transition in the empirical corpus: $\Prob(\text{the}\mid\text{ate}) = 1.00$. The model therefore deterministically emits \textbf{``the''}, yielding \textit{``the mouse ate the''}.
-
-At step $t=4$, conditioning once again on \textit{``the''} reactivates the tripartite distribution over \textit{cat} ($0.25$), \textit{cheese} ($0.25$), and \textit{mouse} ($0.50$). If sampling selects \textbf{``mouse''}, the generated sequence becomes \textit{``the mouse ate the mouse''}. Because the first-order Markov model retains no memory beyond the immediate predecessor $w_3 = \text{``the''}$, it cannot recognize that \textit{``mouse''} was already emitted two steps earlier. Finally, at step $t=5$, conditioning on \textit{``mouse''} offers equal probability between \textit{ate} and \textit{happily}. Sampling selects \textbf{``happily''}, producing the complete sequence \textit{``the mouse ate the mouse happily''}. Because the token \textit{``happily''} has zero outgoing transitions in Table~\ref{tab:transition_matrix}, the process reaches an absorbing terminal state and generation halts naturally.
-
-This worked trace highlights two foundational behavioral characteristics of statistical Markov models:
-
-\subsubsection{Absorbing terminal states and sentence boundaries}
-In Table~\ref{tab:transition_matrix}, terminal tokens such as \textit{``cheese''} and \textit{``happily''} have a row count of zero ($C=0$), leaving the conditional probability division $0/0$ mathematically undefined. If generation enters such a state, no further transitions can be sampled. In standard language modeling, this boundary condition is formalized by augmenting every training sentence with explicit boundary tokens: a beginning-of-sequence delimiter $\langle s \rangle$ and an end-of-sequence delimiter $\langle /s \rangle$ (or $[\text{EOS}]$). Under this convention, every word possesses a strictly defined distribution over either valid successor tokens or the terminal symbol $\langle /s \rangle$, guaranteeing a mathematically well-defined stopping criterion.
-
-\subsubsection{Cyclic limit cycles under greedy decoding}
-Because bigram models condition exclusively on the single preceding token $w_{t-1}$, deterministic decoding strategies such as greedy search ($\argmax_{w} \Prob(w \mid w_{t-1})$) easily fall into repetitive limit cycles. In our transition graph, the path from \textit{``the''} to \textit{``mouse''} ($0.50$), from \textit{``mouse''} to \textit{``ate''} ($0.50$), and from \textit{``ate''} back to \textit{``the''} ($1.00$) forms a closed directed loop. Under deterministic selection, the model generates the infinite repetition \textit{``the mouse ate the mouse ate the \dots''}. Modern foundation models mitigate repetitive degeneracy through extensive self-attention horizons, temperature scaling, nucleus sampling, and repetition penalties.
-
-\clearpage
-\section{Limitations of Statistical Models}
-\label{sec:ngram_limitations}
-
-While $n$-gram models provided the foundation for speech recognition, statistical machine translation, and spelling correction throughout the 1980s and 1990s, they suffer from structural constraints that ultimately motivated the transition toward continuous neural architectures.
-
-\subsection{Combinatorial data sparsity and parameter explosion}
-To condition on $n-1$ tokens, an $n$-gram model requires maintaining a probability tensor of dimensionality $|\vocab|^n$. For realistic natural language vocabularies and software engineering codebases:
+Inspecting Table~\ref{tab:bigram_transition_matrix} illustrates the statistical profile learned by the model:
 \begin{itemize}
-    \item With a modest vocabulary of $|\vocab| = 50{,}000$ unique tokens, a bigram model ($n=2$) requires $|\vocab|^2 = 2.5 \times 10^9$ parameters (approximately $10$~GB in 32-bit floating-point storage).
-    \item A trigram model ($n=3$) requires $|\vocab|^3 = 1.25 \times 10^{14}$ parameters, exceeding hundreds of terabytes.
-    \item A 4-gram model ($n=4$) escalates to $|\vocab|^4 = 6.25 \times 10^{18}$ parameters, requiring exabyte-scale memory.
+    \item Following the word \texttt{"the"}, the model distributes probability mass across three nouns: $P(\texttt{mouse} \mid \texttt{the}) = 0.50$, $P(\texttt{cat} \mid \texttt{the}) = 0.25$, and $P(\texttt{cheese} \mid \texttt{the}) = 0.25$.
+    \item Following the word \texttt{"mouse"}, the model assigns equal probability to the verb \texttt{"ate"} and the adverb \texttt{"happily"}: $P(\texttt{ate} \mid \texttt{mouse}) = 0.50$, $P(\texttt{happily} \mid \texttt{mouse}) = 0.50$.
+    \item Deterministic transitions emerge where a word was observed with only a single successor: $P(\texttt{chased} \mid \texttt{cat}) = 1.00$, $P(\texttt{the} \mid \texttt{chased}) = 1.00$, and $P(\texttt{the} \mid \texttt{ate}) = 1.00$.
 \end{itemize}
-Even if storage were unconstrained, the total count of distinct 4-grams in all digitized text is dwarfed by $10^{18}$. Consequently, the empirical count tensor is overwhelmingly populated by zeros: the vast majority of valid linguistic phrases never appear in any finite training corpus.
 
-\subsection{The zero-frequency problem: joint probability and perplexity collapse}
-\label{subsec:zero_freq_collapse}
-The most direct consequence of combinatorial sparsity is the zero-frequency problem. Under Maximum Likelihood Estimation, any $n$-gram that never appeared verbatim in the training text receives count $C = 0$, yielding:
+Once the transition matrix is populated and normalized, it functions as a complete, trained statistical language model. We can deploy this model in two fundamental operational modes: sequence likelihood evaluation and autoregressive text generation.
+
+\subsection{Inference: evaluating sentence likelihood}
+\label{subsec:evaluating_sentence_likelihood}
+
+The first core inference task consists in evaluating the likelihood of a candidate word sequence. Given an unobserved test sentence, the language model computes its joint probability by taking the product of the corresponding transition probabilities from Table~\ref{tab:bigram_transition_matrix}.
+
+\textit{Worked numerical evaluation.} Suppose we deploy the model to evaluate the probability of a candidate sentence that did not appear in the training corpus:
 \begin{equation}
-\label{eq:zero_mle}
-\Prob_{\text{MLE}}(w_t \mid w_{t-n+1}^{t-1}) = \frac{C(w_{t-n+1}^t)}{C(w_{t-n+1}^{t-1})} = 0.
+W_{\text{test}} = \texttt{"The cat chased the cheese."}
 \end{equation}
-By the probabilistic chain rule (Equation~\eqref{eq:chain_rule_exact}), evaluating a test sequence $W_{\text{test}} = (w_1, \dots, w_N)$ requires taking the product across all constituent conditional transitions:
+
+Applying the bigram factorization from Equation~\eqref{eq:ngram_joint_approximation}:
 \begin{equation}
-\label{eq:chain_rule_zero_collapse}
-\Prob(W_{\text{test}}) = \prod_{t=1}^N \Prob(w_t \mid w_{<t}) = \Prob(w_1) \cdots 0 \cdots \Prob(w_N \mid w_{<N}) = 0.
+P\left(W_{\text{test}}\right) = P\left(\texttt{the}\right) \cdot P\left(\texttt{cat} \mid \texttt{the}\right) \cdot P\left(\texttt{chased} \mid \texttt{cat}\right) \cdot P\left(\texttt{the} \mid \texttt{chased}\right) \cdot P\left(\texttt{cheese} \mid \texttt{the}\right).
 \end{equation}
-A single unobserved token transition collapses the estimated joint probability of an entire document, article, or codebase to absolute zero.
-
-Furthermore, when evaluating the model via Empirical Cross-Entropy $\mathcal{H}(W_{\text{test}})$ or Perplexity $\PPL(W_{\text{test}})$:
-\begin{equation}
-\label{eq:ppl_zero_collapse}
-\mathcal{H}(W_{\text{test}}) = -\frac{1}{N} \sum_{t=1}^N \log_2 \Prob(w_t \mid w_{<t}) \longrightarrow \infty, \quad \PPL(W_{\text{test}}) = 2^{\mathcal{H}(W_{\text{test}})} \longrightarrow \infty.
-\end{equation}
-An unobserved test $n$-gram results in infinite perplexity ($\PPL = \infty$), rendering the entire language model unusable for empirical evaluation or benchmarking.
-
-\subsection{Finite context horizon limitations}
-An $n$-gram model is strictly blind to any token that occurred more than $n-1$ steps in the past:
-\begin{equation}
-\label{eq:context_truncation}
-\Prob(w_t \mid w_1, w_2, \dots, w_{t-1}) \approx \Prob(w_t \mid w_{t-n+1}, \dots, w_{t-1}).
-\end{equation}
-Because the conditioning context is rigidly truncated to the preceding $n-1$ tokens, any semantic constraint, syntactic agreement, or discourse topic established earlier in the text is discarded. This finite context horizon causes severe failures across both natural language and source code.
-
-In natural language, long-range syntactic agreements frequently span multiple clauses or modifier phrases separating a grammatical subject from its governing verb:
-\begin{center}
-\textit{``The \textbf{engineers} who designed the complex distributed compiler infrastructure [\dots] \textbf{were} vs \textbf{was} awarded the patent.''}
-\end{center}
-In a 4-gram model ($n=4$), predicting the verb depends exclusively on the three immediately preceding tokens: $\Prob(\text{verb} \mid \text{compiler}, \text{infrastructure}, [\dots])$. Because the singular noun \textit{``infrastructure''} is adjacent to the verb position, local statistical associations favor the singular form \textit{``was''}, violating subject-verb agreement with the true plural subject \textit{``engineers''}.
-
-In software engineering source code, this failure is even more pronounced due to strict lexical scoping and grammatical nesting. For example, a variable declared in a function signature:
-\begin{center}
-\texttt{void process\_batch(std::vector<TransactionRequest>\& transactions) \{ \dots \}}
-\end{center}
-must be invoked using valid \texttt{std::vector} member methods (such as \texttt{.push\_back()} or \texttt{.size()}) tens or hundreds of lines later. An $n$-gram model observing only the immediate prefix \texttt{transactions.} cannot access the original declaration, leading to invalid member access completions. Similarly, source code requires exact hierarchical pairing of delimiters (\texttt{\{ \dots \}}, \texttt{[ \dots ]}, \texttt{( \dots )}) and control flow blocks (\texttt{try \dots catch \dots finally}). Lacking an internal memory stack or unbounded context, $n$-gram models frequently generate mismatched delimiters or premature block closures.
-
-\subsection{Orthogonal discrete representations and lack of semantic generalization}
-In classical statistical NLP, words are treated as discrete, orthogonal atomic symbols. If the model observes:
-\begin{center}
-\textit{``The \textbf{cat} chased the mouse happily''}
-\end{center}
-it gains zero statistical confidence regarding the identical sentence containing synonyms:
-\begin{center}
-\textit{``The \textbf{feline} chased the mouse happily''}
-\end{center}
-Because \textit{``cat''} and \textit{``feline''} correspond to distinct row indices in Table~\ref{tab:transition_matrix}, observations of one do not inform the other. Discrete tables possess no intrinsic metric of semantic distance, synonymy, or conceptual overlap.
-
-While long-range context degradation and semantic orthogonality ultimately require continuous neural representations (examined in Chapters~\ref{ch:deep_learning_foundations} and~\ref{ch:word_embeddings}), the immediate mathematical obstacle in statistical language modeling is the zero-frequency problem ($C=0 \implies \Prob=0 \implies \PPL=\infty$). To make $n$-gram models evaluable and robust against unseen sequences, we must redistribute probability mass from observed events to unobserved combinations. This redistribution is the objective of statistical smoothing.
-
-\clearpage
-\section{Smoothing and Discounting}
-\label{sec:smoothing}
-
-To prevent probability collapse ($\Prob=0$) and infinite perplexity ($\PPL=\infty$) on unseen test sequences, statistical language modeling relies on smoothing and discounting algorithms. The governing principle of smoothing is conservative probability reallocation: a fraction of probability mass is discounted from frequently observed events and redistributed across unseen combinations, ensuring that every valid sequence receives a strictly positive probability:
-\[
-\forall w \in \vocab, \quad \Prob(w \mid \text{context}) > 0.
-\]
-
-\subsection{Laplace and additive smoothing}
-The simplest smoothing formulation, originated by Pierre-Simon Laplace, adds a uniform pseudo-count $\alpha > 0$ to every transition in the vocabulary. For an unconditioned unigram model, Laplace add-$\alpha$ smoothing assigns:
-\begin{equation}
-\label{eq:laplace_unigram}
-\Prob_{\text{Laplace}}(w) = \frac{C(w) + \alpha}{N + \alpha |\vocab|},
-\end{equation}
-where $N = \sum_{w \in \vocab} C(w)$ is the total token count. For a bigram model conditioned on $w_{t-1}$, the estimator modifies Equation~\eqref{eq:mle_bigram} as:
-\begin{equation}
-\label{eq:laplace_bigram}
-\Prob_{\text{Laplace}}(w_t \mid w_{t-1}) = \frac{C(w_{t-1}, w_t) + \alpha}{C(w_{t-1}) + \alpha |\vocab|}.
-\end{equation}
-When $\alpha = 1$, the technique is known as \emph{Laplace smoothing} (or Add-1); when $0 < \alpha < 1$, it is termed \emph{Lidstone smoothing}.
-
-We verify that Equation~\eqref{eq:laplace_bigram} defines a proper probability distribution satisfying the Kolmogorov axioms by summing over the entire vocabulary $\vocab$:
+Assuming the unigram prior for the sentence-initial token is $P(\texttt{the}) = 1.0$ (since all training sentences in corpus $\mathcal{C}$ begin with \texttt{"The"}), we substitute the empirical conditional probabilities from Table~\ref{tab:bigram_transition_matrix}:
 \begin{align}
-\sum_{w_t \in \vocab} \Prob_{\text{Laplace}}(w_t \mid w_{t-1}) &= \sum_{w_t \in \vocab} \frac{C(w_{t-1}, w_t) + \alpha}{C(w_{t-1}) + \alpha |\vocab|} \notag \\
-&= \frac{\sum_{w_t \in \vocab} C(w_{t-1}, w_t) + \sum_{w_t \in \vocab} \alpha}{C(w_{t-1}) + \alpha |\vocab|} \notag \\
-&= \frac{C(w_{t-1}) + \alpha |\vocab|}{C(w_{t-1}) + \alpha |\vocab|} = 1. \label{eq:laplace_proof}
+P\left(W_{\text{test}}\right) &= 1.0 \times \frac{1}{4} \times 1.0 \times 1.0 \times \frac{1}{4} \notag \\
+&= 1.0 \times 0.25 \times 1.0 \times 1.0 \times 0.25 = \frac{1}{16} = 0.0625.
 \end{align}
 
-Although mathematically well-formed, Add-1 smoothing performs poorly in practice. In realistic vocabularies where $|\vocab| = 50{,}000$, if word $w_{t-1}$ occurred $C(w_{t-1}) = 100$ times, adding $\alpha |\vocab| = 50{,}000$ inflates the denominator from $100$ to $50{,}100$. A frequent observed transition with $C(w_{t-1}, w_t) = 50$ is diluted from an empirical probability of $0.50$ to:
-\[
-\frac{50 + 1}{100 + 50{,}000} = \frac{51}{50{,}100} \approx 0.00102.
-\]
-Add-1 smoothing reallocates over $99.8\%$ of the probability mass from observed events uniformly to unobserved transitions. Even Lidstone smoothing ($\alpha = 0.05$) assigns equal probability to all unseen words, failing to capture that some unseen words (such as frequent nouns) are inherently more probable than rare technical jargon.
+The model assigns a non-zero probability ($P = 0.0625$) to \textit{``The cat chased the cheese''}. Crucially, this demonstrates that statistical language models can assign valid probability mass to novel combinations of words that were never observed verbatim during training, provided that all constituent transitions exist in the learned transition graph.
 
-\subsection{Good-Turing discounting}
-Originally formulated in \cite{good1953} during cryptographic research at Bletchley Park, \emph{Good-Turing discounting} derives the probability of events seen $r$ times directly from the count of events seen $r+1$ times.
-
-Let $r = C(w_{t-n+1}^t) \ge 0$ denote the empirical frequency of an $n$-gram. We define the \emph{frequency of frequencies} $N_r$ as the total number of distinct $n$-grams that appeared exactly $r$ times in the training corpus:
+\textit{Numerical stability via log-likelihood.} In practical applications involving sentences of realistic length ($T \ge 20$), multiplying dozens of conditional probabilities bounded within $[0, 1]$ leads directly to numerical underflow:
 \begin{equation}
-\label{eq:gt_nr}
-N_r = \left| \{ x : C(x) = r \} \right|.
+P(W) = \prod_{t=1}^T P\left(w_t \mid w_{t-1}\right) < 10^{-308},
 \end{equation}
-The total number of tokens in the corpus is $N = \sum_{r=1}^\infty r N_r$, while $N_0$ represents the vast collection of valid $n$-grams that never appeared ($r=0$).
-
-Good-Turing replaces each raw count $r$ with an effective discounted count $r^*$:
+exceeding the precision of standard 64-bit IEEE double-precision floating-point arithmetic. To guarantee numerical stability, all probability computations are evaluated in the logarithmic domain:
 \begin{equation}
-\label{eq:good_turing_rstar}
+\log P(W) = \log P\left(w_1\right) + \sum_{t=2}^T \log P\left(w_t \mid w_{t-1}\right).
+\label{eq:log_likelihood_sum}
+\end{equation}
+Operating in log-space transforms unstable products of small fractions into stable sums of negative real numbers, preserving full analytical fidelity across sequences of arbitrary length.
+
+\subsection{Inference: autoregressive text generation and decoding dynamics}
+\label{subsec:autoregressive_generation_dynamics}
+
+The second operational mode of a language model is \textit{autoregressive text generation}. In this regime, the model does not score an existing sentence; instead, it synthesizes new text token by token. At each step $t$, the model conditions on the antecedent token $w_{t-1}$, retrieves the conditional categorical distribution $P(\cdot \mid w_{t-1})$ from its transition matrix, samples a token $w_t$, appends $w_t$ to the generated sequence, and feeds $w_t$ back into the model to condition the subsequent step:
+\begin{equation}
+w_t \sim P\left(\cdot \mid w_{t-1}\right).
+\end{equation}
+
+\textit{Step-by-step lecture generation trace.} We trace the complete generative execution evaluated in lecture, initiated with the prompt token $w_1 = \texttt{"The"}$:
+\begin{enumerate}
+    \item \textbf{Step 1}: Prompt $w_1 = \texttt{"The"}$. The model queries row \texttt{"the"} in Table~\ref{tab:bigram_transition_matrix}, obtaining the categorical distribution:
+    \begin{equation}
+    P\left(\texttt{cat} \mid \texttt{the}\right) = 0.25, \quad P\left(\texttt{cheese} \mid \texttt{the}\right) = 0.25, \quad P\left(\texttt{mouse} \mid \texttt{the}\right) = 0.50.
+    \end{equation}
+    Sampling stochastically from this distribution selects the candidate $w_2 = \texttt{"mouse"}$.
+    \begin{equation}
+    \text{Current sequence: } \quad \texttt{"The mouse"}
+    \end{equation}
+
+    \item \textbf{Step 2}: Preceding token $w_2 = \texttt{"mouse"}$. The model queries row \texttt{"mouse"}:
+    \begin{equation}
+    P\left(\texttt{ate} \mid \texttt{mouse}\right) = 0.50, \quad P\left(\texttt{happily} \mid \texttt{mouse}\right) = 0.50.
+    \end{equation}
+    Sampling from this distribution selects $w_3 = \texttt{"ate"}$.
+    \begin{equation}
+    \text{Current sequence: } \quad \texttt{"The mouse ate"}
+    \end{equation}
+
+    \item \textbf{Step 3}: Preceding token $w_3 = \texttt{"ate"}$. The model queries row \texttt{"ate"}:
+    \begin{equation}
+    P\left(\texttt{the} \mid \texttt{ate}\right) = 1.00.
+    \end{equation}
+    The transition is fully deterministic, yielding $w_4 = \texttt{"the"}$.
+    \begin{equation}
+    \text{Current sequence: } \quad \texttt{"The mouse ate the"}
+    \end{equation}
+
+    \item \textbf{Step 4}: Preceding token $w_4 = \texttt{"the"}$. The model again queries row \texttt{"the"}. Although the model previously generated \texttt{"mouse"} at step 2, the bigram Markov assumption possesses zero memory of steps $1$ to $3$. Sampling from the identical distribution selects $w_5 = \texttt{"mouse"}$.
+    \begin{equation}
+    \text{Current sequence: } \quad \texttt{"The mouse ate the mouse"}
+    \end{equation}
+
+    \item \textbf{Step 5}: Preceding token $w_5 = \texttt{"mouse"}$. Consulting row \texttt{"mouse"}, the model samples $w_6 = \texttt{"happily"}$.
+    \begin{equation}
+    \text{Current sequence: } \quad \texttt{"The mouse ate the mouse happily"}
+    \end{equation}
+
+    \item \textbf{Step 6}: Preceding token $w_6 = \texttt{"happily"}$. Row \texttt{"happily"} contains strictly zero counts across all columns ($\sum_w C(\texttt{happily}, w) = 0$). In the transition graph, \texttt{"happily"} represents an \textit{absorbing terminal state}. The model has no valid successor tokens to sample, and generation halts.
+\end{enumerate}
+
+The final generated utterance is:
+\begin{equation}
+\texttt{"The mouse ate the mouse happily."}
+\end{equation}
+This sentence never existed in the training corpus; it was synthesized dynamically through iterative sampling along the stochastic transition graph.
+
+\textit{Decoding strategies and pathological dynamics.} The generation trace highlights two critical operational aspects of autoregressive generation:
+\begin{enumerate}
+    \item \textbf{Absorbing terminal states and explicit boundary modeling}: In the toy example, generation halted because the terminal word \texttt{"happily"} had zero outgoing transitions. In rigorous natural language processing, stopping conditions are formalized by augmenting the vocabulary with dedicated boundary tokens: $\texttt{<BOS>}$ (Beginning of Sentence) and $\texttt{<EOS>}$ (End of Sentence). Training sentences are padded as $\texttt{<BOS>} \; w_1 \; \dots \; w_T \; \texttt{<EOS>}$. The model learns explicit transition probabilities $P(\texttt{<EOS>} \mid w_t)$, allowing the network to decide autonomously when an utterance is complete.
+    \item \textbf{Greedy decoding versus stochastic sampling and cyclic limit cycles}: Instead of sampling stochastically, an alternative decoding strategy is \textit{greedy decoding}, where the model deterministically selects the single token with maximum conditional probability:
+    \begin{equation}
+    w_t^* = \arg\max_{w \in \mathcal{V}} P\left(w \mid w_{t-1}\right).
+    \label{eq:greedy_decoding}
+    \end{equation}
+    However, when greedy decoding is applied to finite transition matrices, the model frequently falls into \textit{cyclic limit cycles}. In Table~\ref{tab:bigram_transition_matrix}, starting from \texttt{"the"}, the greedy choice is $w_2 = \texttt{"mouse"}$ ($P = 0.50$). If ties are broken in favor of \texttt{"ate"}, the sequence proceeds $\texttt{"the"} \to \texttt{"mouse"} \to \texttt{"ate"} \to \texttt{"the"} \to \texttt{"mouse"} \to \texttt{"ate"} \dots$, trapping the model in an infinite periodic loop. This pathology persists in modern foundation models, necessitating advanced decoding heuristics such as temperature scaling, top-$k$ sampling, and nucleus (top-$p$) truncation.
+\end{enumerate}
+
+\clearpage
+\section{Limitations of statistical language models and the path to neural representations}
+\label{sec:limitations_smoothing_neural}
+
+Despite their mathematical simplicity and clear probabilistic interpretations, statistical $n$-gram models suffer from severe theoretical, combinatorial, and representational pathologies that fundamentally limit their scalability.
+
+\subsection{Combinatorial data sparsity and the zero-frequency collapse}
+\label{subsec:data_sparsity_zero_freq}
+
+The most fatal pathology of $n$-gram models is the curse of combinatorial data sparsity. An $n$-gram model over a realistic vocabulary $\mathcal{V}$ requires maintaining a contingency table whose parameter count scales exponentially with the context window size:
+\begin{equation}
+N_{\text{parameters}} = |\mathcal{V}|^n.
+\label{eq:ngram_parameter_explosion}
+\end{equation}
+
+For a standard vocabulary of size $|\mathcal{V}| = 50{,}000$:
+\begin{itemize}
+    \item \textbf{Bigram ($n=2$)}: Requires $|\mathcal{V}|^2 = 2.5 \times 10^9$ parameters (requiring $\approx 10\text{ GB}$ of memory under 32-bit floats).
+    \item \textbf{Trigram ($n=3$)}: Requires $|\mathcal{V}|^3 = 1.25 \times 10^{14}$ parameters (requiring $\approx 500\text{ TB}$ of storage).
+    \item \textbf{5-gram ($n=5$)}: Requires $|\mathcal{V}|^5 = 3.125 \times 10^{23}$ parameters, far exceeding the physical storage capacity of global computing infrastructure.
+\end{itemize}
+
+Because human language allows words to combine in virtually boundless configurations, no finite corpus can ever observe more than a microscopic fraction of all valid $n$-grams. In any empirical training set, the vast majority of legitimate word combinations have an observed count of zero:
+\begin{equation}
+C\left(w_{t-n+1}, \dots, w_t\right) = 0.
+\end{equation}
+
+Under Maximum Likelihood Estimation, if a specific bigram $(w_{t-1}, w_t)$ was never seen during training, its assigned probability is identically zero:
+\begin{equation}
+P_{\text{MLE}}\left(w_t \mid w_{t-1}\right) = \frac{0}{C\left(w_{t-1}\right)} = 0.
+\end{equation}
+This leads directly to the \textit{zero-frequency collapse}: when evaluating a candidate test sentence $W = (w_1, \dots, w_T)$, if even a single constituent bigram is unobserved in the training corpus, the entire multiplicative chain collapses to zero:
+\begin{equation}
+P(W) = \prod_{t=1}^T P\left(w_t \mid w_{t-1}\right) = 0.
+\end{equation}
+In log-space, $\log P(W) = \log 0 = -\infty$. Consequently, a model that encounters a single unobserved word combination declares the entire sequence impossible, causing evaluation metrics such as cross-entropy and perplexity to explode to infinity.
+
+\subsection{Smoothing and discounting techniques}
+\label{subsec:smoothing_discounting}
+
+To prevent probability collapse, statistical NLP developed \textit{smoothing} (or discounting) algorithms. Smoothing techniques shave off a small fraction of probability mass from frequently observed events and reallocate it to unobserved events, ensuring that $P(w_t \mid w_{t-1}) > 0$ for all possible token combinations.
+
+\subsubsection{Laplace and additive smoothing}
+The simplest smoothing formulation is \textit{Laplace (Add-1) smoothing}, which artificially increments the count of every possible $n$-gram by 1:
+\begin{equation}
+P_{\text{Laplace}}\left(w_t \mid w_{t-1}\right) = \frac{C\left(w_{t-1}, w_t\right) + 1}{\sum_{w \in \mathcal{V}} \left(C(w_{t-1}, w) + 1\right)} = \frac{C\left(w_{t-1}, w_t\right) + 1}{C\left(w_{t-1}\right) + |\mathcal{V}|}.
+\label{eq:laplace_smoothing}
+\end{equation}
+A generalized variant, \textit{additive ($\alpha$) smoothing} (or Lidstone smoothing), adds a fractional pseudo-count $0 < \alpha < 1$:
+\begin{equation}
+P_{\alpha}\left(w_t \mid w_{t-1}\right) = \frac{C\left(w_{t-1}, w_t\right) + \alpha}{C\left(w_{t-1}\right) + \alpha |\mathcal{V}|}.
+\label{eq:lidstone_smoothing}
+\end{equation}
+
+\textit{Analytical critique of Laplace smoothing.} While Laplace smoothing guarantees that no probability evaluates to zero, it distorts probability distributions disastrously when vocabulary size $|\mathcal{V}|$ is large. Suppose $|\mathcal{V}| = 50{,}000$ and an observed word appears with unigram count $C(w_{t-1}) = 100$. The denominator in Equation~\eqref{eq:laplace_smoothing} increases from $100$ to $100 + 50{,}000 = 50{,}100$. Consequently, an observed bigram that appeared 5 times has its estimated probability reduced from $5/100 = 0.05$ to $6/50{,}100 \approx 0.00012$, attenuating genuine empirical evidence by over $99\%$. Laplace smoothing steals far too much probability mass from observed events and scatters it indiscriminately across billions of unobserved combinations.
+
+\subsubsection{Good-Turing discounting}
+To establish a more principled redistribution of probability mass, the \textit{Good-Turing estimator} \citep{good1953} utilizes the frequency of other frequencies. Let $N_r$ denote the number of distinct $n$-grams that were observed exactly $r$ times in the training corpus. Good-Turing re-estimates the effective count $r^*$ for an $n$-gram observed $r$ times as:
+\begin{equation}
 r^* = (r + 1) \frac{N_{r+1}}{N_r}.
+\label{eq:good_turing_count}
 \end{equation}
-For any observed $n$-gram with count $r > 0$, its Good-Turing smoothed probability is:
+The total probability mass reserved for all unseen events ($r = 0$) is governed by the proportion of singleton $n$-grams (events seen exactly once, $N_1$):
 \begin{equation}
-\label{eq:good_turing_prob}
-\Prob_{\text{GT}}(w_t \mid w_{t-n+1}^{t-1}) = \frac{r^*}{N} = \frac{(r + 1) N_{r+1}}{N \cdot N_r}.
-\end{equation}
-The total probability mass reserved for all unobserved $n$-grams ($r = 0$) is determined by the proportion of \emph{singletons} ($N_1$, words seen exactly once):
-\begin{equation}
-\label{eq:good_turing_p0}
-P_0 = \frac{N_1}{N}.
-\end{equation}
-Because there are $N_0$ unobserved $n$-grams, each individual unseen $n$-gram receives probability:
-\begin{equation}
+P_{\text{GT}}\left(\text{unseen}\right) = \frac{N_1}{N},
 \label{eq:good_turing_unseen}
-\Prob_{\text{GT}}(\text{unseen}) = \frac{P_0}{N_0} = \frac{N_1}{N \cdot N_0}.
 \end{equation}
+where $N = \sum_{r=1}^\infty r N_r$ is the total token count of the corpus. Good-Turing grounds probability estimation in empirical discovery rates: the likelihood of encountering an unobserved token is proportional to the number of tokens observed only once.
 
-For large values of $r$, empirical counts become sparse: $N_r$ fluctuates substantially or drops to zero, rendering the ratio $N_{r+1}/N_r$ undefined. In production systems, \emph{Simple Good-Turing} \cite{manning1999} replaces raw $N_r$ values with smoothed estimates derived from a linear regression fit in log space ($\log N_r = a + b \log r$) for $r > k$.
+\subsubsection{Backoff and linear interpolation}
+When higher-order $n$-gram counts are scarce, models can borrow statistical strength from lower-order distributions. Two primary strategies exist:
+\begin{enumerate}
+    \item \textbf{Jelinek-Mercer linear interpolation}: Computes a convex linear combination of trigram, bigram, and unigram probabilities:
+    \begin{equation}
+    P_{\text{interp}}\left(w_t \mid w_{t-2}, w_{t-1}\right) = \lambda_3 P_{\text{MLE}}\left(w_t \mid w_{t-2}, w_{t-1}\right) + \lambda_2 P_{\text{MLE}}\left(w_t \mid w_{t-1}\right) + \lambda_1 P_{\text{MLE}}\left(w_t\right),
+    \label{eq:jelinek_mercer}
+    \end{equation}
+    where interpolation coefficients satisfy $\sum_{i=1}^3 \lambda_i = 1$ and $\lambda_i > 0$.
+    \item \textbf{Katz backoff}: Prioritizes the highest-order model whenever empirical counts exceed zero, backing off to discounted lower-order estimates only when the higher-order count is zero \citep{katz1987}:
+    \begin{equation}
+    P_{\text{Katz}}\left(w_t \mid w_{t-n+1}^{t-1}\right) = \begin{cases}
+    P^*\left(w_t \mid w_{t-n+1}^{t-1}\right) & \text{if } C\left(w_{t-n+1}^t\right) > 0, \\
+    \alpha\left(w_{t-n+1}^{t-1}\right) P_{\text{Katz}}\left(w_t \mid w_{t-n+2}^{t-1}\right) & \text{if } C\left(w_{t-n+1}^t\right) = 0,
+    \end{cases}
+    \label{eq:katz_backoff}
+    \end{equation}
+    where $P^*$ denotes discounted probabilities and $\alpha(\cdot)$ is a normalization factor that ensures probabilities sum to 1.
+\end{enumerate}
 
-\subsection{Katz backoff with normalization}
-The recursive framework introduced in \cite{katz1987} extended Good-Turing discounting through a hierarchical backoff mechanism: if an $n$-gram has been observed, use its discounted probability; if it has never been observed, back off to the $(n-1)$-gram distribution, scaled by a normalizing factor.
+\subsubsection{Kneser-Ney smoothing and continuation probabilities}
+The gold standard statistical smoothing algorithm is \textit{Modified Kneser-Ney smoothing} \citep{kneser1995}. Kneser-Ney recognizes a critical flaw in standard backoff: lower-order unigram frequency $P(w)$ does not reflect the likelihood of a word completing an unfamiliar context.
 
-For a bigram model, the Katz backoff estimator is:
+Consider the proper noun \texttt{"Francisco"}. In a general news corpus, \texttt{"Francisco"} has a relatively high unigram count $C(\texttt{"Francisco"})$ because it occurs frequently in the bigram \texttt{"San Francisco"}. Under standard Jelinek-Mercer interpolation, if the model evaluates an unfamiliar prefix such as \textit{``I want to eat a [\quad]''}, the high unigram count of \texttt{"Francisco"} would cause the model to assign it substantial probability. However, in human language, \texttt{"Francisco"} almost never appears unless preceded by \texttt{"San"}.
+
+Kneser-Ney resolves this by replacing raw unigram frequency with \textit{continuation probability}, $P_{\text{cont}}(w)$, which measures how versatile a word is across diverse antecedents:
 \begin{equation}
-\label{eq:katz_backoff}
-\Prob_{\text{Katz}}(w_t \mid w_{t-1}) = \begin{cases}
-\Prob^*(w_t \mid w_{t-1}) & \text{if } C(w_{t-1}, w_t) > 0, \\
-\alpha(w_{t-1}) \Prob_{\text{Katz}}(w_t) & \text{if } C(w_{t-1}, w_t) = 0,
-\end{cases}
+P_{\text{cont}}(w) = \frac{\left| \left\{ w': C(w', w) > 0 \right\} \right|}{\sum_{w'' \in \mathcal{V}} \left| \left\{ w': C(w', w'') > 0 \right\} \right|}.
+\label{eq:continuation_probability}
 \end{equation}
-where $\Prob^*(w_t \mid w_{t-1}) = \frac{C^*(w_{t-1}, w_t)}{C(w_{t-1})}$ represents the discounted probability calculated using Good-Turing adjusted counts for low frequencies ($r \le k$, typically $k = 5$) and MLE for high counts ($r > k$):
-\begin{equation}
-\label{eq:katz_cstar}
-C^*(w_{t-1}, w_t) = \frac{\frac{r^*}{r} - \frac{(k+1)N_{k+1}}{N_1}}{1 - \frac{(k+1)N_{k+1}}{N_1}} \cdot r \quad \text{for } 1 \le r \le k.
-\end{equation}
+Because \texttt{"Francisco"} appears almost exclusively after the single predecessor \texttt{"San"}, its continuation count is 1, resulting in a tiny continuation probability $P_{\text{cont}}(\texttt{"Francisco"})$. Conversely, words like \texttt{"apple"} or \texttt{"book"} follow hundreds of distinct words, receiving high continuation probabilities and correctly dominating lower-order backoff distributions.
 
-The leftover probability mass discounted from observed bigrams is:
-\begin{equation}
-\label{eq:katz_beta}
-\beta(w_{t-1}) = 1 - \sum_{w_t : C(w_{t-1}, w_t) > 0} \Prob^*(w_t \mid w_{t-1}).
-\end{equation}
-To ensure that $\sum_{w_t \in \vocab} \Prob_{\text{Katz}}(w_t \mid w_{t-1}) = 1$, the backoff weight $\alpha(w_{t-1})$ scales the lower-order unigram distribution over unobserved words:
-\begin{equation}
-\label{eq:katz_alpha}
-\alpha(w_{t-1}) = \frac{\beta(w_{t-1})}{\sum_{w_t : C(w_{t-1}, w_t) = 0} \Prob_{\text{Katz}}(w_t)}.
-\end{equation}
-Summing across the entire vocabulary confirms proper normalization:
-\begin{align}
-\sum_{w_t \in \vocab} \Prob_{\text{Katz}}(w_t \mid w_{t-1}) &= \sum_{C > 0} \Prob^*(w_t \mid w_{t-1}) + \sum_{C = 0} \alpha(w_{t-1}) \Prob_{\text{Katz}}(w_t) \notag \\
-&= \left( 1 - \beta(w_{t-1}) \right) + \alpha(w_{t-1}) \sum_{C = 0} \Prob_{\text{Katz}}(w_t) \notag \\
-&= \left( 1 - \beta(w_{t-1}) \right) + \beta(w_{t-1}) = 1. \label{eq:katz_proof}
-\end{align}
+\subsection{Intrinsic evaluation metrics: cross-entropy and perplexity}
+\label{subsec:eval_metrics_ppl}
 
-\subsection{Kneser-Ney smoothing and continuation probabilities}
-The standard of statistical language modeling is \emph{Kneser-Ney smoothing} \cite{kneser1995}, which introduces two key innovations: absolute discounting and continuation probabilities.
+To benchmark and compare different language models quantitatively without executing costly downstream applications, natural language processing relies on intrinsic, information-theoretic metrics: \textit{Cross-Entropy} and \textit{Perplexity} \citep{shannon1948,jurafsky2024}.
 
-Empirical analysis of corpus frequencies demonstrates that subtracting a fixed constant $d \in (0, 1)$ (typically $d \approx 0.75$) from all positive counts accurately models the discounted frequency:
-\[
-C_{\text{discounted}} = \max\left( C(w_{t-n+1}^t) - d, \, 0 \right).
-\]
-
-However, standard backoff mechanisms encounter a subtle failure mode when falling back to unigram distributions. Consider predicting the missing word in the sentence:
-\begin{center}
-\textit{``I can't see without my reading \rule{2.0cm}{0.4pt}''}
-\end{center}
-The word \textit{``glasses''} should receive a high conditional probability. Now consider the word \textit{``Francisco''}. In standard text corpora, \textit{``Francisco''} has a high unigram frequency because the proper noun \textit{``San Francisco''} appears frequently. Under standard Katz backoff, because the bigram \textit{``reading Francisco''} has zero count, the model backs off to the high unigram frequency of \textit{``Francisco''}, assigning it an inappropriately high probability of completing the sentence.
-
-The insight in \cite{kneser1995} recognized that the unigram backoff distribution should not reflect \emph{how often} a word appears overall, but \emph{how versatile} the word is across diverse preceding contexts.
-
-\begin{definition}{Continuation probability}{continuation_prob}
-The \emph{continuation probability} $\Prob_{\text{cont}}(w_t)$ is the ratio of the number of unique preceding word types that precede $w_t$ to the total number of unique bigram types in the vocabulary:
-\begin{equation}
-\label{eq:continuation_prob}
-\Prob_{\text{cont}}(w_t) = \frac{|\{ w_{t-1} : C(w_{t-1}, w_t) > 0 \}|}{\sum_{w'} |\{ w_{t-1} : C(w_{t-1}, w') > 0 \}|} = \frac{|\{ w_{t-1} : C(w_{t-1}, w_t) > 0 \}|}{|\{ (w_{t-1}, w_t) : C(w_{t-1}, w_t) > 0 \}|}.
-\end{equation}
-\end{definition}
-
-Because \textit{``Francisco''} almost exclusively appears preceded by the single word \textit{``San''}, $|\{ w_{t-1} : C(w_{t-1}, \text{Francisco}) > 0 \}| \approx 1$, resulting in a tiny continuation probability. In contrast, words like \textit{``glasses''} or \textit{``book''} appear in dozens of distinct contexts, yielding high continuation probabilities.
-
-Combining absolute discounting with continuation probabilities yields the \emph{Interpolated Kneser-Ney} estimator:
-\begin{equation}
-\label{eq:kneser_ney}
-\Prob_{\text{KN}}(w_t \mid w_{t-n+1}^{t-1}) = \frac{\max\left( C(w_{t-n+1}^t) - d, \, 0 \right)}{C(w_{t-n+1}^{t-1})} + \lambda(w_{t-n+1}^{t-1}) \Prob_{\text{KN}}(w_t \mid w_{t-n+2}^{t-1}),
-\end{equation}
-where $\lambda(w_{t-n+1}^{t-1})$ is an explicit normalizing interpolation weight:
-\begin{equation}
-\label{eq:kn_lambda}
-\lambda(w_{t-n+1}^{t-1}) = \frac{d}{C(w_{t-n+1}^{t-1})} \cdot \left| \{ w : C(w_{t-n+1}^{t-1}, w) > 0 \} \right|.
-\end{equation}
-For a bigram model ($n=2$), the base recursion terminates at the unigram continuation probability:
-\begin{equation}
-\label{eq:kn_bigram}
-\Prob_{\text{KN}}(w_t \mid w_{t-1}) = \frac{\max\left( C(w_{t-1}, w_t) - d, \, 0 \right)}{C(w_{t-1})} + \frac{d}{C(w_{t-1})} \cdot \left| \{ w : C(w_{t-1}, w) > 0 \} \right| \cdot \Prob_{\text{cont}}(w_t).
-\end{equation}
-
-Summing Equation~\eqref{eq:kn_bigram} over all $w_t \in \vocab$ verifies proper normalization:
-\begin{align}
-\sum_{w_t \in \vocab} \Prob_{\text{KN}}(w_t \mid w_{t-1}) &= \sum_{w_t : C > 0} \frac{C(w_{t-1}, w_t) - d}{C(w_{t-1})} + \lambda(w_{t-1}) \sum_{w_t \in \vocab} \Prob_{\text{cont}}(w_t) \notag \\
-&= \frac{\sum_{C > 0} C(w_{t-1}, w_t) - d \cdot |\{ w : C(w_{t-1}, w) > 0 \}|}{C(w_{t-1})} + \lambda(w_{t-1}) \cdot 1 \notag \\
-&= \frac{C(w_{t-1}) - d |\{ w : C(w_{t-1}, w) > 0 \}|}{C(w_{t-1})} + \frac{d |\{ w : C(w_{t-1}, w) > 0 \}|}{C(w_{t-1})} = 1. \label{eq:kn_proof}
-\end{align}
-Interpolated Kneser-Ney consistently outperforms other statistical smoothing techniques, serving as the industry standard until the advent of deep continuous language models.
-
-With competing smoothing algorithms established—each reallocating probability mass under different statistical assumptions—we require objective, quantitative criteria to evaluate and compare models on held-out test data. This necessitates formal information-theoretic evaluation metrics.
-
-\clearpage
-\section{Evaluation Metrics}
-\label{sec:eval_metrics}
-
-To benchmark and compare different language models quantitatively without executing costly downstream applications, natural language processing relies on intrinsic, information-theoretic metrics: \emph{Cross-Entropy} and \emph{Perplexity} \cite{shannon1948,jurafsky2024}.
-
-\subsection{Information-theoretic foundations: entropy and KL divergence}
-Let $\mathcal{X}$ denote a discrete sample space (the vocabulary $\vocab$), and let $P(x)$ represent the true, underlying, but inaccessible probability distribution of human language. 
+\subsubsection{Information-theoretic foundations: entropy and KL divergence}
+Let $\mathcal{X}$ denote a discrete sample space (the vocabulary $\mathcal{V}$), and let $P(x)$ represent the true, underlying, but inaccessible probability distribution of human language.
 
 \begin{definition}{Shannon entropy}{shannon_entropy}
-The \emph{Shannon entropy} $H(P)$ measures the fundamental, irreducible uncertainty or average information content inherent in distribution $P$ \cite{shannon1948}:
+The \emph{Shannon entropy} $H(P)$ measures the fundamental, irreducible uncertainty or average information content inherent in distribution $P$ \citep{shannon1948}:
 \begin{equation}
+H(P) = - \sum_{x \in \mathcal{X}} P(x) \log_2 P(x) = \mathbb{E}_{x \sim P}\left[ \log_2 \frac{1}{P(x)} \right].
 \label{eq:shannon_entropy}
-H(P) = - \sum_{x \in \mathcal{X}} P(x) \log_2 P(x) = \E_{x \sim P}\left[ \log_2 \frac{1}{P(x)} \right].
 \end{equation}
 By Shannon's source coding theorem, $H(P)$ represents the absolute theoretical lower bound on the expected number of bits required to encode a symbol emitted by $P$ without loss.
 \end{definition}
 
-When constructing a language model, we approximate the true distribution $P$ with an estimated parameterized distribution $Q_\theta$. To quantify the statistical discrepancy between the true distribution $P$ and our approximating model $Q_\theta$, we employ the \emph{Kullback-Leibler (KL) divergence}.
+When constructing a language model, we approximate the true distribution $P$ with an estimated parameterized distribution $Q_\theta$. To quantify the statistical discrepancy between the true distribution $P$ and our approximating model $Q_\theta$, we employ the \textit{Kullback-Leibler (KL) divergence}.
 
 \begin{definition}{Kullback-Leibler (KL) divergence}{kl_divergence}
 The \emph{KL divergence} (or relative entropy) from model distribution $Q$ to target distribution $P$ is:
 \begin{equation}
+D_{\text{KL}}(P \parallel Q) = \sum_{x \in \mathcal{X}} P(x) \log_2 \left( \frac{P(x)}{Q(x)} \right) = \mathbb{E}_{x \sim P}\left[ \log_2 \frac{P(x)}{Q(x)} \right].
 \label{eq:kl_divergence}
-D_{\text{KL}}(P \parallel Q) = \sum_{x \in \mathcal{X}} P(x) \log_2 \left( \frac{P(x)}{Q(x)} \right) = \E_{x \sim P}\left[ \log_2 \frac{P(x)}{Q(x)} \right].
 \end{equation}
 \end{definition}
 
 \begin{theorem}{Gibbs' inequality}{gibbs_inequality}
 For any two discrete probability distributions $P$ and $Q$, the KL divergence is non-negative:
 \begin{equation}
-\label{eq:gibbs_ineq}
 D_{\text{KL}}(P \parallel Q) \ge 0,
+\label{eq:gibbs_ineq}
 \end{equation}
 with equality $D_{\text{KL}}(P \parallel Q) = 0$ if and only if $P(x) = Q(x)$ for all $x \in \mathcal{X}$.
 \end{theorem}
 
-We verify Gibbs' inequality by expressing the divergence via the natural logarithm and utilizing the inequality $\ln(u) \le u - 1$ for all $u > 0$ (with equality if and only if $u = 1$):
-\begin{align*}
-- D_{\text{KL}}(P \parallel Q) &= \sum_{x \in \mathcal{X}} P(x) \log_2 \left( \frac{Q(x)}{P(x)} \right) = \frac{1}{\ln 2} \sum_{x \in \mathcal{X}} P(x) \ln \left( \frac{Q(x)}{P(x)} \right) \\
-&\le \frac{1}{\ln 2} \sum_{x \in \mathcal{X}} P(x) \left( \frac{Q(x)}{P(x)} - 1 \right) \\
+\textit{Proof.} Expressing the divergence via the natural logarithm and utilizing the standard inequality $\ln(u) \le u - 1$ for all $u > 0$ (with equality if and only if $u = 1$):
+\begin{align}
+- D_{\text{KL}}(P \parallel Q) &= \sum_{x \in \mathcal{X}} P(x) \log_2 \left( \frac{Q(x)}{P(x)} \right) = \frac{1}{\ln 2} \sum_{x \in \mathcal{X}} P(x) \ln \left( \frac{Q(x)}{P(x)} \right) \notag \\
+&\le \frac{1}{\ln 2} \sum_{x \in \mathcal{X}} P(x) \left( \frac{Q(x)}{P(x)} - 1 \right) \notag \\
 &= \frac{1}{\ln 2} \left( \sum_{x \in \mathcal{X}} Q(x) - \sum_{x \in \mathcal{X}} P(x) \right) = \frac{1}{\ln 2} (1 - 1) = 0.
-\end{align*}
-Multiplying both sides by $-1$ reverses the inequality, yielding $D_{\text{KL}}(P \parallel Q) \ge 0$. \hfill $\blacksquare$
+\end{align}
+Multiplying both sides by $-1$ reverses the inequality, yielding $D_{\text{KL}}(P \parallel Q) \ge 0$.
 
-\subsection{Cross-entropy decomposition}
+\subsubsection{Cross-entropy decomposition and empirical sequence loss}
 Expanding the logarithm in the definition of KL divergence demonstrates the fundamental relationship connecting Entropy, KL Divergence, and Cross-Entropy:
 \begin{align}
 D_{\text{KL}}(P \parallel Q) &= \sum_{x \in \mathcal{X}} P(x) \log_2 P(x) - \sum_{x \in \mathcal{X}} P(x) \log_2 Q(x) \notag \\
-&= - H(P) + \left( - \sum_{x \in \mathcal{X}} P(x) \log_2 Q(x) \right). \label{eq:kl_expanded}
+&= - H(P) + \left( - \sum_{x \in \mathcal{X}} P(x) \log_2 Q(x) \right).
 \end{align}
-Rearranging terms defines the \emph{Cross-Entropy} $H(P, Q)$:
+Rearranging terms defines the \textit{Cross-Entropy} $H(P, Q)$:
 \begin{equation}
-\label{eq:cross_entropy_decomp}
 H(P, Q) \triangleq - \sum_{x \in \mathcal{X}} P(x) \log_2 Q(x) = H(P) + D_{\text{KL}}(P \parallel Q).
+\label{eq:cross_entropy_decomp}
 \end{equation}
 
 Equation~\eqref{eq:cross_entropy_decomp} provides the theoretical justification for cross-entropy minimization during training. Because the true language distribution $P$ is determined by human linguistic behavior, its entropy $H(P)$ is an invariant physical constant. When minimizing cross-entropy with respect to model parameters $\theta$:
 \begin{equation}
-\label{eq:mle_equivalence}
-\argmin_\theta H(P, Q_\theta) = \argmin_\theta \left( H(P) + D_{\text{KL}}(P \parallel Q_\theta) \right) = \argmin_\theta D_{\text{KL}}(P \parallel Q_\theta).
+\arg\min_\theta H\left(P, Q_\theta\right) = \arg\min_\theta \left( H(P) + D_{\text{KL}}(P \parallel Q_\theta) \right) = \arg\min_\theta D_{\text{KL}}(P \parallel Q_\theta).
 \end{equation}
 Minimizing cross-entropy is mathematically identical to driving the KL divergence between model $Q_\theta$ and the true language distribution $P$ to zero.
 
-\subsection{Empirical sequence cross-entropy}
-Because we do not have closed-form access to the true distribution $P(x)$, we cannot compute the expectation $\E_{x \sim P}[\cdot]$ directly. Instead, by the Shannon-McMillan-Breiman theorem (the ergodic theorem for stationary information sources), the expected value is estimated empirically by sampling a long test sequence $W = (w_1, w_2, \dots, w_T) \sim P$:
+Because we do not have closed-form access to the true distribution $P(x)$, the expected value is estimated empirically by sampling a long test sequence $W = (w_1, w_2, \dots, w_T) \sim P$:
 \begin{equation}
+\mathcal{H}(W) = - \frac{1}{T} \log_2 Q\left(w_1, w_2, \dots, w_T\right) = - \frac{1}{T} \sum_{t=1}^T \log_2 Q\left(w_t \mid w_{<t}\right).
 \label{eq:empirical_cross_entropy}
-\mathcal{H}(W) = - \frac{1}{T} \log_2 Q(w_1, w_2, \dots, w_T) = - \frac{1}{T} \sum_{t=1}^T \log_2 Q(w_t \mid w_{<t}).
 \end{equation}
 Empirical cross-entropy measures the average number of bits required to compress each token of test text using model $Q$.
 
-\subsection{Perplexity as an intrinsic evaluation metric}
-While cross-entropy evaluates performance on a logarithmic scale, researchers and practitioners report \emph{Perplexity} ($\PPL$), defined as the exponentiated cross-entropy loss:
+\subsubsection{Perplexity as an intrinsic evaluation metric}
+While cross-entropy evaluates performance on a logarithmic scale, researchers and practitioners report \textit{Perplexity} ($\text{PPL}$), defined as the exponentiated cross-entropy loss:
 \begin{align}
-\PPL(W) &= 2^{\mathcal{H}(W)} = 2^{-\frac{1}{T} \sum_{t=1}^T \log_2 Q(w_t \mid w_{<t})} \label{eq:ppl_base2} \\
-&= \left( \prod_{t=1}^T \frac{1}{Q(w_t \mid w_{<t})} \right)^{\frac{1}{T}}. \label{eq:ppl_geometric}
+\text{PPL}(W) &= 2^{\mathcal{H}(W)} = 2^{-\frac{1}{T} \sum_{t=1}^T \log_2 Q\left(w_t \mid w_{<t}\right)} \label{eq:ppl_base2} \\
+&= \left( \prod_{t=1}^T \frac{1}{Q\left(w_t \mid w_{<t}\right)} \right)^{\frac{1}{T}}. \label{eq:ppl_geometric}
 \end{align}
 Perplexity represents the reciprocal geometric mean of the token probabilities assigned by the model across the test corpus.
-
-\subsection{Formal derivation: perplexity as the effective branching factor}
-The intuitive interpretation of perplexity is that it quantifies the \emph{effective branching factor} of a language model. We formalize this property through the following derivation:
 
 \begin{theorem}{Perplexity of a uniform $K$-ary distribution}{ppl_branching_proof}
 Let a language model $Q$ predict next tokens such that at each timestep $t$, the probability mass is distributed uniformly across exactly $K$ equally likely candidate tokens ($Q(w_t \mid w_{<t}) = \frac{1}{K}$ for each candidate). Then the perplexity on any generated sequence $W$ of length $T$ is identically $K$:
 \begin{equation}
+\text{PPL}(W) = K.
 \label{eq:ppl_equals_k}
-\PPL(W) = K.
 \end{equation}
 \end{theorem}
 
-Substituting the uniform prediction probability $Q(w_t \mid w_{<t}) = \frac{1}{K}$ into the empirical cross-entropy formula yields:
-\begin{align*}
-\mathcal{H}(W) &= - \frac{1}{T} \sum_{t=1}^T \log_2 \left( \frac{1}{K} \right) = - \frac{1}{T} \sum_{t=1}^T \left( - \log_2 K \right) \\
+\textit{Proof.} Substituting the uniform prediction probability $Q(w_t \mid w_{<t}) = \frac{1}{K}$ into the empirical cross-entropy formula yields:
+\begin{align}
+\mathcal{H}(W) &= - \frac{1}{T} \sum_{t=1}^T \log_2 \left( \frac{1}{K} \right) = - \frac{1}{T} \sum_{t=1}^T \left( - \log_2 K \right) \notag \\
 &= \frac{1}{T} \left( T \log_2 K \right) = \log_2 K.
-\end{align*}
+\end{align}
 Exponentiating the cross-entropy:
-\[
-\PPL(W) = 2^{\mathcal{H}(W)} = 2^{\log_2 K} = K. \quad \blacksquare
-\]
+\begin{equation}
+\text{PPL}(W) = 2^{\mathcal{H}(W)} = 2^{\log_2 K} = K.
+\end{equation}
 
-When a model evaluates a text corpus and achieves $\PPL = 42$, this indicates that, on average, the model's predictive uncertainty at each token is mathematically equivalent to choosing uniformly at random from a shortlist of $42$ equally plausible words. A uniform random guesser across vocabulary $\vocab$ achieves $\PPL = |\vocab|$ (for example, $\PPL = 50{,}000$), while an optimal oracle that predicts every token with probability $1.0$ achieves the theoretical lower bound $\PPL = 1.0$. State-of-the-art foundation models on natural language benchmarks typically achieve perplexities between $8$ and $15$.
+Theorem~\ref{thm:ppl_branching_proof} establishes the physical interpretation of perplexity: it quantifies the \textit{effective branching factor} of a language model. When a model evaluates a text corpus and achieves $\text{PPL} = 42$, this indicates that, on average, the model's predictive uncertainty at each token is mathematically equivalent to choosing uniformly at random from a shortlist of $42$ equally plausible words. A uniform random guesser across vocabulary $\mathcal{V}$ achieves $\text{PPL} = |\mathcal{V}|$ (for example, $\text{PPL} = 50{,}000$), while an optimal oracle that predicts every token with probability $1.0$ achieves the theoretical lower bound $\text{PPL} = 1.0$.
 
-\subsection{Logarithmic base conversions: bits versus nats}
-\label{subsec:log_base_conversions}
-
+\subsubsection{Logarithmic base conversions: bits versus nats}
 A practical mathematical distinction arises when connecting information-theoretic formulations (which employ base-$2$ logarithms) with deep learning frameworks such as PyTorch (which compute natural base-$e$ cross-entropy loss):
 \begin{center}
-\begin{tabularx}{\linewidth}{l >{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}X}
+\small
+\begin{tabularx}{\linewidth}{l X X}
 \toprule
 \textbf{Property} & \textbf{Information Theory (Bits)} & \textbf{Deep Learning / PyTorch (Nats)} \\
 \midrule
 Loss Formula & $\mathcal{H}_2 = -\frac{1}{T} \sum \log_2 Q(w_t \mid w_{<t})$ & $\mathcal{L}_{\text{CE}} = -\frac{1}{T} \sum \ln Q(w_t \mid w_{<t})$ \\
 Unit & Bits per token & Nats per token \\
-Perplexity Formula & $\PPL = 2^{\mathcal{H}_2}$ & $\PPL = \exp(\mathcal{L}_{\text{CE}}) = e^{\mathcal{L}_{\text{CE}}}$ \\
+Perplexity Formula & $\text{PPL} = 2^{\mathcal{H}_2}$ & $\text{PPL} = \exp(\mathcal{L}_{\text{CE}}) = e^{\mathcal{L}_{\text{CE}}}$ \\
 Conversion Identity & \multicolumn{2}{c}{$\mathcal{H}_2 = \frac{\mathcal{L}_{\text{CE}}}{\ln 2} \approx \frac{\mathcal{L}_{\text{CE}}}{0.693147}, \quad \mathcal{L}_{\text{CE}} = \mathcal{H}_2 \cdot \ln 2 \approx 0.693147 \cdot \mathcal{H}_2$} \\
 \bottomrule
 \end{tabularx}
 \end{center}
 
-To observe the effect of this conversion, suppose a model trained on code completion reports an evaluation loss of $\mathcal{L}_{\text{CE}} = 2.7726$ nats. Computing base-$e$ perplexity directly yields:
-\[
-\PPL = e^{2.7726} = \exp(2.7726) \approx 16.00.
-\]
+To observe the effect of this conversion, suppose a neural model trained on code completion reports an evaluation loss of $\mathcal{L}_{\text{CE}} = 2.7726$ nats. Computing base-$e$ perplexity directly yields:
+\begin{equation}
+\text{PPL} = e^{2.7726} = \exp(2.7726) \approx 16.00.
+\end{equation}
 Converting the loss to information bits produces:
-\[
+\begin{equation}
 \mathcal{H}_2 = \frac{2.7726}{\ln 2} = \frac{2.7726}{0.693147} = 4.00 \text{ bits/token},
-\]
-which confirms the identical perplexity value: $\PPL = 2^{\mathcal{H}_2} = 2^{4.00} = 16.00$. Inadvertently evaluating $2^{\mathcal{L}_{\text{CE}}} = 2^{2.7726} \approx 6.83$ would severely underestimate the true branching factor by more than $57\%$, highlighting the necessity of matching logarithmic bases.
+\end{equation}
+which confirms the identical perplexity value: $\text{PPL} = 2^{\mathcal{H}_2} = 2^{4.00} = 16.00$. Inadvertently evaluating $2^{\mathcal{L}_{\text{CE}}} = 2^{2.7726} \approx 6.83$ would severely underestimate the true branching factor by more than $57\%$, highlighting the necessity of matching logarithmic bases.
 
-\subsection{The structural ceiling of smoothed $n$-gram models}
-While Kneser-Ney smoothing substantially reduces test perplexity by eliminating zero-frequency collapses, smoothed $n$-gram models remain constrained by fundamental structural limitations:
-\begin{itemize}
-    \item \textbf{Context Horizon Truncation}: Conditioning remains restricted to $n-1$ tokens. Increasing $n \ge 5$ yields diminishing returns because higher-order frequencies are almost entirely unobserved, causing the model to constantly back off to lower orders.
-    \item \textbf{Absence of Parameter Sharing}: Words remain discrete orthogonal indices. The model cannot generalize that \textit{``The programmer wrote a test''} informs \textit{``The developer authored a test''}.
-    \item \textbf{Combinatorial Storage Overheads}: Count matrices for large corpora require gigabytes to terabytes of memory.
-\end{itemize}
-These structural limits motivated researchers to explore paradigms that replace discrete counting tables with continuous, parameterized functions.
+\subsection{The structural ceiling and the bridge to continuous word embeddings}
+\label{subsec:structural_ceiling_bridge}
 
-\clearpage
+While advanced smoothing techniques such as Modified Kneser-Ney eliminate zero-frequency collapses and reduce empirical perplexity, statistical $n$-gram models remain trapped behind two insurmountable theoretical barriers:
+\begin{enumerate}
+    \item \textbf{Context horizon truncation}: The $(n-1)$-th order Markov assumption discards all context residing beyond $n-1$ tokens. Increasing $n \ge 5$ yields rapidly diminishing returns because higher-order frequency tables become almost entirely empty, forcing the model to constantly back off to lower orders. Consequently, statistical $n$-gram models cannot maintain long-range syntactic agreement (e.g. subject-verb agreement across intervening subordinate clauses) or preserve document-level topic coherence.
+    \item \textbf{Discrete orthogonal representations and zero parameter sharing}: In statistical counting tables, words are represented as atomic, discrete symbolic indices. In vector space, this corresponds to treating words as standard basis vectors (one-hot vectors) in $\mathbb{R}^{|\mathcal{V}|}$:
+    \begin{equation}
+    \mathbf{e}_i^\top \mathbf{e}_j = 0, \quad \|\mathbf{e}_i - \mathbf{e}_j\|_2 = \sqrt{2}, \quad \forall i \neq j.
+    \end{equation}
+    Every word is geometrically orthogonal and equidistant to every other word. The model possesses no intrinsic notion of semantic similarity. Observing the training phrase \textit{``The cat chased the mouse''} provides strictly zero statistical evidence to assist the model when evaluating the semantically identical sentence \textit{``The feline pursued the rodent''}. Because each lexical entry occupies an isolated, independent row in the transition matrix, the model cannot share statistical parameters between synonyms.
+\end{enumerate}
 
+Smoothing techniques merely patch zero-frequency counts; they do not solve the fundamental lack of continuous semantic representation. Overcoming this representational ceiling requires replacing discrete, tabular counting models with continuous, parameterized mathematical functions \citep{bengio2003}. Words must be projected into continuous Euclidean vector spaces $\mathbb{R}^d$ where geometric distance reflects semantic similarity. This profound conceptual leap—transitioning from discrete orthogonal indices to distributed continuous vector representations—forms the subject of Chapter~\ref{ch:word_embeddings}.
 
-\clearpage
-\thispagestyle{empty}
-\null
-\clearpage
-
+\clearpage\thispagestyle{empty}\null\clearpage
 \end{document}
