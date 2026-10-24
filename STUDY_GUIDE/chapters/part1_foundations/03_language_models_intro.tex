@@ -95,41 +95,83 @@ By framing language modeling as sequential next-token prediction, we can constru
 \section{The Markov assumption, $n$-gram models, and operational inference}
 \label{sec:markov_ngrams_inference}
 
-While Equation~\eqref{eq:exact_chain_rule} is mathematically exact, it cannot be implemented directly in practice using raw frequency tables. As sequence length $t$ increases, the conditioning prefix $w_{<t}$ grows linearly, meaning that the historical context becomes unique. To construct practical statistical models, we must introduce simplifying independence assumptions that truncate the conditioning horizon.
+While the exact chain rule decomposition in Equation~\eqref{eq:exact_chain_rule} provides a mathematically sound probabilistic factorization, it cannot be implemented directly in practice using raw tabular frequencies. As the sequence length $t$ increases, the conditioning history $w_{<t} = (w_1, \dots, w_{t-1})$ expands monotonically, rendering each historical context effectively unique. To construct tractable statistical models from empirical corpora, we must introduce principled independence assumptions that truncate the conditioning context.
 
-\subsection{The Markov assumption and combinatorial reduction}
+\subsection{The Markov assumption and combinatorial state-space reduction}
 \label{subsec:markov_assumption}
 
-Consider estimating the conditional probability $P(w_t \mid w_1, \dots, w_{t-1})$ using empirical counting over a text corpus. For a vocabulary of size $|\mathcal{V}| = 50{,}000$, a prefix of length $t-1 = 10$ admits $|\mathcal{V}|^{10} \approx 9.76 \times 10^{46}$ distinct possible histories. Because no realistic training corpus contains more than $10^{10}$ to $10^{12}$ total words, the probability of encountering any specific 10-word prefix multiple times approaches zero, rendering empirical frequency ratios completely undefined.
+To understand why an unconstrained history is computationally intractable, consider tracking the exact sequence of preceding tokens. At position $t$, the conditioning history $h_t = (w_1, \dots, w_{t-1})$ belongs to the Cartesian product $\mathcal{V}^{t-1}$. The cardinality of the conditioning state space at step $t$ evaluates to:
+\begin{equation}
+|\mathcal{H}_t| = |\mathcal{V}|^{t-1}.
+\label{eq:unconstrained_history_cardinality}
+\end{equation}
 
-To overcome this combinatorial barrier, statistical language modeling applies the \textit{Markov assumption} \citep{jurafsky2024}. Formally, an $(n-1)$-th order Markov chain posits that the conditional probability of the current state depends exclusively on the immediately preceding $n-1$ states, remaining conditionally independent of all earlier history:
+For a modest vocabulary of $|\mathcal{V}| = 10{,}000$ words, tracking histories of length $t = 4$ requires estimating probabilities across $10{,}000^3 = 10^{12}$ distinct conditioning states. For a realistic vocabulary of $|\mathcal{V}| = 50{,}000$ at step $t=10$, the state space expands to $|\mathcal{V}|^9 \approx 1.95 \times 10^{42}$ states. Because no empirical text corpus contains more than $10^{10}$ to $10^{12}$ total tokens, the vast majority of prefixes will occur zero times in training data, rendering empirical frequency ratios completely undefined.
+
+To make parameter estimation mathematically tractable, statistical language modeling applies the \textit{Markov assumption} \citep{jurafsky2024}. In his foundational 1948 treatise on information theory \citep{shannon1948}, Claude Shannon demonstrated that modeling natural language as a discrete stochastic process with bounded memory yields increasingly coherent approximations as the conditioning order increases.
+
+\begin{definition}{Markov assumption of order $n-1$}{markov_assumption}
+An $n$-gram language model posits that the conditional probability of the current word $w_t$ depends exclusively on the immediately preceding $n-1$ words, remaining conditionally independent of all earlier discourse history:
 \begin{equation}
 P\left(w_t \mid w_1, w_2, \dots, w_{t-1}\right) \approx P\left(w_t \mid w_{t-n+1}, \dots, w_{t-1}\right).
 \label{eq:markov_assumption}
 \end{equation}
-
-Under the $(n-1)$-th order Markov assumption, an $n$-gram language model approximates the true joint probability of a sequence as:
-\begin{equation}
-P\left(w_1, \dots, w_T\right) \approx \prod_{t=1}^T P\left(w_t \mid w_{t-n+1}, \dots, w_{t-1}\right).
-\label{eq:ngram_joint_approximation}
-\end{equation}
-
-The choice of parameter $n$ defines the context horizon of the statistical model:
-\begin{enumerate}
-    \item \textbf{Unigram model ($n=1$)}: Assumes complete zeroth-order independence. The probability of each word is evaluated in total isolation from its context:
+The integer $n \ge 1$ dictates the order of the statistical model:
+\begin{itemize}
+    \item \textbf{Unigram model ($n=1$, Order 0)}: Completely memoryless. Each word is treated as statistically independent of past and future tokens:
     \begin{equation}
     P\left(w_1, \dots, w_T\right) \approx \prod_{t=1}^T P\left(w_t\right).
     \end{equation}
-    A unigram model ignores all syntactic structure and word order, treating sentences as an unordered ``bag of words''.
-    \item \textbf{Bigram model ($n=2$)}: Imposes a first-order Markov assumption. The probability of the next word depends strictly and exclusively on the single immediately preceding word:
+    A unigram model ignores all syntactic structure and word order, treating the sequence as an unordered bag of words.
+    \item \textbf{Bigram model ($n=2$, Order 1)}: First-order Markov chain. Conditioning depends exclusively on the single preceding token $w_{t-1}$:
     \begin{equation}
     P\left(w_1, \dots, w_T\right) \approx P\left(w_1\right) \prod_{t=2}^T P\left(w_t \mid w_{t-1}\right).
+    \label{eq:bigram_joint_approximation}
     \end{equation}
-    \item \textbf{Trigram model ($n=3$)}: Imposes a second-order Markov assumption, conditioning each word on the preceding two-word prefix:
+    \item \textbf{Trigram model ($n=3$, Order 2)}: Second-order Markov chain. Conditioning depends on the preceding pair of tokens $(w_{t-2}, w_{t-1})$:
     \begin{equation}
     P\left(w_1, \dots, w_T\right) \approx P\left(w_1\right) P\left(w_2 \mid w_1\right) \prod_{t=3}^T P\left(w_t \mid w_{t-2}, w_{t-1}\right).
     \end{equation}
-\end{enumerate}
+\end{itemize}
+\end{definition}
+
+The primary mathematical virtue of the Markov assumption is that it collapses an exponentially expanding state space into a stationary cardinality that remains constant across all sequence positions $t$. Under an $n$-gram model, the conditioning context is always restricted to $n-1$ words, yielding a fixed state-space cardinality:
+\begin{equation}
+|\mathcal{H}^{(n)}| = |\mathcal{V}|^{n-1}.
+\label{eq:state_space_markov}
+\end{equation}
+
+Consequently, specifying the complete transition probability distribution across the entire vocabulary requires a conditioning table containing:
+\begin{equation}
+N_{\text{parameters}} = |\mathcal{V}|^{n-1} \times (|\mathcal{V}| - 1) \approx |\mathcal{V}|^n,
+\label{eq:parameters_ngram}
+\end{equation}
+free parameters. Table~\ref{tab:state_space_reduction} contrasts the combinatorial explosion of the unconstrained historical state space with fixed $n$-gram Markov orders for representative vocabulary sizes.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{l l c >{\raggedleft\arraybackslash}X >{\raggedleft\arraybackslash}X}
+\toprule
+\textbf{Model / Order} & \textbf{Effective Context} & \textbf{Formula} & \textbf{States ($|\mathcal{V}| = 10^4$)} & \textbf{States ($|\mathcal{V}| = 5 \times 10^4$)} \\
+\midrule
+Unconstrained ($t=2$)  & 1 previous token   & $|\mathcal{V}|^1$       & $1.0 \times 10^4$    & $5.0 \times 10^4$    \\
+Unconstrained ($t=3$)  & 2 previous tokens  & $|\mathcal{V}|^2$       & $1.0 \times 10^8$    & $2.5 \times 10^9$    \\
+Unconstrained ($t=5$)  & 4 previous tokens  & $|\mathcal{V}|^4$       & $1.0 \times 10^{16}$ & $6.25 \times 10^{18}$ \\
+Unconstrained ($t=10$) & 9 previous tokens  & $|\mathcal{V}|^9$       & $1.0 \times 10^{36}$ & $1.95 \times 10^{42}$ \\
+Unconstrained ($t=20$) & 19 previous tokens & $|\mathcal{V}|^{19}$    & $1.0 \times 10^{76}$ & $1.90 \times 10^{89}$ \\
+\midrule
+\textbf{Unigram ($n=1$)} & 0 tokens (memoryless) & $|\mathcal{V}|^0 = 1$   & $1$                  & $1$                  \\
+\textbf{Bigram ($n=2$)}  & 1 previous token      & $|\mathcal{V}|^1$       & $1.0 \times 10^4$    & $5.0 \times 10^4$    \\
+\textbf{Trigram ($n=3$)} & 2 previous tokens     & $|\mathcal{V}|^2$       & $1.0 \times 10^8$    & $2.5 \times 10^9$    \\
+\textbf{4-gram ($n=4$)}  & 3 previous tokens     & $|\mathcal{V}|^3$       & $1.0 \times 10^{12}$ & $1.25 \times 10^{14}$ \\
+\bottomrule
+\end{tabularx}
+\caption{State-space cardinality $|\mathcal{H}|$ as a function of sequence position $t$ in unconstrained conditioning histories versus fixed $n$-gram Markov orders for vocabularies $|\mathcal{V}| = 10{,}000$ and $|\mathcal{V}| = 50{,}000$.}
+\label{tab:state_space_reduction}
+\end{table}
+
+As demonstrated in Table~\ref{tab:state_space_reduction}, while the unconstrained state space exceeds $10^{76}$ states by position $t=20$ (surpassing the total number of atoms in the observable universe), a bigram model maintains a fixed, stationary state space of $50{,}000$ conditioning rows. Truncating the context horizon makes statistical modeling computationally viable, enabling direct parameter estimation from observed text counts.
 
 \subsection{The worked transition matrix and parameter estimation}
 \label{subsec:worked_transition_matrix}
@@ -204,7 +246,7 @@ The first core inference task consists in evaluating the likelihood of a candida
 W_{\text{test}} = \texttt{"The cat chased the cheese."}
 \end{equation}
 
-Applying the bigram factorization from Equation~\eqref{eq:ngram_joint_approximation}:
+Applying the bigram factorization from Equation~\eqref{eq:bigram_joint_approximation}:
 \begin{equation}
 P\left(W_{\text{test}}\right) = P\left(\texttt{the}\right) \cdot P\left(\texttt{cat} \mid \texttt{the}\right) \cdot P\left(\texttt{chased} \mid \texttt{cat}\right) \cdot P\left(\texttt{the} \mid \texttt{chased}\right) \cdot P\left(\texttt{cheese} \mid \texttt{the}\right).
 \end{equation}
@@ -398,7 +440,7 @@ The limitations examined in this section demonstrate that smoothing merely patch
     \item Discrete symbolic representations, which prevent parameter sharing across synonymous or semantically related words.
 \end{enumerate}
 
-Furthermore, while quantitative evaluation metrics such as Perplexity and Cross-Entropy are essential for benchmarking language models systematically (and are analyzed comprehensively in Chapter~\ref{ch:evaluation_benchmarks}), no mathematical metric can overcome the intrinsic capacity ceiling of tabular $n$-grams.
+Furthermore, while quantitative evaluation metrics such as Perplexity and Cross-Entropy are essential for benchmarking language models systematically (and are analyzed comprehensively in Chapter~\ref{ch:evaluation_metrics_benchmarks}), no mathematical metric can overcome the intrinsic capacity ceiling of tabular $n$-grams.
 
 Resolving these fundamental challenges requires a paradigm shift away from discrete, tabular frequency counts toward continuous, parameterized neural networks \citep{bengio2003}. In this modern framework, words are projected into continuous, low-dimensional Euclidean vector spaces $\mathbb{R}^d$ ($d \ll |\mathcal{V}|$), where geometric proximity directly encodes semantic similarity. By framing language modeling as a continuous classification task parameterized by neural architectures, models can simultaneously maintain extended context histories and share statistical strength across related lexical concepts. This foundational transition---from discrete orthogonal indices to continuous distributed representations---is explored in depth in Chapter~\ref{ch:word_embeddings}.
 
