@@ -10,7 +10,7 @@ The preceding chapters established the computational foundations of deep learnin
 
 The goal of language modeling is to formulate computational mechanisms capable of distinguishing between probable, semantically coherent utterances and implausible, grammatically corrupted sequences. Historically, this objective originated in the pioneering work of Claude Shannon and the engineering impasses of early speech recognition, where deterministic grammars proved fundamentally inadequate to capture the pervasive ambiguity and continuous variability of natural human expression. Early statistical approaches addressed this challenge through Markovian assumptions and discrete frequency estimation over local $n$-gram tuples, establishing the foundational paradigms of maximum likelihood training, likelihood evaluation, and autoregressive generation.
 
-This chapter develops the theoretical, statistical, and algorithmic principles of language modeling. We begin by examining the historical imperatives that motivated probabilistic language modeling and formalize the joint distribution over word sequences via the probability chain rule. We then formulate the Markov assumption and $n$-gram models, trace parameter estimation via Maximum Likelihood Estimation on a concrete corpus, and systematically analyze the dual inference modes: sequence likelihood evaluation and autoregressive sequence generation. Finally, we dissect the fundamental limitations of statistical counting models—specifically combinatorial data sparsity, the zero-frequency collapse, and orthogonal symbolic representations—examine smoothing and discounting remedies, derive information-theoretic evaluation metrics including cross-entropy and perplexity, and establish the structural necessity of transitioning to continuous distributed word embeddings.
+This chapter develops the theoretical, statistical, and algorithmic principles of language modeling. We begin by examining the historical imperatives that motivated probabilistic language modeling and formalize the joint distribution over word sequences via the probability chain rule. We then formulate the Markov assumption and $n$-gram models, trace parameter estimation via Maximum Likelihood Estimation on a concrete corpus, and systematically analyze the dual inference modes: sequence likelihood evaluation and autoregressive sequence generation. Finally, we dissect the fundamental limitations of statistical counting models---specifically combinatorial data sparsity, context horizon truncation, and the lack of semantic generalization---examine the smoothing mechanism as a mitigation strategy, and establish the structural necessity of transitioning to continuous distributed word embeddings.
 
 \clearpage
 \section{Introduction to language models and the modeling task}
@@ -296,32 +296,32 @@ This sentence never existed in the training corpus; it was synthesized dynamical
 
 \clearpage
 \section{Limitations of statistical language models and the path to neural representations}
-\label{sec:limitations_smoothing_neural}
+\label{sec:statistical_lm_limitations}
 
-Despite their mathematical simplicity and clear probabilistic interpretations, statistical $n$-gram models suffer from severe theoretical, combinatorial, and representational pathologies that fundamentally limit their scalability.
+Despite their mathematical simplicity and clear probabilistic interpretations, statistical $n$-gram models suffer from severe architectural and theoretical limitations that fundamentally restrict their scalability and utility in modern natural language processing. In this section, we examine the three primary limitations of statistical language models---combinatorial data sparsity, context horizon truncation, and the absence of semantic generalization---analyze smoothing as an intuitive mitigation strategy, and establish the necessity of continuous neural representations.
 
 \subsection{Combinatorial data sparsity and the zero-frequency collapse}
 \label{subsec:data_sparsity_zero_freq}
 
-The most fatal pathology of $n$-gram models is the curse of combinatorial data sparsity. An $n$-gram model over a realistic vocabulary $\mathcal{V}$ requires maintaining a contingency table whose parameter count scales exponentially with the context window size:
+The most prominent limitation of $n$-gram models is the curse of combinatorial data sparsity. An $n$-gram model over a realistic vocabulary $\mathcal{V}$ requires maintaining a contingency table whose parameter count scales exponentially with the window size $n$:
 \begin{equation}
 N_{\text{parameters}} = |\mathcal{V}|^n.
 \label{eq:ngram_parameter_explosion}
 \end{equation}
 
-For a standard vocabulary of size $|\mathcal{V}| = 50{,}000$:
+For a standard vocabulary of size $|\mathcal{V}| = 50{,}000$, the parameter requirements scale aggressively with $n$:
 \begin{itemize}
     \item \textbf{Bigram ($n=2$)}: Requires $|\mathcal{V}|^2 = 2.5 \times 10^9$ parameters (requiring $\approx 10\text{ GB}$ of memory under 32-bit floats).
     \item \textbf{Trigram ($n=3$)}: Requires $|\mathcal{V}|^3 = 1.25 \times 10^{14}$ parameters (requiring $\approx 500\text{ TB}$ of storage).
     \item \textbf{5-gram ($n=5$)}: Requires $|\mathcal{V}|^5 = 3.125 \times 10^{23}$ parameters, far exceeding the physical storage capacity of global computing infrastructure.
 \end{itemize}
 
-Because human language allows words to combine in virtually boundless configurations, no finite corpus can ever observe more than a microscopic fraction of all valid $n$-grams. In any empirical training set, the vast majority of legitimate word combinations have an observed count of zero:
+Because human language allows words to combine in virtually boundless configurations, no finite corpus can observe more than a microscopic fraction of all valid $n$-grams. In any empirical training set, the vast majority of legitimate word combinations have an observed count of zero:
 \begin{equation}
 C\left(w_{t-n+1}, \dots, w_t\right) = 0.
 \end{equation}
 
-Under Maximum Likelihood Estimation, if a specific bigram $(w_{t-1}, w_t)$ was never seen during training, its assigned probability is identically zero:
+Under Maximum Likelihood Estimation, if a specific bigram $(w_{t-1}, w_t)$ was never seen during training, its assigned conditional probability is identically zero:
 \begin{equation}
 P_{\text{MLE}}\left(w_t \mid w_{t-1}\right) = \frac{0}{C\left(w_{t-1}\right)} = 0.
 \end{equation}
@@ -329,209 +329,78 @@ This leads directly to the \textit{zero-frequency collapse}: when evaluating a c
 \begin{equation}
 P(W) = \prod_{t=1}^T P\left(w_t \mid w_{t-1}\right) = 0.
 \end{equation}
-In log-space, $\log P(W) = \log 0 = -\infty$. Consequently, a model that encounters a single unobserved word combination declares the entire sequence impossible, causing evaluation metrics such as cross-entropy and perplexity to explode to infinity.
+In log-space, $\log P(W) = \log 0 = -\infty$. Consequently, a statistical model that encounters a single unobserved word combination declares the entire sequence impossible, regardless of how fluent or probable the remaining tokens are.
 
-\subsection{Smoothing and discounting techniques}
-\label{subsec:smoothing_discounting}
+\subsection{Context horizon truncation and the loss of long-range dependencies}
+\label{subsec:context_truncation}
 
-To prevent probability collapse, statistical NLP developed \textit{smoothing} (or discounting) algorithms. Smoothing techniques shave off a small fraction of probability mass from frequently observed events and reallocate it to unobserved events, ensuring that $P(w_t \mid w_{t-1}) > 0$ for all possible token combinations.
+The second structural limitation arises from the Markov assumption itself. By conditioning the prediction of $w_t$ strictly on the previous $n-1$ tokens:
+\begin{equation}
+P(w_t \mid w_1, \dots, w_{t-1}) \approx P(w_t \mid w_{t-n+1}, \dots, w_{t-1}),
+\end{equation}
+the model discards all contextual information residing beyond this immediate historical window. In natural language, however, syntactic agreement and semantic coherence frequently span dozens or hundreds of tokens. 
 
-\subsubsection{Laplace and additive smoothing}
-The simplest smoothing formulation is \textit{Laplace (Add-1) smoothing}, which artificially increments the count of every possible $n$-gram by 1:
+Consider long-range subject-verb agreement across intervening subordinate clauses:
+\begin{center}
+\textit{``The \textbf{teacher} who guided the students across several challenging semesters \textbf{was} recognized.''}
+\end{center}
+Under a bigram or trigram model ($n \le 3$), when predicting the auxiliary verb, the conditioning context consists exclusively of the preceding tokens \textit{``challenging semesters''}. Because \textit{``semesters''} is plural, an $n$-gram model assigns high probability to the plural auxiliary \textit{``were''}, completely blind to the singular subject \textit{``teacher''} introduced nine tokens earlier.
+
+Furthermore, discourse-level narrative and topic consistency operate over long time horizons. Human communication requires persistent thematic memory: statements made several paragraphs prior constrain the interpretation of pronouns, references, and stylistic choices. Because scaling $n$ beyond 4 or 5 is computationally intractable due to exponential parameter explosion, $n$-gram models cannot maintain long-term narrative coherence.
+
+\subsection{Lack of semantic generalization and orthogonal representations}
+\label{subsec:lack_of_semantics}
+
+The third fundamental limitation is the complete absence of semantic generalization. In statistical contingency tables, words are represented as atomic, discrete symbolic entities. Mathematically, this corresponds to representing each vocabulary item $w_i$ as a discrete one-hot standard basis vector $\mathbf{e}_i \in \{0, 1\}^{|\mathcal{V}|}$. In this discrete representation space, any pair of distinct words $w_i$ and $w_j$ ($i \neq j$) is strictly orthogonal:
+\begin{equation}
+\mathbf{e}_i^\top \mathbf{e}_j = 0, \quad \|\mathbf{e}_i - \mathbf{e}_j\|_2 = \sqrt{2}.
+\end{equation}
+
+Every word is equidistant and geometrically independent of every other word. Consequently, the model possesses no intrinsic notion of lexical similarity or semantic relatedness:
+\begin{enumerate}
+    \item \textbf{Failure to transfer knowledge across synonyms}: Suppose the training corpus contains multiple instances of the sentence \textit{``The cat chased the mouse''}. The model learns high transition probabilities for $P(\text{chased} \mid \text{cat})$ and $P(\text{mouse} \mid \text{chased})$. If the model is subsequently tasked with evaluating the semantically identical sentence \textit{``The feline pursued the rodent''}, it treats the words \textit{``feline''}, \textit{``pursued''}, and \textit{``rodent''} as entirely novel, unrelated symbols. It cannot transfer the statistical knowledge acquired from \textit{``cat''} to its near-synonym \textit{``feline''}.
+    \item \textbf{Polysemy neglect}: Discrete tables assign a single conditional probability distribution to each lexical token, conflating distinct word senses. A polysemous word such as \textit{``bank''} (denoting either a financial institution or a riverbank) is treated as a single uniform entry. The model cannot adapt the internal representation of the word based on the semantic domain established by the surrounding discourse.
+\end{enumerate}
+
+Because each lexical entry occupies an isolated, independent row in the transition matrix, statistical $n$-gram models exhibit zero parameter sharing across semantically related contexts.
+
+\subsection{Mitigating zero frequencies: the smoothing mechanism}
+\label{subsec:smoothing_mitigation}
+
+To prevent the catastrophic zero-frequency collapse caused by unobserved $n$-grams, statistical natural language processing introduced \textit{smoothing} mechanisms. 
+
+\textit{The general intuition of smoothing.} The core principle of smoothing is probability mass reallocation: the model shaves off a small portion of probability mass from frequently observed events and redistributes this reserved mass to unobserved events. By ensuring that every valid vocabulary token receives a strictly positive probability ($P(w_t \mid w_{t-1}) > 0$), smoothing guarantees that candidate sentences never collapse to zero probability when evaluated on unseen text.
+
+\textit{Basic implementation: Laplace (Add-1) smoothing.} The most fundamental and intuitive implementation of smoothing is \textit{Laplace smoothing} (also known as Add-1 smoothing). The algorithm modifies the Maximum Likelihood Estimation formula by artificially incrementing the observed count of every possible $n$-gram by 1. For a bigram model, the smoothed conditional probability is defined as:
 \begin{equation}
 P_{\text{Laplace}}\left(w_t \mid w_{t-1}\right) = \frac{C\left(w_{t-1}, w_t\right) + 1}{\sum_{w \in \mathcal{V}} \left(C(w_{t-1}, w) + 1\right)} = \frac{C\left(w_{t-1}, w_t\right) + 1}{C\left(w_{t-1}\right) + |\mathcal{V}|}.
 \label{eq:laplace_smoothing}
 \end{equation}
-A generalized variant, \textit{additive ($\alpha$) smoothing} (or Lidstone smoothing), adds a fractional pseudo-count $0 < \alpha < 1$:
-\begin{equation}
-P_{\alpha}\left(w_t \mid w_{t-1}\right) = \frac{C\left(w_{t-1}, w_t\right) + \alpha}{C\left(w_{t-1}\right) + \alpha |\mathcal{V}|}.
-\label{eq:lidstone_smoothing}
-\end{equation}
 
-\textit{Analytical critique of Laplace smoothing.} While Laplace smoothing guarantees that no probability evaluates to zero, it distorts probability distributions disastrously when vocabulary size $|\mathcal{V}|$ is large. Suppose $|\mathcal{V}| = 50{,}000$ and an observed word appears with unigram count $C(w_{t-1}) = 100$. The denominator in Equation~\eqref{eq:laplace_smoothing} increases from $100$ to $100 + 50{,}000 = 50{,}100$. Consequently, an observed bigram that appeared 5 times has its estimated probability reduced from $5/100 = 0.05$ to $6/50{,}100 \approx 0.00012$, attenuating genuine empirical evidence by over $99\%$. Laplace smoothing steals far too much probability mass from observed events and scatters it indiscriminately across billions of unobserved combinations.
-
-\subsubsection{Good-Turing discounting}
-To establish a more principled redistribution of probability mass, the \textit{Good-Turing estimator} \citep{good1953} utilizes the frequency of other frequencies. Let $N_r$ denote the number of distinct $n$-grams that were observed exactly $r$ times in the training corpus. Good-Turing re-estimates the effective count $r^*$ for an $n$-gram observed $r$ times as:
+By adding $1$ to the numerator, any unobserved bigram ($C(w_{t-1}, w_t) = 0$) receives a non-zero probability:
 \begin{equation}
-r^* = (r + 1) \frac{N_{r+1}}{N_r}.
-\label{eq:good_turing_count}
+P_{\text{Laplace}}\left(w_t \mid w_{t-1}\right) = \frac{1}{C(w_{t-1}) + |\mathcal{V}|} > 0.
 \end{equation}
-The total probability mass reserved for all unseen events ($r = 0$) is governed by the proportion of singleton $n$-grams (events seen exactly once, $N_1$):
+To preserve the axioms of probability such that the conditional distribution over next tokens sums to 1:
 \begin{equation}
-P_{\text{GT}}\left(\text{unseen}\right) = \frac{N_1}{N},
-\label{eq:good_turing_unseen}
+\sum_{w_t \in \mathcal{V}} P_{\text{Laplace}}\left(w_t \mid w_{t-1}\right) = \sum_{w_t \in \mathcal{V}} \frac{C\left(w_{t-1}, w_t\right) + 1}{C\left(w_{t-1}\right) + |\mathcal{V}|} = \frac{C(w_{t-1}) + |\mathcal{V}|}{C(w_{t-1}) + |\mathcal{V}|} = 1.0,
 \end{equation}
-where $N = \sum_{r=1}^\infty r N_r$ is the total token count of the corpus. Good-Turing grounds probability estimation in empirical discovery rates: the likelihood of encountering an unobserved token is proportional to the number of tokens observed only once.
+the denominator must be incremented by the vocabulary size $|\mathcal{V}|$.
 
-\subsubsection{Backoff and linear interpolation}
-When higher-order $n$-gram counts are scarce, models can borrow statistical strength from lower-order distributions. Two primary strategies exist:
+\textit{Limitations of basic smoothing.} While Laplace smoothing mathematically resolves the zero-frequency collapse, it introduces a severe structural distortion when applied to realistic vocabularies. Suppose $|\mathcal{V}| = 50{,}000$ and an observed context word appears $C(w_{t-1}) = 100$ times. The denominator in Equation~\eqref{eq:laplace_smoothing} increases from $100$ to $100 + 50{,}000 = 50{,}100$. An observed bigram that appeared 5 times in the corpus has its estimated probability suppressed from $5/100 = 0.05$ to $6/50{,}100 \approx 0.00012$, attenuating empirical evidence by over $99\%$. Laplace smoothing steals excessive probability mass from genuine linguistic patterns and diffuses it across thousands of unobserved, syntactically invalid combinations.
+
+\subsection{The architectural transition to continuous neural representations}
+\label{subsec:bridge_to_neural}
+
+The limitations examined in this section demonstrate that smoothing merely patches zero-frequency counts without addressing the root cause of the failure. Statistical $n$-gram models remain fundamentally constrained by:
 \begin{enumerate}
-    \item \textbf{Jelinek-Mercer linear interpolation}: Computes a convex linear combination of trigram, bigram, and unigram probabilities:
-    \begin{equation}
-    P_{\text{interp}}\left(w_t \mid w_{t-2}, w_{t-1}\right) = \lambda_3 P_{\text{MLE}}\left(w_t \mid w_{t-2}, w_{t-1}\right) + \lambda_2 P_{\text{MLE}}\left(w_t \mid w_{t-1}\right) + \lambda_1 P_{\text{MLE}}\left(w_t\right),
-    \label{eq:jelinek_mercer}
-    \end{equation}
-    where interpolation coefficients satisfy $\sum_{i=1}^3 \lambda_i = 1$ and $\lambda_i > 0$.
-    \item \textbf{Katz backoff}: Prioritizes the highest-order model whenever empirical counts exceed zero, backing off to discounted lower-order estimates only when the higher-order count is zero \citep{katz1987}:
-    \begin{equation}
-    P_{\text{Katz}}\left(w_t \mid w_{t-n+1}^{t-1}\right) = \begin{cases}
-    P^*\left(w_t \mid w_{t-n+1}^{t-1}\right) & \text{if } C\left(w_{t-n+1}^t\right) > 0, \\
-    \alpha\left(w_{t-n+1}^{t-1}\right) P_{\text{Katz}}\left(w_t \mid w_{t-n+2}^{t-1}\right) & \text{if } C\left(w_{t-n+1}^t\right) = 0,
-    \end{cases}
-    \label{eq:katz_backoff}
-    \end{equation}
-    where $P^*$ denotes discounted probabilities and $\alpha(\cdot)$ is a normalization factor that ensures probabilities sum to 1.
+    \item Exponential parameter growth $\mathcal{O}(|\mathcal{V}|^n)$, which enforces severely truncated context horizons ($n \le 3$).
+    \item Discrete symbolic representations, which prevent parameter sharing across synonymous or semantically related words.
 \end{enumerate}
 
-\subsubsection{Kneser-Ney smoothing and continuation probabilities}
-The gold standard statistical smoothing algorithm is \textit{Modified Kneser-Ney smoothing} \citep{kneser1995}. Kneser-Ney recognizes a critical flaw in standard backoff: lower-order unigram frequency $P(w)$ does not reflect the likelihood of a word completing an unfamiliar context.
+Furthermore, while quantitative evaluation metrics such as Perplexity and Cross-Entropy are essential for benchmarking language models systematically (and are analyzed comprehensively in Chapter~\ref{ch:evaluation_benchmarks}), no mathematical metric can overcome the intrinsic capacity ceiling of tabular $n$-grams.
 
-Consider the proper noun \texttt{"Francisco"}. In a general news corpus, \texttt{"Francisco"} has a relatively high unigram count $C(\texttt{"Francisco"})$ because it occurs frequently in the bigram \texttt{"San Francisco"}. Under standard Jelinek-Mercer interpolation, if the model evaluates an unfamiliar prefix such as \textit{``I want to eat a [\quad]''}, the high unigram count of \texttt{"Francisco"} would cause the model to assign it substantial probability. However, in human language, \texttt{"Francisco"} almost never appears unless preceded by \texttt{"San"}.
-
-Kneser-Ney resolves this by replacing raw unigram frequency with \textit{continuation probability}, $P_{\text{cont}}(w)$, which measures how versatile a word is across diverse antecedents:
-\begin{equation}
-P_{\text{cont}}(w) = \frac{\left| \left\{ w': C(w', w) > 0 \right\} \right|}{\sum_{w'' \in \mathcal{V}} \left| \left\{ w': C(w', w'') > 0 \right\} \right|}.
-\label{eq:continuation_probability}
-\end{equation}
-Because \texttt{"Francisco"} appears almost exclusively after the single predecessor \texttt{"San"}, its continuation count is 1, resulting in a tiny continuation probability $P_{\text{cont}}(\texttt{"Francisco"})$. Conversely, words like \texttt{"apple"} or \texttt{"book"} follow hundreds of distinct words, receiving high continuation probabilities and correctly dominating lower-order backoff distributions.
-
-\subsection{Intrinsic evaluation metrics: cross-entropy and perplexity}
-\label{subsec:eval_metrics_ppl}
-
-To benchmark and compare different language models quantitatively without executing costly downstream applications, natural language processing relies on intrinsic, information-theoretic metrics: \textit{Cross-Entropy} and \textit{Perplexity} \citep{shannon1948,jurafsky2024}.
-
-\subsubsection{Information-theoretic foundations: entropy and KL divergence}
-Let $\mathcal{X}$ denote a discrete sample space (the vocabulary $\mathcal{V}$), and let $P(x)$ represent the true, underlying, but inaccessible probability distribution of human language.
-
-\begin{definition}{Shannon entropy}{shannon_entropy}
-The \emph{Shannon entropy} $H(P)$ measures the fundamental, irreducible uncertainty or average information content inherent in distribution $P$ \citep{shannon1948}:
-\begin{equation}
-H(P) = - \sum_{x \in \mathcal{X}} P(x) \log_2 P(x) = \mathbb{E}_{x \sim P}\left[ \log_2 \frac{1}{P(x)} \right].
-\label{eq:shannon_entropy}
-\end{equation}
-By Shannon's source coding theorem, $H(P)$ represents the absolute theoretical lower bound on the expected number of bits required to encode a symbol emitted by $P$ without loss.
-\end{definition}
-
-When constructing a language model, we approximate the true distribution $P$ with an estimated parameterized distribution $Q_\theta$. To quantify the statistical discrepancy between the true distribution $P$ and our approximating model $Q_\theta$, we employ the \textit{Kullback-Leibler (KL) divergence}.
-
-\begin{definition}{Kullback-Leibler (KL) divergence}{kl_divergence}
-The \emph{KL divergence} (or relative entropy) from model distribution $Q$ to target distribution $P$ is:
-\begin{equation}
-D_{\text{KL}}(P \parallel Q) = \sum_{x \in \mathcal{X}} P(x) \log_2 \left( \frac{P(x)}{Q(x)} \right) = \mathbb{E}_{x \sim P}\left[ \log_2 \frac{P(x)}{Q(x)} \right].
-\label{eq:kl_divergence}
-\end{equation}
-\end{definition}
-
-\begin{theorem}{Gibbs' inequality}{gibbs_inequality}
-For any two discrete probability distributions $P$ and $Q$, the KL divergence is non-negative:
-\begin{equation}
-D_{\text{KL}}(P \parallel Q) \ge 0,
-\label{eq:gibbs_ineq}
-\end{equation}
-with equality $D_{\text{KL}}(P \parallel Q) = 0$ if and only if $P(x) = Q(x)$ for all $x \in \mathcal{X}$.
-\end{theorem}
-
-\textit{Proof.} Expressing the divergence via the natural logarithm and utilizing the standard inequality $\ln(u) \le u - 1$ for all $u > 0$ (with equality if and only if $u = 1$):
-\begin{align}
-- D_{\text{KL}}(P \parallel Q) &= \sum_{x \in \mathcal{X}} P(x) \log_2 \left( \frac{Q(x)}{P(x)} \right) = \frac{1}{\ln 2} \sum_{x \in \mathcal{X}} P(x) \ln \left( \frac{Q(x)}{P(x)} \right) \notag \\
-&\le \frac{1}{\ln 2} \sum_{x \in \mathcal{X}} P(x) \left( \frac{Q(x)}{P(x)} - 1 \right) \notag \\
-&= \frac{1}{\ln 2} \left( \sum_{x \in \mathcal{X}} Q(x) - \sum_{x \in \mathcal{X}} P(x) \right) = \frac{1}{\ln 2} (1 - 1) = 0.
-\end{align}
-Multiplying both sides by $-1$ reverses the inequality, yielding $D_{\text{KL}}(P \parallel Q) \ge 0$.
-
-\subsubsection{Cross-entropy decomposition and empirical sequence loss}
-Expanding the logarithm in the definition of KL divergence demonstrates the fundamental relationship connecting Entropy, KL Divergence, and Cross-Entropy:
-\begin{align}
-D_{\text{KL}}(P \parallel Q) &= \sum_{x \in \mathcal{X}} P(x) \log_2 P(x) - \sum_{x \in \mathcal{X}} P(x) \log_2 Q(x) \notag \\
-&= - H(P) + \left( - \sum_{x \in \mathcal{X}} P(x) \log_2 Q(x) \right).
-\end{align}
-Rearranging terms defines the \textit{Cross-Entropy} $H(P, Q)$:
-\begin{equation}
-H(P, Q) \triangleq - \sum_{x \in \mathcal{X}} P(x) \log_2 Q(x) = H(P) + D_{\text{KL}}(P \parallel Q).
-\label{eq:cross_entropy_decomp}
-\end{equation}
-
-Equation~\eqref{eq:cross_entropy_decomp} provides the theoretical justification for cross-entropy minimization during training. Because the true language distribution $P$ is determined by human linguistic behavior, its entropy $H(P)$ is an invariant physical constant. When minimizing cross-entropy with respect to model parameters $\theta$:
-\begin{equation}
-\arg\min_\theta H\left(P, Q_\theta\right) = \arg\min_\theta \left( H(P) + D_{\text{KL}}(P \parallel Q_\theta) \right) = \arg\min_\theta D_{\text{KL}}(P \parallel Q_\theta).
-\end{equation}
-Minimizing cross-entropy is mathematically identical to driving the KL divergence between model $Q_\theta$ and the true language distribution $P$ to zero.
-
-Because we do not have closed-form access to the true distribution $P(x)$, the expected value is estimated empirically by sampling a long test sequence $W = (w_1, w_2, \dots, w_T) \sim P$:
-\begin{equation}
-\mathcal{H}(W) = - \frac{1}{T} \log_2 Q\left(w_1, w_2, \dots, w_T\right) = - \frac{1}{T} \sum_{t=1}^T \log_2 Q\left(w_t \mid w_{<t}\right).
-\label{eq:empirical_cross_entropy}
-\end{equation}
-Empirical cross-entropy measures the average number of bits required to compress each token of test text using model $Q$.
-
-\subsubsection{Perplexity as an intrinsic evaluation metric}
-While cross-entropy evaluates performance on a logarithmic scale, researchers and practitioners report \textit{Perplexity} ($\text{PPL}$), defined as the exponentiated cross-entropy loss:
-\begin{align}
-\text{PPL}(W) &= 2^{\mathcal{H}(W)} = 2^{-\frac{1}{T} \sum_{t=1}^T \log_2 Q\left(w_t \mid w_{<t}\right)} \label{eq:ppl_base2} \\
-&= \left( \prod_{t=1}^T \frac{1}{Q\left(w_t \mid w_{<t}\right)} \right)^{\frac{1}{T}}. \label{eq:ppl_geometric}
-\end{align}
-Perplexity represents the reciprocal geometric mean of the token probabilities assigned by the model across the test corpus.
-
-\begin{theorem}{Perplexity of a uniform $K$-ary distribution}{ppl_branching_proof}
-Let a language model $Q$ predict next tokens such that at each timestep $t$, the probability mass is distributed uniformly across exactly $K$ equally likely candidate tokens ($Q(w_t \mid w_{<t}) = \frac{1}{K}$ for each candidate). Then the perplexity on any generated sequence $W$ of length $T$ is identically $K$:
-\begin{equation}
-\text{PPL}(W) = K.
-\label{eq:ppl_equals_k}
-\end{equation}
-\end{theorem}
-
-\textit{Proof.} Substituting the uniform prediction probability $Q(w_t \mid w_{<t}) = \frac{1}{K}$ into the empirical cross-entropy formula yields:
-\begin{align}
-\mathcal{H}(W) &= - \frac{1}{T} \sum_{t=1}^T \log_2 \left( \frac{1}{K} \right) = - \frac{1}{T} \sum_{t=1}^T \left( - \log_2 K \right) \notag \\
-&= \frac{1}{T} \left( T \log_2 K \right) = \log_2 K.
-\end{align}
-Exponentiating the cross-entropy:
-\begin{equation}
-\text{PPL}(W) = 2^{\mathcal{H}(W)} = 2^{\log_2 K} = K.
-\end{equation}
-
-Theorem~\ref{thm:ppl_branching_proof} establishes the physical interpretation of perplexity: it quantifies the \textit{effective branching factor} of a language model. When a model evaluates a text corpus and achieves $\text{PPL} = 42$, this indicates that, on average, the model's predictive uncertainty at each token is mathematically equivalent to choosing uniformly at random from a shortlist of $42$ equally plausible words. A uniform random guesser across vocabulary $\mathcal{V}$ achieves $\text{PPL} = |\mathcal{V}|$ (for example, $\text{PPL} = 50{,}000$), while an optimal oracle that predicts every token with probability $1.0$ achieves the theoretical lower bound $\text{PPL} = 1.0$.
-
-\subsubsection{Logarithmic base conversions: bits versus nats}
-A practical mathematical distinction arises when connecting information-theoretic formulations (which employ base-$2$ logarithms) with deep learning frameworks such as PyTorch (which compute natural base-$e$ cross-entropy loss):
-\begin{center}
-\small
-\begin{tabularx}{\linewidth}{l X X}
-\toprule
-\textbf{Property} & \textbf{Information Theory (Bits)} & \textbf{Deep Learning / PyTorch (Nats)} \\
-\midrule
-Loss Formula & $\mathcal{H}_2 = -\frac{1}{T} \sum \log_2 Q(w_t \mid w_{<t})$ & $\mathcal{L}_{\text{CE}} = -\frac{1}{T} \sum \ln Q(w_t \mid w_{<t})$ \\
-Unit & Bits per token & Nats per token \\
-Perplexity Formula & $\text{PPL} = 2^{\mathcal{H}_2}$ & $\text{PPL} = \exp(\mathcal{L}_{\text{CE}}) = e^{\mathcal{L}_{\text{CE}}}$ \\
-Conversion Identity & \multicolumn{2}{c}{$\mathcal{H}_2 = \frac{\mathcal{L}_{\text{CE}}}{\ln 2} \approx \frac{\mathcal{L}_{\text{CE}}}{0.693147}, \quad \mathcal{L}_{\text{CE}} = \mathcal{H}_2 \cdot \ln 2 \approx 0.693147 \cdot \mathcal{H}_2$} \\
-\bottomrule
-\end{tabularx}
-\end{center}
-
-To observe the effect of this conversion, suppose a neural model trained on code completion reports an evaluation loss of $\mathcal{L}_{\text{CE}} = 2.7726$ nats. Computing base-$e$ perplexity directly yields:
-\begin{equation}
-\text{PPL} = e^{2.7726} = \exp(2.7726) \approx 16.00.
-\end{equation}
-Converting the loss to information bits produces:
-\begin{equation}
-\mathcal{H}_2 = \frac{2.7726}{\ln 2} = \frac{2.7726}{0.693147} = 4.00 \text{ bits/token},
-\end{equation}
-which confirms the identical perplexity value: $\text{PPL} = 2^{\mathcal{H}_2} = 2^{4.00} = 16.00$. Inadvertently evaluating $2^{\mathcal{L}_{\text{CE}}} = 2^{2.7726} \approx 6.83$ would severely underestimate the true branching factor by more than $57\%$, highlighting the necessity of matching logarithmic bases.
-
-\subsection{The structural ceiling and the bridge to continuous word embeddings}
-\label{subsec:structural_ceiling_bridge}
-
-While advanced smoothing techniques such as Modified Kneser-Ney eliminate zero-frequency collapses and reduce empirical perplexity, statistical $n$-gram models remain trapped behind two insurmountable theoretical barriers:
-\begin{enumerate}
-    \item \textbf{Context horizon truncation}: The $(n-1)$-th order Markov assumption discards all context residing beyond $n-1$ tokens. Increasing $n \ge 5$ yields rapidly diminishing returns because higher-order frequency tables become almost entirely empty, forcing the model to constantly back off to lower orders. Consequently, statistical $n$-gram models cannot maintain long-range syntactic agreement (e.g. subject-verb agreement across intervening subordinate clauses) or preserve document-level topic coherence.
-    \item \textbf{Discrete orthogonal representations and zero parameter sharing}: In statistical counting tables, words are represented as atomic, discrete symbolic indices. In vector space, this corresponds to treating words as standard basis vectors (one-hot vectors) in $\mathbb{R}^{|\mathcal{V}|}$:
-    \begin{equation}
-    \mathbf{e}_i^\top \mathbf{e}_j = 0, \quad \|\mathbf{e}_i - \mathbf{e}_j\|_2 = \sqrt{2}, \quad \forall i \neq j.
-    \end{equation}
-    Every word is geometrically orthogonal and equidistant to every other word. The model possesses no intrinsic notion of semantic similarity. Observing the training phrase \textit{``The cat chased the mouse''} provides strictly zero statistical evidence to assist the model when evaluating the semantically identical sentence \textit{``The feline pursued the rodent''}. Because each lexical entry occupies an isolated, independent row in the transition matrix, the model cannot share statistical parameters between synonyms.
-\end{enumerate}
-
-Smoothing techniques merely patch zero-frequency counts; they do not solve the fundamental lack of continuous semantic representation. Overcoming this representational ceiling requires replacing discrete, tabular counting models with continuous, parameterized mathematical functions \citep{bengio2003}. Words must be projected into continuous Euclidean vector spaces $\mathbb{R}^d$ where geometric distance reflects semantic similarity. This profound conceptual leap—transitioning from discrete orthogonal indices to distributed continuous vector representations—forms the subject of Chapter~\ref{ch:word_embeddings}.
+Resolving these fundamental challenges requires a paradigm shift away from discrete, tabular frequency counts toward continuous, parameterized neural networks \citep{bengio2003}. In this modern framework, words are projected into continuous, low-dimensional Euclidean vector spaces $\mathbb{R}^d$ ($d \ll |\mathcal{V}|$), where geometric proximity directly encodes semantic similarity. By framing language modeling as a continuous classification task parameterized by neural architectures, models can simultaneously maintain extended context histories and share statistical strength across related lexical concepts. This foundational transition---from discrete orthogonal indices to continuous distributed representations---is explored in depth in Chapter~\ref{ch:word_embeddings}.
 
 \clearpage\thispagestyle{empty}\null\clearpage
 \end{document}
