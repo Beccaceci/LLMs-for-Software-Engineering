@@ -1,7 +1,7 @@
 \documentclass[../../main.tex]{subfiles}
 \begin{document}
 
-\chapter{The Transformer architecture}
+\chapter{The Transformer Architecture}
 \label{ch:transformer_architecture}
 
 Chapters~\ref{ch:deep_learning_foundations} through~\ref{ch:word_embeddings} developed the foundations of neural representation learning, recurrent sequence transitions, statistical language modeling, and dense vector embeddings. Through these developments, language models acquired the mathematical capacity to represent discrete tokens in continuous semantic vector spaces and to optimize parameterized neural transitions using gradient backpropagation.
@@ -18,7 +18,7 @@ To resolve this impasse, Vaswani et al. introduced the \textbf{Transformer} \cit
 This chapter presents a comprehensive, first-principles analysis of the Transformer architecture. Section~\ref{sec:tokenization_taxonomy_bpe} establishes the foundations of tokenization, comparing character-, word-, and subword-level granularities, deriving the Byte Pair Encoding (BPE) algorithm with empirical Zipfian compression dynamics, and detailing operational special tokens. Section~\ref{sec:positional_representations_taxonomy} examines positional representations, formalizing the permutation equivariance of self-attention, developing sinusoidal and learned absolute positional encodings, and formulating Shaw et al.'s relative positional representations. Section~\ref{sec:attention_mechanism_primitive} derives the Attention primitive from classical dictionary lookup to continuous scaled dot-product attention, complete with geometric projections, variance scaling proofs, and an exact numerical walkthrough. Section~\ref{sec:attention_types_architectures} analyzes the three fundamental attention types: bidirectional encoder self-attention, causal masked decoder self-attention, and cross-attention. Finally, Section~\ref{sec:transformer_core_blocks_journey} dissects Multi-Head Attention, Feed-Forward Networks, Residual Connections, and Layer Normalization, culminating in an end-to-end translation journey tracing tokens through the full architecture.
 
 \clearpage
-\section{Tokenization: granularities, BPE mechanics, and special tokens}
+\section{Tokenization and Subword Algorithms}
 \label{sec:tokenization_taxonomy_bpe}
 
 \subsection{Why tokenization is mandatory}
@@ -345,7 +345,7 @@ In addition to linguistic subwords, neural sequence models require explicit stru
 \end{enumerate}
 
 \clearpage
-\section{Positional representations: from permutation equivariance to relative encodings}
+\section{Positional Encodings}
 \label{sec:positional_representations_taxonomy}
 
 \subsection{Motivation: permutation equivariance of self-attention}
@@ -624,7 +624,7 @@ As emphasized in Slide 79, relative positional embeddings are mathematically nat
 Consequently, cross-attention must rely on absolute representations or content-based addressing, whereas self-attention can deploy relative representations effectively.
 
 \clearpage
-\section{The Attention mechanism: from dictionary lookups to scaled dot products}
+\section{The Attention Mechanism}
 \label{sec:attention_mechanism_primitive}
 
 \subsection{Motivation: dynamic context routing vs. static aggregation}
@@ -1078,7 +1078,7 @@ Evaluating all three rows simultaneously via matrix multiplication $\mO = \mA \m
 This reproduces the exact tensor calculations displayed in the lecture slides.
 
 \clearpage
-\section{Attention types across architectures: self-attention, masked attention, and cross-attention}
+\section{Attention Variants: Self, Masked, and Cross}
 \label{sec:attention_types_architectures}
 
 \subsection{Architectural motivation for diverse attention types}
@@ -1277,7 +1277,7 @@ When the decoder is positioned at token 2 (\texttt{"chat"}), its query vector $\
 Applying softmax allocates over 99\% of the attention weight to the source key $\vk_{\text{cat}}$. Cross-attention dynamically extracts the value payload $\vv_{\text{cat}}$, allowing the decoder to generate \texttt{"chat"} conditioned directly on the source noun.
 
 \clearpage
-\section{Transformer core blocks and end-to-end processing journey}
+\section{Transformer Blocks and Information Flow}
 \label{sec:transformer_core_blocks_journey}
 
 \subsection{Multi-Head Attention (MHA)}

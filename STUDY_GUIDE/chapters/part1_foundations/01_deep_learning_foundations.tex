@@ -2,7 +2,7 @@
 
 \begin{document}
 
-\chapter{Foundations of deep learning}
+\chapter{Deep Learning Foundations}
 \label{ch:deep_learning_foundations}
 
 The fundamental challenge of artificial intelligence resides in discovering computational mechanisms capable of mapping high-dimensional, unstructured sensory and symbolic observations into structured semantic representations. Classical machine learning systems approached this objective by decoupling feature engineering from statistical inference: domain experts manually designed deterministic transformation pipelines to extract handcrafted numerical descriptors, which were subsequently supplied to shallow linear classifiers or regression models. While computationally tractable in controlled environments, this paradigm proved fragile when confronted with the continuous variability, high dimensionality, and compositional complexity of natural language and perceptual signals.
@@ -12,7 +12,7 @@ Deep learning fundamentally alters this architectural philosophy by adopting a c
 This chapter establishes the theoretical, geometric, and algorithmic foundations of deep feed-forward architectures. We trace the lineage of neural computation from early biological abstractions and the single-layer perceptron, formalize the geometric barriers imposed by linear decision boundaries, derive the space-folding mechanics of non-linear activation functions, establish the statistical grounding of task-specific loss functions under maximum likelihood estimation, and formulate reverse-mode automatic differentiation on computational graphs as the universal optimization engine for deep learning.
 
 \clearpage
-\section{Historical context and theoretical motivation}
+\section{Historical Context and Theoretical Origins}
 \label{sec:dl_historical_motivation}
 
 Understanding the structural necessity of deep neural networks requires examining why classical algorithmic paradigms and shallow statistical models proved insufficient for complex perceptual and linguistic tasks. The progression from symbolic reasoning to modern representation learning illustrates how computational and geometric constraints shaped modern neural architectures.
@@ -83,7 +83,7 @@ N_{\text{parameters}} = \mathcal{O}\left( L \cdot K^2 \right).
 This exponential disparity in expressive efficiency provides the fundamental mathematical justification for deep architectures: deep composition generates exponentially complex, multi-scale decision boundaries using a polynomial parameter budget, enabling neural networks to model intricate manifold topologies that remain inaccessible to shallow models.
 
 \clearpage
-\section{The perceptron and the linear inseparability barrier}
+\section{The Perceptron and Linear Separability}
 \label{sec:perceptron_linear_barrier}
 
 The conceptual building block of modern neural architectures is the artificial perceptron. To understand why modern deep architectures are structured as hierarchical non-linear networks, one must first analyze the computational properties and geometric limitations of this foundational linear operator.
@@ -294,7 +294,7 @@ Conversely, summing inequalities~(\ref{eq:xor_ineq1}) and (\ref{eq:xor_ineq4}) p
 Inequality~(\ref{eq:xor_sum_pos}) and Inequality~(\ref{eq:xor_sum_neg}) are mutually contradictory: the scalar quantity $w_1 + w_2 + 2b$ cannot simultaneously be strictly positive and non-positive ($0 < w_1 + w_2 + 2b \le 0$). Hence, no parameters $\{w_1, w_2, b\}$ exist that solve the system. Because the input points alternate diagonally across the vertices of the unit square, the dataset is linearly inseparable, establishing an insurmountable barrier for purely linear units.
 
 \clearpage
-\section{Non-linearity and activation functions}
+\section{Activation Functions and Non-Linearity}
 \label{sec:non_linearity_activations}
 
 To overcome the linear stacking collapse and solve non-linearly separable problems such as XOR, neural networks must interleave affine transformations with point-wise non-linear mapping functions. These mappings, termed activation functions, provide the mathematical mechanism that enables multi-layer networks to approximate arbitrary functional relationships.
@@ -585,7 +585,7 @@ Combining both cases using the Kronecker delta $\delta_{ik}$ yields the compact 
 In practical implementations, numerical stability is guaranteed by choosing $c = -\max_k z_k$. The largest exponentiated term evaluates to $e^0 = 1.0$, which prevents overflow while ensuring the denominator contains at least one non-vanishing term.
 
 \clearpage
-\section{Loss functions and optimization dynamics}
+\section{Loss Functions and Optimization}
 \label{sec:loss_functions_optimization}
 
 To train a parameterized neural network, one must define a scalar criterion that quantifies the discrepancy between model predictions and empirical ground truth. This objective, termed the loss function, provides the supervisory signal that guides parameter optimization.
@@ -788,7 +788,7 @@ The parameter update is then evaluated coordinate-wise:
 where $\epsilon \approx 10^{-8}$ prevents division by zero. Adam dynamically rescales updates: parameters with large historical variance receive smaller, dampened steps, while parameters with sparse, small gradients receive amplified steps, ensuring robust optimization dynamics across diverse neural layers.
 
 \clearpage
-\section{Computational graphs, backpropagation, and the feed-forward network}
+\section{Computational Graphs and Backpropagation}
 \label{sec:computational_graphs_ffn}
 
 To execute gradient-based optimization algorithms such as Adam, the learning system must compute the partial derivatives of the scalar loss function with respect to every parameter in the network ($\nabla_\theta \mathcal{L}$). This section establishes the graph-theoretic formalism of computational graphs, derives the reverse-mode automatic differentiation algorithm, and synthesizes these mechanisms into a complete multi-layer feed-forward network.

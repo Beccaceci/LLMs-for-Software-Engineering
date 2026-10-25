@@ -2,7 +2,7 @@
 
 \begin{document}
 
-\chapter{Distributed word representations and Word2Vec}
+\chapter{Word Embeddings and Word2Vec}
 \label{ch:word_embeddings}
 
 The preceding chapters established the computational foundations of deep learning, sequence modeling through recurrent state transitions, and the probabilistic principles of language models. However, deploying neural architectures on natural language requires resolving a fundamental representation problem: mapping discrete symbolic tokens into continuous numerical inputs on which gradient backpropagation can operate.
@@ -12,7 +12,7 @@ Tokens in written language and source code are discrete, categorical symbols. As
 This chapter systematically analyzes the theoretical, algorithmic, and geometric foundations of continuous word representations. We begin by examining why words require continuous vector representations and analyze the baseline one-hot encoding alongside its structural failure modes. We then formulate the Word2Vec framework, examining the Continuous Bag-of-Words (CBOW) and Skip-Gram objectives, the softmax computational bottleneck, and negative sampling approximations. Next, we analyze FastText, which extends word vectors to subword character $n$-grams to eliminate the out-of-vocabulary barrier and capture morphological regularities. Finally, we dissect how language models update embedding matrices through self-supervised training and explore the emergent geometric properties of continuous semantic spaces, including clustering, metric distances, and linear relational analogies.
 
 \clearpage
-\section{The representation problem: why continuous embeddings are mandatory}
+\section{The Word Representation Problem}
 \label{sec:representation_problem}
 
 Natural language and software engineering source code are fundamentally composed of discrete, symbolic tokens. In written English or in source files, programs and sentences present themselves as strings of alphanumeric characters: words such as \texttt{"compiler"}, \texttt{"optimizer"}, \texttt{"gradient"}, and keywords such as \texttt{"class"}, \texttt{"def"}, \texttt{"return"}.
@@ -47,7 +47,7 @@ To understand why dense continuous representations are indispensable, we must fi
 \clearpage
 
 \clearpage
-\section{Local one-hot encodings: intuition, implementation, and limitations}
+\section{One-Hot Encoding and Its Limitations}
 \label{sec:onehot_baseline}
 
 The most straightforward, historical baseline for converting discrete categorical symbols into numeric vectors is \textbf{one-hot encoding}. Under this local representational scheme, every word $w_i \in \vocab$ is mapped to a standard basis coordinate vector $\ve_i$ in a $V$-dimensional Euclidean space $\R^V$:
@@ -293,7 +293,7 @@ Because local one-hot encodings confine words to isolated, orthogonal coordinate
 \clearpage
 
 \clearpage
-\section{Word2Vec: intuition, architectures, and limitations}
+\section{Word2Vec: CBOW and Skip-Gram}
 \label{sec:word2vec_cbow_skipgram}
 
 To overcome the orthogonality and isolation of local representations, modern deep learning adopts \textit{distributed representations}, a concept formalized in connectionist neural networks \citep{rumelhart1986}. In 2013, Mikolov et al.~\citep{mikolov2013efficient,mikolov2013distributed} introduced \textbf{Word2Vec}, a family of computationally efficient log-linear architectures designed to learn continuous word representations from web-scale text corpora. In this section, we examine the distributional hypothesis underlying distributed representations, analyze the Continuous Bag-of-Words (CBOW) and Skip-Gram architectures, derive the negative sampling objective to scale beyond the full softmax bottleneck, and examine the structural limitations of static word vectors.
@@ -948,7 +948,7 @@ While FastText successfully addresses the out-of-vocabulary barrier and morpholo
 \end{enumerate}
 
 \clearpage
-\section{Training dynamics, embedding matrix updates, and emergent semantic geometry}
+\section{Training Dynamics and Semantic Geometry}
 \label{sec:training_dynamics_semantics}
 
 Having formalized the mathematical objectives of continuous word embeddings, we now examine the mechanistic and geometric dynamics of how these representations are acquired during training. Specifically, we investigate how language models update dual embedding matrices via gradient backpropagation, how repeated contextual prediction yields semantic clustering, and how vector spaces spontaneously organize into linear relational geometries.

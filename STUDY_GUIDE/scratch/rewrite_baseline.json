@@ -3,17 +3,17 @@
     {
       "path": "STUDY_GUIDE/chapters/part1_foundations/01_deep_learning_foundations.tex",
       "structure": [
-        "\\chapter{Foundations of deep learning}",
-        "\\section{Historical context and theoretical motivation}",
+        "\\chapter{Deep Learning Foundations}",
+        "\\section{Historical Context and Theoretical Origins}",
         "\\subsection{From symbolic artificial intelligence to connectionism}",
         "\\subsection{The curse of dimensionality and high-dimensional geometry}",
         "\\subsection{The manifold hypothesis and the expressive power of depth}",
-        "\\section{The perceptron and the linear inseparability barrier}",
+        "\\section{The Perceptron and Linear Separability}",
         "\\subsection{The artificial perceptron}",
         "\\subsection{The geometry of decision hyperplanes}",
         "\\subsection{The linear stacking collapse proof}",
         "\\subsection{The XOR linear inseparability barrier}",
-        "\\section{Non-linearity and activation functions}",
+        "\\section{Activation Functions and Non-Linearity}",
         "\\subsection{Coordinate space folding and the resolution of XOR}",
         "\\subsection{The universal approximation theorem}",
         "\\subsection{Taxonomy of activation functions}",
@@ -24,7 +24,7 @@
         "\\subsubsection{Gaussian error linear unit}",
         "\\subsubsection{SwiGLU and gated linear units}",
         "\\subsubsection{The softmax operator}",
-        "\\section{Loss functions and optimization dynamics}",
+        "\\section{Loss Functions and Optimization}",
         "\\subsection{The operational role of loss functions}",
         "\\subsection{Task-conditioned output topologies}",
         "\\subsection{Task-specific loss taxonomy and statistical derivations}",
@@ -37,7 +37,7 @@
         "\\subsubsection{Vanilla gradient descent}",
         "\\subsubsection{Momentum}",
         "\\subsubsection{Adam: Adaptive Moment Estimation}",
-        "\\section{Computational graphs, backpropagation, and the feed-forward network}",
+        "\\section{Computational Graphs and Backpropagation}",
         "\\subsection{Methods of gradient evaluation}",
         "\\subsection{Computational graphs and reverse-mode automatic differentiation}",
         "\\subsection{Worked arithmetic calculation of backpropagation}",
@@ -129,29 +129,35 @@
       "equations": 102,
       "tables": 1,
       "figures": 5,
-      "listings": 0
+      "listings": 0,
+      "counts": {
+        "equations": 102,
+        "tables": 1,
+        "figures": 5,
+        "listings": 0
+      }
     },
     {
       "path": "STUDY_GUIDE/chapters/part1_foundations/02_recurrent_neural_networks.tex",
       "structure": [
-        "\\chapter{Recurrent neural networks}",
-        "\\section{Limitations of feed-forward architectures on sequential data}",
+        "\\chapter{Recurrent Neural Networks}",
+        "\\section{Sequential Data and Feed-Forward Limits}",
         "\\subsection{Fixed dimensionality constraints on inputs and outputs}",
         "\\subsection{Lack of position invariance and weight localization}",
         "\\subsection{The structural requirement for dynamic temporal processing}",
-        "\\section{Recurrent neural networks: intuition, unrolling, and cell mechanics}",
+        "\\section{RNN Architecture and Cell Dynamics}",
         "\\subsection{The recurrent intuition and persistent hidden state}",
         "\\subsection{Time unfolding and unrolled computational graphs}",
         "\\subsection{Internal cell mechanics and state-space transformations}",
-        "\\section{Weight sharing and backpropagation through time}",
+        "\\section{Backpropagation Through Time}",
         "\\subsection{The weight-sharing paradigm and position invariance}",
         "\\subsection{Backpropagation through time (BPTT) formulation}",
         "\\subsection{Empirical training dynamics: the Sherlock Holmes casing benchmark}",
-        "\\section{Pathologies of vanilla RNNs and gated architectures}",
+        "\\section{Gradient Pathologies and Gated Units}",
         "\\subsection{The vanishing and exploding gradient problem}",
         "\\subsection{Long-term dependency decay and computational sequentiality}",
         "\\subsection{Gated recurrent units: LSTM and GRU}",
-        "\\section{Sequence-to-sequence modeling, encoder-decoder architectures, and the information bottleneck}",
+        "\\section{Sequence-to-Sequence and Encoder-Decoder Models}",
         "\\subsection{Limitations of one-to-one sequence mapping}",
         "\\subsection{The encoder-decoder paradigm}",
         "\\subsection{Empirical validation: revised Sherlock Holmes casing}",
@@ -239,13 +245,19 @@
       "equations": 52,
       "tables": 4,
       "figures": 5,
-      "listings": 0
+      "listings": 0,
+      "counts": {
+        "equations": 52,
+        "tables": 4,
+        "figures": 5,
+        "listings": 0
+      }
     },
     {
       "path": "STUDY_GUIDE/chapters/part1_foundations/03_language_models_intro.tex",
       "structure": [
-        "\\chapter{Language models}",
-        "\\section{Introduction to language models and the modeling task}",
+        "\\chapter{Language Modeling Fundamentals}",
+        "\\section{Probabilistic Language Modeling}",
         "\\subsection{Historical motivation: the urge to model natural language}",
         "\\subsection{The language model task: formal probability distribution}",
         "\\subsection{Factoring joint probabilities via the chain rule}",
@@ -254,7 +266,7 @@
         "\\subsection{The worked transition matrix and parameter estimation}",
         "\\subsection{Inference: evaluating sentence likelihood}",
         "\\subsection{Inference: autoregressive text generation and decoding dynamics}",
-        "\\section{Limitations of statistical language models and the path to neural representations}",
+        "\\section{Statistical Limits and the Neural Paradigm}",
         "\\subsection{Combinatorial data sparsity and the zero-frequency collapse}",
         "\\subsection{Context horizon truncation and the loss of long-range dependencies}",
         "\\subsection{Lack of semantic generalization and orthogonal representations}",
@@ -304,14 +316,20 @@
       "equations": 45,
       "tables": 2,
       "figures": 0,
-      "listings": 0
+      "listings": 0,
+      "counts": {
+        "equations": 45,
+        "tables": 2,
+        "figures": 0,
+        "listings": 0
+      }
     },
     {
       "path": "STUDY_GUIDE/chapters/part1_foundations/04_word_embeddings.tex",
       "structure": [
-        "\\chapter{Distributed word representations and Word2Vec}",
-        "\\section{The representation problem: why continuous embeddings are mandatory}",
-        "\\section{Local one-hot encodings: intuition, implementation, and limitations}",
+        "\\chapter{Word Embeddings and Word2Vec}",
+        "\\section{The Word Representation Problem}",
+        "\\section{One-Hot Encoding and Its Limitations}",
         "\\subsection{Algebraic equivalence: one-hot matrix multiplication as embedding lookup}",
         "\\subsubsection{Column-vector orientation (standard basis representation)}  ",
         "\\subsubsection{Row-vector orientation (PyTorch convention)}  ",
@@ -322,7 +340,7 @@
         "\\subsubsection{Zero gradient parameter sharing during backpropagation}",
         "\\subsubsection{Simplex confinement and absence of latent manifolds}",
         "\\subsubsection{Software engineering identifier polymorphism}",
-        "\\section{Word2Vec: intuition, architectures, and limitations}",
+        "\\section{Word2Vec: CBOW and Skip-Gram}",
         "\\subsection{The distributional hypothesis and distributed representations}",
         "\\subsection{Continuous Bag-of-Words (CBOW) architecture}",
         "\\subsubsection{Matrix formulation and tensor plumbing}",
@@ -356,7 +374,7 @@
         "\\subsubsection{Memory bounding via the Fowler-Noll-Vo hash trick}",
         "\\subsection{Connection to modern subword tokenizers: BPE and WordPiece}",
         "\\subsection{Limitations of FastText}",
-        "\\section{Training dynamics, embedding matrix updates, and emergent semantic geometry}",
+        "\\section{Training Dynamics and Semantic Geometry}",
         "\\subsection{How language models update embedding matrices}",
         "\\subsubsection{The 7-step self-supervised optimization cycle}",
         "\\subsubsection{Geometric phase transition of the embedding space}",
@@ -528,13 +546,19 @@
       "equations": 81,
       "tables": 1,
       "figures": 5,
-      "listings": 0
+      "listings": 0,
+      "counts": {
+        "equations": 81,
+        "tables": 1,
+        "figures": 5,
+        "listings": 0
+      }
     },
     {
       "path": "STUDY_GUIDE/chapters/part1_foundations/05_transformer_architecture.tex",
       "structure": [
-        "\\chapter{The Transformer architecture}",
-        "\\section{Tokenization: granularities, BPE mechanics, and special tokens}",
+        "\\chapter{The Transformer Architecture}",
+        "\\section{Tokenization and Subword Algorithms}",
         "\\subsection{Why tokenization is mandatory}",
         "\\subsection{Character-level tokenization}",
         "\\subsubsection{Advantages of character-level tokenization}",
@@ -552,7 +576,7 @@
         "\\subsubsection{Worked walkthrough: the slide example on ``would a woodchuck chuck wood''}",
         "\\subsubsection{Empirical compression dynamics and Zipf's law}",
         "\\subsection{Special tokens in modern language models}",
-        "\\section{Positional representations: from permutation equivariance to relative encodings}",
+        "\\section{Positional Encodings}",
         "\\subsection{Motivation: permutation equivariance of self-attention}",
         "\\subsection{Taxonomy of positional representations}",
         "\\subsection{Absolute positional embeddings}",
@@ -560,7 +584,7 @@
         "\\subsubsection{Learned absolute positional embeddings}",
         "\\subsection{Relative positional embeddings (Shaw et al.)}",
         "\\subsubsection{Asymmetry: why relative embeddings fit self-attention but not cross-attention}",
-        "\\section{The Attention mechanism: from dictionary lookups to scaled dot products}",
+        "\\section{The Attention Mechanism}",
         "\\subsection{Motivation: dynamic context routing vs. static aggregation}",
         "\\subsection{The associative memory progression: dictionary lookup to continuous attention}",
         "\\subsubsection{1. Classical dictionary lookup (discrete hash table)}",
@@ -571,7 +595,7 @@
         "\\subsection{Scaled Dot-Product Attention and theoretical variance derivation}",
         "\\subsubsection{Theoretical derivation: why the $\\frac{1}{\\sqrt{d_k}}$ scaling factor is mandatory}",
         "\\subsection{Complete numerical worked example: reproducing the lecture calculations}",
-        "\\section{Attention types across architectures: self-attention, masked attention, and cross-attention}",
+        "\\section{Attention Variants: Self, Masked, and Cross}",
         "\\subsection{Architectural motivation for diverse attention types}",
         "\\subsection{Bidirectional Encoder Self-Attention}",
         "\\subsubsection{General idea}",
@@ -585,7 +609,7 @@
         "\\subsubsection{General idea}",
         "\\subsubsection{Mathematical formulation and asymmetric dimensions}",
         "\\subsubsection{Concrete worked example: cross-lingual machine translation}",
-        "\\section{Transformer core blocks and end-to-end processing journey}",
+        "\\section{Transformer Blocks and Information Flow}",
         "\\subsection{Multi-Head Attention (MHA)}",
         "\\subsubsection{Motivation: why a single attention head is insufficient}",
         "\\subsubsection{Mathematical formulation}",
@@ -714,12 +738,18 @@
       "equations": 78,
       "tables": 5,
       "figures": 7,
-      "listings": 0
+      "listings": 0,
+      "counts": {
+        "equations": 78,
+        "tables": 5,
+        "figures": 7,
+        "listings": 0
+      }
     },
     {
       "path": "STUDY_GUIDE/chapters/part1_foundations/06_transformer_variants.tex",
       "structure": [
-        "\\chapter{Transformer Architectures and Decoding Strategies}",
+        "\\chapter{Transformer Variants and Decoding}",
         "\\section{Encoder-Decoder Models}",
         "\\subsection{The unified text-to-text framework and T5}",
         "\\subsection{Architectural modifications and pre-training in T5}",
@@ -734,7 +764,7 @@
         "\\subsection{Causal autoregressive formulation and architecture topology}",
         "\\subsection{Architectural streamlining: eliminating encoder and cross-attention}",
         "\\subsection{Convergence on the decoder-only paradigm}",
-        "\\section{Autoregressive Sampling Strategies}",
+        "\\section{Decoding and Sampling Strategies}",
         "\\subsection{The decoding dilemma: maximization versus degeneration}",
         "\\subsection{Deterministic decoding: greedy search and beam search}",
         "\\paragraph{Greedy Decoding}",
@@ -827,31 +857,37 @@
       "equations": 39,
       "tables": 1,
       "figures": 9,
-      "listings": 0
+      "listings": 0,
+      "counts": {
+        "equations": 39,
+        "tables": 1,
+        "figures": 9,
+        "listings": 0
+      }
     },
     {
       "path": "STUDY_GUIDE/chapters/part1_foundations/07_scaling_laws_pretraining.tex",
       "structure": [
-        "\\chapter{Pre-Training, Scaling Laws, and the Evolution of Large Language Models}",
-        "\\section{GPT-1: Generative Pre-Training and Supervised Adaptation}",
+        "\\chapter{Pre-Training, Scaling Laws, and Model Evolution}",
+        "\\section{GPT-1: Generative Pre-Training}",
         "\\subsection{Architectural topology and pre-training setup}",
         "\\subsection{Supervised task adaptation and delimiter token linearization}",
-        "\\section{GPT-2, WebText, and the Empirical Foundation of Scaling Laws}",
+        "\\section{GPT-2 and Empirical Scaling Laws}",
         "\\subsection{Architectural stabilization, model scaling, and WebText curation}",
         "\\subsection{Emergent zero-shot multi-task generalization and staged release}",
         "\\subsection{The breakthrough of empirical scaling laws (Kaplan et al., 2020)}",
-        "\\section{GPT-3: In-Context Learning Dynamics and Parameter Scaling}",
+        "\\section{GPT-3 and In-Context Learning}",
         "\\subsection{Model topology, 175B capacity, and filtered corpus mixture}",
         "\\subsection{In-context learning mechanics across the prompting spectrum}",
         "\\subsection{Empirical benchmark performance and comparison with fine-tuned models}",
-        "\\section{The Race to Bigger Models and the Chinchilla Scaling Revolution}",
+        "\\section{Chinchilla and Compute-Optimal Scaling}",
         "\\subsection{The race to massive scale and the undertraining diagnosis}",
         "\\subsection{The three methodological approaches to compute-optimal scaling}",
         "\\paragraph{Approach 1: Minimum Loss Envelopes over Training Curves}",
         "\\paragraph{Approach 2: IsoFLOP Profiles}",
         "\\paragraph{Approach 3: Parametric Loss Surface Modeling}",
         "\\subsection{Empirical validation: Chinchilla (70B) versus Gopher (280B)}",
-        "\\section{The Modern Paradigm Shift: Token Saturation and Open Foundation Models}",
+        "\\section{Open Foundation Models and Token Saturation}",
         "\\subsection{Token over-training and inference economics}",
         "\\subsection{The LLaMA ecosystem and generational evolution}",
         "\\subsection{Open foundation model families and the macro-evolutionary tree}"
@@ -933,13 +969,19 @@
       "equations": 23,
       "tables": 3,
       "figures": 10,
-      "listings": 0
+      "listings": 0,
+      "counts": {
+        "equations": 23,
+        "tables": 3,
+        "figures": 10,
+        "listings": 0
+      }
     },
     {
       "path": "STUDY_GUIDE/chapters/part1_foundations/08_evaluation_metrics_benchmarks.tex",
       "structure": [
-        "\\chapter{Evaluation and Benchmarks}",
-        "\\section{Principles of Evaluation}",
+        "\\chapter{Model Evaluation and Benchmarks}",
+        "\\section{Evaluation Metrics and Principles}",
         "\\subsubsection{The geometric mean and multiplicative error penalization}",
         "\\subsubsection{Numerical stability via logarithmic formulation}",
         "\\subsection{Perplexity}",
@@ -974,7 +1016,7 @@
         "\\subsubsection{Human evaluation: Absolute scales vs. pairwise comparisons}",
         "\\subsubsection{Cognitive failure mode of absolute scoring}",
         "\\subsubsection{Scalability bottleneck and LLM-as-a-judge}",
-        "\\section{Evaluation Tasks and Problem Formulations}",
+        "\\section{NLP Tasks and Evaluation Taxonomy}",
         "\\subsection{A Two-Dimensional Taxonomy of Language Model Tasks}",
         "\\subsubsection{Axis 1: Operational output structure and target space}",
         "\\subsubsection{Axis 2: The cognitive capability and reasoning hierarchy}",
@@ -1006,7 +1048,7 @@
         "\\subsubsection{Consequences: Memorization vs. reasoning}",
         "\\subsubsection{The closed-model auditing barrier}",
         "\\subsubsection{Decontamination protocols and countermeasures}",
-        "\\section{Evaluation Synthesis}"
+        "\\section{Evaluation Challenges and Synthesis}"
       ],
       "labels": [
         "\\label{ch:evaluation_metrics_benchmarks}",
@@ -1124,7 +1166,13 @@
       "equations": 59,
       "tables": 4,
       "figures": 2,
-      "listings": 0
+      "listings": 0,
+      "counts": {
+        "equations": 59,
+        "tables": 4,
+        "figures": 2,
+        "listings": 0
+      }
     }
   ],
   "frontmatter": [

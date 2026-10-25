@@ -2,7 +2,7 @@
 
 \begin{document}
 
-\chapter{Pre-Training, Scaling Laws, and the Evolution of Large Language Models}
+\chapter{Pre-Training, Scaling Laws, and Model Evolution}
 \label{ch:scaling_laws_pretraining}
 
 Chapter~\ref{ch:transformer_variants} analyzed the structural taxonomy of Transformer variants, detailing how encoder-only, encoder-decoder, and decoder-only topologies specialize for distinct linguistic representations and sequence generation tasks. While architectural topology dictates how tokens attend to one another within the multi-head attention mechanism, the emergent cognitive, semantic, and reasoning capabilities of modern foundation models are governed by the scale of self-supervised pre-training, parameter capacity, and compute allocation.
@@ -12,7 +12,7 @@ The evolution of modern large language models began with the empirical demonstra
 This chapter provides an exhaustive theoretical and empirical analysis of the evolution of large language models, their pre-training methodologies, and the scaling laws governing their performance. We begin in Section~\ref{sec:gpt1_architecture} by formalizing the Generative Pre-trained Transformer (GPT-1), dissecting its two-stage pre-training and supervised fine-tuning framework with delimiter tokens. Section~\ref{sec:gpt2_scaling_laws} examines GPT-2, its zero-shot multi-task paradigm, WebText corpus curation, benchmark evaluations, and the breakthrough empirical scaling laws of Kaplan et al. Section~\ref{sec:gpt3_in_context_learning} deconstructs GPT-3, contrasting supervised fine-tuning with in-context learning across zero-shot, one-shot, and few-shot regimes, and detailing its empirical performance against task-specific state-of-the-art baselines. Section~\ref{sec:chinchilla_scaling} analyzes the race to massive scale, the undertraining diagnosis, and the three empirical approaches of the DeepMind Chinchilla framework that formalized compute-optimal pre-training. Finally, Section~\ref{sec:open_models_paradigm} examines the modern paradigm shift toward token saturation, inference economics, and the rise of open foundation model families.
 
 
-\section{GPT-1: Generative Pre-Training and Supervised Adaptation}
+\section{GPT-1: Generative Pre-Training}
 \label{sec:gpt1_architecture}
 
 Prior to 2018, natural language processing was characterized by fragmented, task-specific architectures. Researchers predominantly trained recurrent neural networks (LSTMs, GRUs) or convolutional networks on supervised datasets from scratch, relying on static word embeddings such as Word2Vec or GloVe for initialization. While semi-supervised approaches such as ELMo contextualized word representations, the underlying task-specific model architectures still required bespoke engineering for each target task.
@@ -204,7 +204,7 @@ A defining innovation of GPT-1 was the complete avoidance of task-customized neu
 \end{enumerate}
 
 
-\section{GPT-2, WebText, and the Empirical Foundation of Scaling Laws}
+\section{GPT-2 and Empirical Scaling Laws}
 \label{sec:gpt2_scaling_laws}
 
 Following the success of GPT-1, Radford et al.~\cite{radford2019} released GPT-2. The primary conceptual breakthrough of GPT-2 was the demonstration of \emph{unsupervised multi-task learning}: when trained on a sufficiently diverse and massive corpus, a language model develops zero-shot capabilities across distinct tasks without requiring supervised fine-tuning or parameter updates.
@@ -465,7 +465,7 @@ Panel B of Figure~\ref{fig:kaplan_figures2_3} illustrates the physical consequen
 In practical engineering terms, Kaplan et al. concluded: \emph{"As the computational budget $C$ increases, it should be spent primarily on larger models, without dramatic increases in training time or dataset size."} Specifically, a $10\times$ increase in compute budget prescribed scaling model size $N$ by $5.4\times$, while increasing training tokens $D$ by merely $1.8\times$ and optimization steps by $1.07\times$. This theoretical prescription directly catalyzed the industry race toward colossal parameter regimes trained on relatively modest token horizons.
 
 
-\section{GPT-3: In-Context Learning Dynamics and Parameter Scaling}
+\section{GPT-3 and In-Context Learning}
 \label{sec:gpt3_in_context_learning}
 
 In June 2020, Brown et al.~\cite{brown2020} from OpenAI published \emph{"Language Models are Few-Shot Learners"}, unveiling GPT-3. Building directly upon the scaling laws of Kaplan et al., GPT-3 scaled model capacity to 175 billion parameters—an order of magnitude larger than any previously trained dense autoregressive model.
@@ -694,7 +694,7 @@ A rigorous examination of Table~\ref{tab:gpt3_vs_sota} provides vital insights i
 \end{itemize}
 
 
-\section{The Race to Bigger Models and the Chinchilla Scaling Revolution}
+\section{Chinchilla and Compute-Optimal Scaling}
 \label{sec:chinchilla_scaling}
 
 Following the publication of GPT-3 and the confirmation that model loss scales smoothly with parameter capacity, the natural language processing industry embarked on an aggressive race to construct ever-larger dense neural networks. Between 2020 and 2022, leading research institutions treated parameter count as the primary determinant of model intelligence.
@@ -922,7 +922,7 @@ Despite having only one-fourth of Gopher's parameter count, Chinchilla uniformly
 The Chinchilla experiments conclusively refuted the Kaplan allocation rule, proving that the post-GPT-3 race toward massive parameter sizes had produced oversized, undertrained architectures.
 
 
-\section{The Modern Paradigm Shift: Token Saturation and Open Foundation Models}
+\section{Open Foundation Models and Token Saturation}
 \label{sec:open_models_paradigm}
 
 The Chinchilla breakthrough prompted an industry-wide transition in language model training. Rather than continuing parameter escalation ($500\text{B} \to 1\text{T}$), the field pivoted toward training compact models on massive token volumes. This shift made high-performance language models vastly more accessible, catalyzing the modern open-weight ecosystem.

@@ -5,7 +5,7 @@
 % ==============================================================================
 % CHAPTER 07: LANGUAGE MODEL EVALUATION, METRICS, AND BENCHMARKS
 % ==============================================================================
-\chapter{Evaluation and Benchmarks}
+\chapter{Model Evaluation and Benchmarks}
 \label{ch:evaluation_metrics_benchmarks}
 
 Chapter~\ref{ch:scaling_laws_pretraining} described how model size, training data, and compute affect next-token cross-entropy. This objective measures token prediction under teacher forcing, where the model conditions on the reference prefix. It does not directly measure whether generated text is coherent, factually accurate, appropriate to its context, or useful for a reasoning task. Evaluation therefore requires measures that reflect the intended use of the model.
@@ -21,7 +21,7 @@ This chapter formalizes the principles of language model evaluation. We begin by
 % ==============================================================================
 % SECTION 7.1: EVALUATION METRICS FOR LANGUAGE MODELS
 % ==============================================================================
-\section{Principles of Evaluation}
+\section{Evaluation Metrics and Principles}
 \label{sec:evaluation_metrics}
 
 Evaluation metrics in natural language processing can be partitioned into two distinct paradigms: intrinsic likelihood metrics and extrinsic generation metrics. Intrinsic metrics evaluate the model's mathematical representation of language by computing the probability distribution it assigns to unseen test corpora under teacher forcing. They require no sample generation, no decoding algorithms, and no reference texts; they assess the predictive confidence of the probability model itself. Extrinsic metrics, by contrast, operate on the discrete sequences emitted during autoregressive inference, comparing the generated hypothesis against one or more human gold-standard references.
@@ -813,7 +813,7 @@ While metrics provide the mathematical scoring instruments, they cannot exist in
 % ==============================================================================
 % SECTION 8.2: EVALUATION TASKS AND PROBLEM FORMULATIONS
 % ==============================================================================
-\section{Evaluation Tasks and Problem Formulations}
+\section{NLP Tasks and Evaluation Taxonomy}
 \label{sec:evaluation_tasks}
 
 Evaluating foundation models requires probing a wide spectrum of linguistic, semantic, and reasoning capabilities. In early natural language processing literature, models were trained and evaluated on isolated, specialized tasks using task-specific neural heads. In modern foundation model engineering, diverse tasks are unified under the shared autoregressive interface: every problem is formulated as a text prompt conditioning the generation of target tokens. However, presenting downstream tasks as an arbitrary collection of disparate datasets conceals the underlying principles of model assessment. To establish a rigorous foundation, tasks must be systematically classified along two orthogonal taxonomic axes: operational output structure and cognitive reasoning depth.
@@ -1384,7 +1384,7 @@ To safeguard evaluation integrity, modern foundation model research employs rigo
 % ==============================================================================
 % SECTION 7.4: SYNTHESIS & COMPARATIVE LANDSCAPE
 % ==============================================================================
-\section{Evaluation Synthesis}
+\section{Evaluation Challenges and Synthesis}
 \label{sec:evaluation_synthesis}
 
 To provide a comprehensive reference for researchers and software engineers, Table~\ref{tab:evaluation_comprehensive_matrix} synthesizes the entire hierarchy of language model evaluation examined in this chapter, connecting evaluation paradigms, operational metrics, canonical benchmark datasets, and primary failure modes.

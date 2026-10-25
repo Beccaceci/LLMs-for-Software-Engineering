@@ -2,7 +2,7 @@
 
 \begin{document}
 
-\chapter{Transformer Architectures and Decoding Strategies}
+\chapter{Transformer Variants and Decoding}
 \label{ch:transformer_variants}
 
 Chapter~\ref{ch:transformer_architecture} established the foundational mathematics of the canonical Transformer, detailing how multi-head self-attention, cross-attention, and position-wise feed-forward networks overcome the sequential bottlenecks of recurrent architectures. While that framework was originally formulated as a dual-stack encoder-decoder for bilingual machine translation, subsequent deep learning research recognized that the encoder and decoder perform distinct representational functions that can be decoupled and specialized for different NLP tasks.
@@ -540,7 +540,7 @@ The NLP research community progressively standardized on decoder-only architectu
 The empirical scaling laws, pre-training corpus curation strategies, and historical milestones (from GPT-1 and GPT-2 to massive modern parameter regimes) that established this paradigm's dominance are examined comprehensively in Chapter~\ref{ch:scaling_laws_pretraining}.
 
 
-\section{Autoregressive Sampling Strategies}
+\section{Decoding and Sampling Strategies}
 \label{sec:decoding_and_sampling}
 
 Regardless of whether an architecture employs an encoder-decoder or decoder-only topology, generating text requires converting continuous output vectors into discrete token sequences. At generation step $t$, the final hidden state $\mathbf{h}_t \in \mathbb{R}^{d_{\text{model}}}$ is projected onto vocabulary $\mathcal{V}$ via the unembedding matrix $\mathbf{W}_U \in \mathbb{R}^{|\mathcal{V}| \times d_{\text{model}}}$ to yield raw logits $\mathbf{z}_t \in \mathbb{R}^{|\mathcal{V}|}$:

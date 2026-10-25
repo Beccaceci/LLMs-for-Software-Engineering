@@ -2,7 +2,7 @@
 
 \begin{document}
 
-\chapter{Language models}
+\chapter{Language Modeling Fundamentals}
 \label{ch:language_models}
 \label{ch:language_models_intro}
 
@@ -13,7 +13,7 @@ The goal of language modeling is to formulate computational mechanisms capable o
 This chapter develops the theoretical, statistical, and algorithmic principles of language modeling. We begin by examining the historical imperatives that motivated probabilistic language modeling and formalize the joint distribution over word sequences via the probability chain rule. We then formulate the Markov assumption and $n$-gram models, trace parameter estimation via Maximum Likelihood Estimation on a concrete corpus, and systematically analyze the dual inference modes: sequence likelihood evaluation and autoregressive sequence generation. Finally, we dissect the fundamental limitations of statistical counting models---specifically combinatorial data sparsity, context horizon truncation, and the lack of semantic generalization---examine the smoothing mechanism as a mitigation strategy, and establish the structural necessity of transitioning to continuous distributed word embeddings.
 
 \clearpage
-\section{Introduction to language models and the modeling task}
+\section{Probabilistic Language Modeling}
 \label{sec:lm_intro_task}
 
 Understanding modern foundation architectures requires first examining how natural language was formalized as a statistical object. The formulation of language modeling emerged not from abstract linguistic taxonomy, but from concrete engineering challenges in telecommunications and signal processing that required machines to quantify the plausibility of textual hypotheses.
@@ -337,7 +337,7 @@ This sentence never existed in the training corpus; it was synthesized dynamical
 \end{enumerate}
 
 \clearpage
-\section{Limitations of statistical language models and the path to neural representations}
+\section{Statistical Limits and the Neural Paradigm}
 \label{sec:statistical_lm_limitations}
 
 Despite their mathematical simplicity and clear probabilistic interpretations, statistical $n$-gram models suffer from severe architectural and theoretical limitations that fundamentally restrict their scalability and utility in modern natural language processing. In this section, we examine the three primary limitations of statistical language models---combinatorial data sparsity, context horizon truncation, and the absence of semantic generalization---analyze smoothing as an intuitive mitigation strategy, and establish the necessity of continuous neural representations.
