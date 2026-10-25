@@ -101,14 +101,16 @@ Every feature identified during the Survey phase is mapped to an implementation 
 │   └── notation.tex
 ├── chapters/
 │   ├── part1_foundations/
-│   │   ├── 01_language_models_intro.tex
-│   │   ├── 02_deep_learning_foundations.tex
-│   │   ├── 03_recurrent_neural_networks.tex
+│   │   ├── 01_deep_learning_foundations.tex
+│   │   ├── 02_recurrent_neural_networks.tex
+│   │   ├── 03_language_models_intro.tex
 │   │   ├── 04_word_embeddings.tex
 │   │   ├── 05_transformer_architecture.tex
-│   │   ├── 06_scaling_laws_pretraining.tex
-│   │   ├── 07_instruction_tuning_alignment.tex
-│   │   └── 08_peft_inference_optimization.tex
+│   │   ├── 06_transformer_variants.tex
+│   │   ├── 07_scaling_laws_pretraining.tex
+│   │   ├── 08_evaluation_metrics_benchmarks.tex
+│   │   ├── 09_instruction_tuning_alignment.tex
+│   │   └── 10_peft_inference_optimization.tex
 │   └── part2_llm4se/
 │       ├── 09_ai_in_software_engineering.tex
 │       ├── 10_prompt_engineering_chaining.tex
