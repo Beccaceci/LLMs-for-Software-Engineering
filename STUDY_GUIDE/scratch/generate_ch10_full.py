@@ -1,0 +1,990 @@
+# Python script to generate complete, rigorous Chapter 10 for the study guide
+import re
+from pathlib import Path
+
+out_dir = Path("STUDY_GUIDE/chapters/part1_foundations/chapter10")
+out_dir.mkdir(parents=True, exist_ok=True)
+out_file = out_dir / "10_efficient_finetuning_inference_optimization.tex"
+
+content = r"""\documentclass[../../../main.tex]{subfiles}
+
+\begin{document}
+
+\chapter{Efficient Fine-Tuning and Inference Optimization}
+\label{ch:efficient_finetuning_inference_optimization}
+
+Language models have demonstrated emergent few-shot and zero-shot reasoning capabilities across diverse tasks through in-context learning~\citep{brown2020, wei2022finetuned}. However, as demonstrated in empirical benchmarks, the upper bound of task performance is overwhelmingly established by fine-tuned models: a moderately sized foundation model tailored to a specialized domain consistently outperforms a substantially larger model evaluated purely through zero-shot prompt conditioning. 
+
+Despite its empirical superiority, full-parameter fine-tuning of multi-billion parameter models presents severe computational, storage, and operational bottlenecks. Updating all parameters requires storing gradients and optimizer states that multiply GPU memory requirements by an order of magnitude, producing distinct multi-gigabyte checkpoints for every downstream task and triggering catastrophic forgetting of general reasoning capabilities. 
+
+To resolve this fundamental tension between task adaptation and resource constraints, modern research pursues two complementary directions:
+\begin{enumerate}
+    \item \textbf{Parameter-Efficient Fine-Tuning (PEFT)}: Adapting pre-trained models by updating or injecting a minimal fraction of parameters ($\le 1\%$), retaining base representations while achieving performance comparable to full fine-tuning.
+    \item \textbf{Model Compression and Serving Optimization}: Compressing numerical bitwidths through quantization, transferring dark knowledge via model distillation, and overcoming memory bandwidth saturation during autoregressive inference through KV caching and hardware-aware serving dynamics.
+\end{enumerate}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    scale=0.92, transform shape,
+    box/.style={draw=politoNavy, fill=skyBlue!12, rounded corners=6pt, font=\small\sffamily, align=center, thick, inner sep=7pt},
+    header/.style={draw=politoNavy, fill=politoNavy, text=white, rounded corners=6pt, font=\small\bfseries\sffamily, align=center, inner sep=7pt},
+    leaf/.style={draw=steelBlue, fill=white, rounded corners=4pt, font=\footnotesize\sffamily, align=center, inner sep=5pt},
+    arrow/.style={->, >=stealth, thick, politoNavy}
+]
+
+% Root
+\node[header, minimum width=6cm] (root) at (7, 6) {Foundational Model Efficiency Paradigm};
+
+% Level 1
+\node[box, minimum width=6.2cm] (peft) at (2.8, 4.3) {\textbf{Parameter-Efficient Fine-Tuning (PEFT)}\\Training-Phase Adaptation ($\Delta \theta \ll \Theta$)};
+\node[box, minimum width=6.2cm] (comp) at (11.2, 4.3) {\textbf{Model Compression \& Inference}\\Serving-Phase Acceleration \& Footprint Reduction};
+
+% Level 2: PEFT Categories
+\node[leaf, text width=3.3cm] (peft_sel) at (0.2, 2.2) {\textbf{Selective}\\\textit{BitFit}\\Freeze weights, tune bias vectors ($b$)};
+\node[leaf, text width=3.3cm] (peft_add) at (2.8, 0.4) {\textbf{Additive}\\\textit{Bottleneck Adapters}\\Insert down/up linear projections ($\sigma(xW_d)W_u$)};
+\node[leaf, text width=3.3cm] (peft_rep) at (5.4, 2.2) {\textbf{Reparameterization}\\\textit{LoRA \& Soft Prompts}\\Low-rank factor updates ($\Delta W = \frac{\alpha}{r}BA$)};
+
+% Level 2: Compression Categories
+\node[leaf, text width=3.4cm] (comp_quant) at (8.6, 2.2) {\textbf{Quantization}\\\textit{PTQ, QAT, LLM.int8()}\\Map $\mathbb{R} \to \mathbb{Z}_b$ (Absmax / Zero-Point)};
+\node[leaf, text width=3.4cm] (comp_dist) at (11.2, 0.4) {\textbf{Knowledge Distillation}\\\textit{DistilBERT, TinyBERT}\\Soft target matching ($D_{\text{KL}}$ at temp $T$)};
+\node[leaf, text width=3.4cm] (comp_serv) at (13.8, 2.2) {\textbf{Serving Dynamics}\\\textit{KV Caching}\\Overcome memory-bound decoding};
+
+% Connections
+\draw[arrow] (root.south) -- ++(0,-0.3) -| (peft.north);
+\draw[arrow] (root.south) -- ++(0,-0.3) -| (comp.north);
+
+\draw[arrow] (peft.south) -- ++(0,-0.4) -| (peft_sel.north);
+\draw[arrow] (peft.south) -- (peft_add.north);
+\draw[arrow] (peft.south) -- ++(0,-0.4) -| (peft_rep.north);
+
+\draw[arrow] (comp.south) -- ++(0,-0.4) -| (comp_quant.north);
+\draw[arrow] (comp.south) -- (comp_dist.north);
+\draw[arrow] (comp.south) -- ++(0,-0.4) -| (comp_serv.north);
+
+\end{tikzpicture}
+\caption{Taxonomy of parameter-efficient fine-tuning and model compression paradigms for large language models, classifying techniques by their operational intervention across adaptation, representation, and inference.}
+\label{fig:peft_efficiency_taxonomy}
+\end{figure}
+
+% ==============================================================================
+% SECTION 10.1: THE ADAPTATION BOTTLENECK & PEFT FOUNDATIONS
+% ==============================================================================
+\section{The Adaptation Bottleneck and PEFT Foundations}
+\label{sec:adaptation_bottleneck_peft}
+
+To understand the mathematical and systemic necessity of Parameter-Efficient Fine-Tuning, one must examine the computational footprint and memory mechanics of standard foundation model adaptation.
+
+\subsection{Full Fine-Tuning versus Feature-Based Transfer}
+\label{subsec:full_ft_vs_feature_based}
+
+When adapting a pre-trained base model with parameters $\theta_0 \in \mathbb{R}^{|\Theta|}$ to a specific downstream task dataset $\mathcal{D} = \{(x_i, y_i)\}_{i=1}^N$, historical transfer learning in deep learning offered two polar strategies:
+
+\paragraph{1. Full Fine-Tuning (End-to-End Retraining).}
+In full fine-tuning, all model parameters remain unconstrained and are updated via gradient descent:
+\begin{equation}
+\label{eq:full_ft_update}
+\theta^* = \arg\min_\theta \sum_{(x, y) \in \mathcal{D}} \mathcal{L}(f_\theta(x), y), \quad \theta_{t+1} = \theta_t - \eta \cdot \nabla_\theta \mathcal{L}_t.
+\end{equation}
+While full fine-tuning maximizes model expressivity and allows the network to reorganize internal representational manifolds, it introduces three severe systemic failure modes:
+\begin{itemize}
+    \item \textbf{Optimizer Memory Multiplication}: Training with first-order adaptive optimizers like Adam requires maintaining two auxiliary states per parameter (the first moment $m_t$ and second raw moment $v_t$). When utilizing 32-bit floating-point precision ($\text{FP32}$), each state requires 4 bytes. Thus, for a base model of $|\Theta|$ parameters, optimizer states alone consume:
+    \begin{equation}
+    \label{eq:adam_optimizer_memory}
+    \text{Memory}_{\text{Adam}} = 2 \times 4 \times |\Theta| = 8 |\Theta| \quad \text{bytes}.
+    \end{equation}
+    Accounting for model weights (4 bytes in $\text{FP32}$ or 2 bytes in $\text{FP16}$), gradients (4 bytes), and optimizer states (8 bytes), fine-tuning a 70-billion parameter model ($|\Theta| = 70 \times 10^9$) demands over $1.12\text{ TB}$ of GPU memory purely for static parameter buffers, completely excluding forward activation tensors.
+    \item \textbf{Storage and Deployment Explosion}: Fine-tuning produces an entirely new set of updated weights $\theta^*$. Serving $K$ specialized downstream tasks (e.g., medical summarization, SQL code generation, legal drafting) requires storing and hosting $K$ independent copies of the full model checkpoint, scaling disk storage as $\mathcal{O}(K \cdot |\Theta|)$.
+    \item \textbf{Catastrophic Forgetting}: Unconstrained gradient updates on narrow task distributions erode the rich pre-trained general knowledge, degrading out-of-distribution reasoning and instruction-following robustness.
+\end{itemize}
+
+\paragraph{2. Feature-Based Transfer (Linear Probing).}
+At the opposite extreme, feature-based transfer freezes the entire pre-trained backbone ($\nabla_{\theta_0} \mathcal{L} = 0$) and trains only a small task-specific classification or projection head parameterized by $W_h \in \mathbb{R}^{d \times c}$:
+\begin{equation}
+\label{eq:feature_based_head}
+\hat{y} = \text{Softmax}(W_h \cdot f_{\theta_0}(x)).
+\end{equation}
+While feature-based transfer avoids optimizer memory overhead and checkpoint duplication, its representational capacity is fundamentally bounded. If the target downstream task requires hierarchical transformations that diverge substantially from the pre-training objective, frozen intermediate representations cannot adapt, resulting in severe performance degradation compared to end-to-end fine-tuning.
+
+\subsection{Taxonomy of Parameter-Efficient Adaptation}
+\label{subsec:peft_taxonomy}
+
+Parameter-Efficient Fine-Tuning (PEFT) resolves this dilemma by keeping the pre-trained backbone parameters $\theta_0$ entirely frozen while optimizing only a minimal parameter subset $\Delta \theta$, such that $|\Delta \theta| \ll |\theta_0|$ (typically $0.01\% \le \frac{|\Delta \theta|}{|\theta_0|} \le 1\%$). PEFT approaches are broadly classified into three structural paradigms~\citep{lialin2023peft}:
+\begin{enumerate}
+    \item \textbf{Selective PEFT}: Modifying a sparse, pre-existing subset of the network's original parameters while freezing all remaining weights. The canonical exemplar is \textbf{BitFit}~\citep{zaken2021bitfit}, which updates exclusively the bias vectors of linear layers.
+    \item \textbf{Additive PEFT}: Introducing newly instantiated, trainable parameter modules into the network architecture while freezing original parameters. This includes sequential \textbf{Bottleneck Adapters}~\citep{houlsby2019parameter, pfeiffer2020adapterhub} and input-level \textbf{Prompt Tuning}~\citep{lester2021power}.
+    \item \textbf{Reparameterization PEFT}: Modeling weight updates as low-rank matrix factorizations during optimization, notably \textbf{Low-Rank Adaptation (LoRA)}~\citep{hu2021lora}. Crucially, reparameterization enables mathematical weight merging at inference time, avoiding added computational graph depth.
+\end{enumerate}
+
+\begin{table}[htbp]
+\centering
+\small
+\caption{Systemic comparison of fine-tuning paradigms across parameter footprint, training VRAM, deployment storage, and inference latency overhead.}
+\label{tab:peft_comparative_matrix}
+\begin{tabularx}{\textwidth}{l c c c c X}
+\toprule
+\textbf{Paradigm} & \textbf{Tuned Params} & \textbf{Optimizer VRAM} & \textbf{Checkpoint Size} & \textbf{Added Latency} & \textbf{Primary Trade-off} \\
+\midrule
+\textbf{Full Fine-Tuning} 
+    & $100\%$ & $8|\Theta|$ bytes & $100\%$ of model & None & Maximum expressivity; prohibitive memory and checkpoint explosion. \\
+\addlinespace
+\textbf{Feature Probing} 
+    & $<0.05\%$ & Negligible & $<0.05\%$ & None & Lightweight; incapable of adapting deep semantic representations. \\
+\addlinespace
+\textbf{BitFit} 
+    & $\approx 0.1\%$ & $\approx 0.008|\Theta|$ & $\approx 0.1\%$ & None & Zero architectural modifications; bounded capacity on complex tasks. \\
+\addlinespace
+\textbf{Adapters} 
+    & $0.5 - 3\%$ & $0.04 - 0.24|\Theta|$ & $0.5 - 3\%$ & $+15 - 30\%$ & High modularity; sequential latency penalty from added forward depth. \\
+\addlinespace
+\textbf{LoRA} 
+    & $0.05 - 0.5\%$ & $0.004 - 0.04|\Theta|$ & $0.05 - 0.5\%$ & \textbf{0\% (folded)} & Matches full fine-tuning performance; zero latency overhead at inference. \\
+\addlinespace
+\textbf{Prompt Tuning} 
+    & $<0.01\%$ & Negligible & $<0.01\%$ & Context overhead & Zero weight updates; requires large scale ($\ge 11\text{B}$) to match full FT. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Bias-Terms Fine-Tuning (BitFit)}
+\label{subsec:bitfit_bias_tuning}
+
+\begin{definition}{BitFit Sparse Adaptation}{def_bitfit}
+Let a linear transformation within a Transformer layer be defined by $h = W x + b$, where $W \in \mathbb{R}^{d_{\text{out}} \times d_{\text{in}}}$ is the weight matrix and $b \in \mathbb{R}^{d_{\text{out}}}$ is the additive bias vector. \textbf{BitFit}~\citep{zaken2021bitfit} freezes all weight matrices $W$ across all layers and optimizes exclusively the bias vectors $b$:
+\begin{equation}
+\label{eq:bitfit_formulation}
+\theta_{\text{trainable}} = \{b_l\}_{l=1}^L, \quad \theta_{\text{frozen}} = \{W_l\}_{l=1}^L.
+\end{equation}
+\end{definition}
+
+In a standard BERT-Base architecture ($|\Theta| \approx 110\text{M}$ parameters), the bias terms of the query, key, value projections, feed-forward layers, and layer normalizations collectively account for approximately $100{,}000$ parameters, representing roughly \textbf{$0.09\%$ of total network capacity}.
+
+\paragraph{Empirical Effectiveness and the "Fortunate Mistake".}
+Despite modifying fewer than one in a thousand parameters, Ben Zaken et al.~\citep{zaken2021bitfit} demonstrated that BitFit achieves over $95\%$ of the performance of full fine-tuning across the GLUE benchmark suite, outperforming linear probing by substantial margins.
+
+As highlighted by Prof.~Giobergia, the success of BitFit reveals a curious historical irony in deep learning architecture design:
+\begin{itemize}
+    \item In the original Transformer paper \textit{"Attention Is All You Need"}~\citep{vaswani2017}, the multi-head attention equations contain \textbf{no bias terms}:
+    \begin{equation}
+    Q = X W_Q, \quad K = X W_K, \quad V = X W_V.
+    \end{equation}
+    \item When BERT~\citep{devlin2019} was implemented, standard linear layers (\texttt{torch.nn.Linear}) were instantiated with default parameters, which include additive bias terms (\texttt{bias=True}). 
+    \item The presence of bias vectors in language model attention blocks was essentially a historical artifact of default software settings, yet BitFit proves that these very parameters provide sufficient degrees of freedom to adapt pre-trained decision boundaries.
+\end{itemize}
+
+\begin{intuition}[Why Bias Tuning Works]
+Geometrically, pre-trained weight matrices $W$ span the foundational feature coordinate system and semantic subspaces learned during pre-training. Full fine-tuning rotates and stretches these coordinate frames, which is computationally expensive and risks destroying pre-trained manifolds. In contrast, tuning the bias vector $b$ applies an affine translation: it shifts the activation thresholds and activation boundaries of intermediate neurons (e.g., shifting the zero-crossing of GeLU or ReLU non-linearities), selectively amplifying or suppressing pre-existing linguistic features without disrupting the underlying coordinate geometry.
+\end{intuition}
+
+% ==============================================================================
+% SECTION 10.2: ADAPTERS, LORA, AND SOFT PROMPTS
+% ==============================================================================
+\section{Adapters, Low-Rank Adaptation, and Soft Prompts}
+\label{sec:adapters_lora_soft_prompts}
+
+While BitFit provides extreme parameter sparsity, complex downstream tasks often demand deeper structural capacity. This motivates modular architectural insertions and low-rank matrix factorizations.
+
+\subsection{Bottleneck Adapter Layers}
+\label{subsec:bottleneck_adapters}
+
+Introduced by Houlsby et al.~\citep{houlsby2019parameter}, \textbf{Adapter layers} introduce compact feed-forward bottleneck sub-networks directly into the pre-trained Transformer architecture.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    scale=0.95, transform shape,
+    block/.style={draw=politoNavy, fill=skyBlue!15, rounded corners=4pt, font=\small\sffamily, align=center, thick, minimum width=4.5cm, minimum height=0.75cm},
+    adapter/.style={draw=crimsonRed!80, fill=crimsonRed!10, rounded corners=4pt, font=\small\bfseries\sffamily, align=center, thick, minimum width=4.5cm, minimum height=0.75cm},
+    norm/.style={draw=steelBlue, fill=steelBlue!20, rounded corners=4pt, font=\small\sffamily, align=center, thick, minimum width=4.5cm, minimum height=0.6cm},
+    circ/.style={circle, draw=politoNavy, fill=white, thick, inner sep=1.5pt},
+    arrow/.style={->, >=stealth, thick, politoNavy}
+]
+
+% Transformer Block Outline
+\node[block] (mha) at (0, 0) {Multi-Head Attention};
+\node[circ] (add1) at (0, 1.1) {$+$};
+\node[adapter] (ad1) at (0, 2.1) {Adapter Layer (Down $\to \sigma \to$ Up)};
+\node[circ] (add_ad1) at (0, 3.1) {$+$};
+\node[norm] (ln1) at (0, 3.9) {Layer Normalization};
+
+\node[block] (ffn) at (0, 5.0) {Feed-Forward Network};
+\node[circ] (add2) at (0, 6.1) {$+$};
+\node[adapter] (ad2) at (0, 7.1) {Adapter Layer (Down $\to \sigma \to$ Up)};
+\node[circ] (add_ad2) at (0, 8.1) {$+$};
+\node[norm] (ln2) at (0, 8.9) {Layer Normalization};
+
+% Arrows main flow
+\draw[arrow] (0, -0.8) -- (mha.south);
+\draw[arrow] (mha.north) -- (add1.south);
+\draw[arrow] (add1.north) -- (ad1.south);
+\draw[arrow] (ad1.north) -- (add_ad1.south);
+\draw[arrow] (add_ad1.north) -- (ln1.south);
+\draw[arrow] (ln1.north) -- (ffn.south);
+\draw[arrow] (ffn.north) -- (add2.south);
+\draw[arrow] (add2.north) -- (ad2.south);
+\draw[arrow] (ad2.north) -- (add_ad2.south);
+\draw[arrow] (add_ad2.north) -- (ln2.south);
+\draw[arrow] (ln2.north) -- (0, 9.6);
+
+% Skip connections
+\draw[arrow] (0, -0.5) -- ++(-2.8,0) |- (add1.west);
+\draw[arrow] (add1.north) ++(0, 0.2) -- ++(-2.8,0) |- (add_ad1.west);
+\draw[arrow] (ln1.north) ++(0, 0.2) -- ++(-2.8,0) |- (add2.west);
+\draw[arrow] (add2.north) ++(0, 0.2) -- ++(-2.8,0) |- (add_ad2.west);
+
+% Detail callout on the right
+\begin{scope}[shift={(5.2, 3.8)}]
+    \draw[dashed, steelBlue, thick] (-2.2, -2.4) rectangle (4.2, 3.8);
+    \node[font=\small\bfseries\sffamily, steelBlue] at (1.0, 3.5) {Adapter Internal Architecture};
+
+    \node[font=\footnotesize\sffamily] (in) at (1.0, -2.0) {Input $x \in \mathbb{R}^d$};
+    \node[draw=steelBlue, fill=skyBlue!10, rounded corners=3pt, text width=3.4cm, align=center, font=\scriptsize\sffamily] (down) at (1.0, -1.0) {Linear Down-Projection\\$W_{\text{down}} \in \mathbb{R}^{d \times m}$ ($m \ll d$)};
+    \node[draw=steelBlue, fill=skyBlue!20, rounded corners=3pt, text width=3.4cm, align=center, font=\scriptsize\sffamily] (act) at (1.0, 0.2) {Non-Linearity $\sigma(\cdot)$ (ReLU/GELU)};
+    \node[draw=steelBlue, fill=skyBlue!10, rounded corners=3pt, text width=3.4cm, align=center, font=\scriptsize\sffamily] (up) at (1.0, 1.4) {Linear Up-Projection\\$W_{\text{up}} \in \mathbb{R}^{m \times d}$ (Init $\approx 0$)};
+    \node[circ] (ad_sum) at (1.0, 2.5) {$+$};
+    \node[font=\footnotesize\sffamily] (out) at (1.0, 3.1) {Output $h \in \mathbb{R}^d$};
+
+    \draw[arrow] (in) -- (down);
+    \draw[arrow] (down) -- (act);
+    \draw[arrow] (act) -- (up);
+    \draw[arrow] (up) -- (ad_sum);
+    \draw[arrow] (ad_sum) -- (out);
+    \draw[arrow] (in) -- ++(-1.6, 0) |- (ad_sum.west);
+\end{scope}
+
+\end{tikzpicture}
+\caption{Architecture of the Houlsby bottleneck adapter inserted into a Transformer block. Left: placement after multi-head attention and feed-forward modules. Right: internal bottleneck projection with identity residual connection.}
+\label{fig:adapter_bottleneck_architecture}
+\end{figure}
+
+\paragraph{Mathematical Formulation.}
+An adapter layer operates on intermediate hidden representations $x \in \mathbb{R}^d$. To restrict the parameter count, it compresses $x$ into a low-dimensional bottleneck space of rank $m \ll d$ (typically $m \in \{16, 32, 64\}$) via a down-projection matrix $W_{\text{down}} \in \mathbb{R}^{d \times m}$, applies a non-linear activation $\sigma(\cdot)$, and projects back to the original dimension $d$ via an up-projection matrix $W_{\text{up}} \in \mathbb{R}^{m \times d}$:
+\begin{equation}
+\label{eq:adapter_forward}
+f_{\text{adapter}}(x) = \sigma(x W_{\text{down}} + b_{\text{down}}) W_{\text{up}} + b_{\text{up}}, \quad h = x + f_{\text{adapter}}(x).
+\end{equation}
+The residual connection ($+ x$) is structurally essential.
+
+\paragraph{Parameter Sizing.}
+In BERT-Base ($d = 768$), a single standard transformer block possesses roughly $7\text{M}$ parameters. Setting bottleneck dimension $m = 32$, a single adapter module contains:
+\begin{equation}
+\label{eq:adapter_parameter_count}
+|\Theta_{\text{adapter}}| = (768 \times 32 + 32) + (32 \times 768 + 768) = 24{,}608 + 25{,}344 = 49{,}952 \approx 50\text{K parameters}.
+\end{equation}
+Inserting two adapters per layer (one following attention, one following feed-forward) yields $\approx 100\text{K}$ trainable parameters per layer, representing a \textbf{$70\times$ reduction in tunable weights} compared to full fine-tuning.
+
+\paragraph{The Identity Initialization Protocol.}
+A critical engineering challenge arises when injecting newly initialized layers into a well-trained, functional network: random initial weights would produce arbitrary non-linear perturbations, corrupting intermediate representations and triggering severe optimization instability.
+
+To resolve this, adapters enforce an \textbf{identity initialization protocol}:
+\begin{itemize}
+    \item The up-projection matrix is initialized to exact zeros: $W_{\text{up}} = \mathbf{0}$, $b_{\text{up}} = \mathbf{0}$.
+    \item The down-projection weights $W_{\text{down}}$ are initialized randomly from a standard Gaussian $\mathcal{N}(0, \sigma^2)$.
+    \item At step $t = 0$:
+    \begin{equation}
+    f_{\text{adapter}}(x) = \sigma(x W_{\text{down}} + b_{\text{down}}) \cdot \mathbf{0} + \mathbf{0} = \mathbf{0} \implies h = x + \mathbf{0} = x.
+    \end{equation}
+\end{itemize}
+Consequently, the adapter strictly acts as an identity function at initialization, ensuring that fine-tuning starts smoothly from the exact baseline performance of the pre-trained model.
+
+\paragraph{The Inference Latency Bottleneck.}
+Although adapters dramatically reduce training memory and checkpoint size, they suffer from a major operational disadvantage: \textbf{inference latency penalty}. Because the adapter contains a non-linear activation function $\sigma(\cdot)$, the forward pass through the adapter cannot be mathematically folded into the preceding frozen linear layer. In production serving, sequentially executing these additional kernel launches across dozens of Transformer layers typically introduces a \textbf{$15\%$ to $30\%$ inference latency slowdown}.
+
+\subsection{Mathematical Foundations of Low-Rank Matrices}
+\label{subsec:math_low_rank_matrices}
+
+To overcome the sequential latency penalty of adapters, modern adaptation relies on the algebraic properties of matrix rank.
+
+\begin{definition}{Matrix Rank and Linear Independence}{def_matrix_rank}
+The \textbf{rank} of a matrix $M \in \mathbb{R}^{n \times k}$, denoted $\operatorname{rank}(M)$, is the maximum number of linearly independent rows (or equivalently, columns) in $M$. A matrix $M$ is \textbf{full rank} if $\operatorname{rank}(M) = \min(n, k)$; otherwise, it is \textbf{rank deficient} or \textbf{low rank}.
+\end{definition}
+
+If a matrix $L \in \mathbb{R}^{n \times k}$ has low rank $r \ll \min(n, k)$, it can be factorized without loss of information into the product of two compact rectangular matrices $B \in \mathbb{R}^{n \times r}$ and $A \in \mathbb{R}^{r \times k}$:
+\begin{equation}
+\label{eq:low_rank_factorization}
+L = B A, \quad \text{where } \operatorname{rank}(L) \le r.
+\end{equation}
+
+\paragraph{Walkthrough: Factorization of a Rank-1 Matrix.}
+Consider the $3 \times 3$ matrix examined during lecture:
+\begin{equation}
+M = \begin{bmatrix} 1 & 2 & 1 \\ 2 & 4 & 2 \\ -1 & -2 & -1 \end{bmatrix}.
+\end{equation}
+Inspecting the rows reveals that:
+\begin{equation}
+\text{Row}_2 = 2 \cdot \text{Row}_1, \quad \text{Row}_3 = -1 \cdot \text{Row}_1.
+\end{equation}
+Because rows 2 and 3 are exact scalar multiples of row 1, the matrix possesses only one linearly independent row, yielding $\operatorname{rank}(M) = 1$. Consequently, $M$ can be decomposed into the outer product of a column vector $B \in \mathbb{R}^{3 \times 1}$ and a row vector $A \in \mathbb{R}^{1 \times 3}$:
+\begin{equation}
+M = B A = \begin{bmatrix} 1 \\ 2 \\ -1 \end{bmatrix} \begin{bmatrix} 1 & 2 & 1 \end{bmatrix} = \begin{bmatrix} 1(1) & 1(2) & 1(1) \\ 2(1) & 2(2) & 2(1) \\ -1(1) & -1(2) & -1(1) \end{bmatrix} = \begin{bmatrix} 1 & 2 & 1 \\ 2 & 4 & 2 \\ -1 & -2 & -1 \end{bmatrix}.
+\end{equation}
+While storing $M$ directly requires $3 \times 3 = 9$ numerical values, the factorized representation requires only $3 + 3 = 6$ values. For matrices of large dimensionality ($d = 4096$), storing $B \in \mathbb{R}^{4096 \times r}$ and $A \in \mathbb{R}^{r \times 4096}$ with $r = 8$ requires $2 \times 4096 \times 8 = 65{,}536$ parameters, compared to $4096^2 \approx 16.78\text{M}$ parameters for the full matrix—a \textbf{$256\times$ compression ratio}.
+
+\paragraph{Near Low-Rank Matrices and SVD Approximation.}
+In real-world neural networks, weight update matrices are rarely exactly low-rank due to numerical stochasticity. Consider perturbing $M$ slightly:
+\begin{equation}
+\tilde{M} = \begin{bmatrix} 1 & 2 & 1 \\ 2.01 & 4 & 2 \\ -1 & -2 & -1.01 \end{bmatrix}.
+\end{equation}
+Technically, $\tilde{M}$ is full rank ($\operatorname{rank}(\tilde{M}) = 3$). However, $\tilde{M}$ is \textbf{near low-rank}: its spectral energy is overwhelmingly concentrated in a single dominant singular value ($\sigma_1 \gg \sigma_2, \sigma_3$). By the Eckart-Young-Mirsky Theorem, the optimal rank-$r$ approximation $M_r$ obtained via Singular Value Decomposition (SVD):
+\begin{equation}
+M = U \Sigma V^T \implies M_r = \sum_{i=1}^r \sigma_i u_i v_i^T,
+\end{equation}
+minimizes the Frobenius error $\|M - M_r\|_F = \sqrt{\sum_{i=r+1}^{\min(n,k)} \sigma_i^2}$. When trailing singular values are negligible, factorizing into rank $r$ captures nearly all functional dynamics of the matrix update.
+
+\paragraph{The Intrinsic Dimensionality Hypothesis.}
+The theoretical foundation of low-rank adaptation was established by Aghajanyan et al.~\citep{aghajanyan2020intrinsic}. They proved that pre-trained language models exhibit extremely low \textbf{intrinsic dimensionality}: although foundation models are parameterized in multi-billion dimensional spaces, the objective manifolds corresponding to downstream adaptation can be optimized within subspaces of dimensionality several orders of magnitude smaller. This empirical reality implies that the parameter update matrix $\Delta W$ does not require full rank to achieve optimal task performance.
+
+\subsection{Low-Rank Adaptation (LoRA) Architecture}
+\label{subsec:lora_architecture}
+
+Building upon the intrinsic dimensionality hypothesis, Hu et al.~\citep{hu2021lora} proposed \textbf{Low-Rank Adaptation (LoRA)}. 
+
+\begin{definition}{LoRA Reparameterization}{def_lora_reparam}
+For a pre-trained, frozen weight matrix $W_0 \in \mathbb{R}^{d \times k}$, LoRA decomposes the weight update $\Delta W \in \mathbb{R}^{d \times k}$ into the product of two low-rank trainable matrices $B \in \mathbb{R}^{d \times r}$ and $A \in \mathbb{R}^{r \times k}$, scaled by a hyperparameter constant $\frac{\alpha}{r}$:
+\begin{equation}
+\label{eq:lora_forward}
+h = W' x = (W_0 + \Delta W) x = W_0 x + \frac{\alpha}{r} B A x,
+\end{equation}
+where rank $r \ll \min(d, k)$, and $\alpha \ge 1$ is a constant scaling hyperparameter.
+\end{definition}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    scale=0.92, transform shape,
+    box/.style={draw=politoNavy, fill=skyBlue!12, rounded corners=4pt, font=\small\sffamily, align=center, thick},
+    frozen/.style={draw=steelBlue, fill=steelBlue!15, rounded corners=4pt, font=\small\bfseries\sffamily, align=center, thick},
+    trainable/.style={draw=crimsonRed!80, fill=crimsonRed!10, rounded corners=4pt, font=\small\bfseries\sffamily, align=center, thick},
+    circ/.style={circle, draw=politoNavy, fill=white, thick, inner sep=2pt},
+    arrow/.style={->, >=stealth, thick, politoNavy}
+]
+
+% Input
+\node[font=\small\sffamily] (in) at (0, 0) {Input $x \in \mathbb{R}^{k}$};
+
+% Split paths
+\node[frozen, text width=3.8cm, minimum height=3.2cm] (w0) at (-3.2, 2.5) {Frozen Pre-Trained\\Weight Matrix\\$W_0 \in \mathbb{R}^{d \times k}$\\\scriptsize($\nabla_{W_0}\mathcal{L} = 0$)};
+
+% Trainable LoRA matrices
+\node[trainable, text width=3.2cm, minimum height=1.1cm] (A) at (3.2, 1.4) {Matrix $A \in \mathbb{R}^{r \times k}$\\\scriptsize Init: $\mathcal{N}(0, \sigma^2)$};
+\node[trainable, text width=3.2cm, minimum height=1.1cm] (B) at (3.2, 3.6) {Matrix $B \in \mathbb{R}^{d \times r}$\\\scriptsize Init: $\mathbf{0}$};
+\node[font=\footnotesize\sffamily, text=crimsonRed!80] (scale) at (4.8, 2.5) {$\times \frac{\alpha}{r}$};
+
+% Addition
+\node[circ] (sum) at (0, 4.8) {$+$};
+
+% Output
+\node[font=\small\sffamily] (out) at (0, 5.8) {Output $h = W_0 x + \frac{\alpha}{r}BAx \in \mathbb{R}^d$};
+
+% Connecting paths
+\draw[arrow] (in) -- ++(0, 0.5) -| (w0.south);
+\draw[arrow] (in) -- ++(0, 0.5) -| (A.south);
+\draw[arrow] (A.north) -- (B.south) node[midway, right, font=\scriptsize] {$r \ll \min(d,k)$};
+\draw[arrow] (w0.north) |- (sum.west);
+\draw[arrow] (B.north) |- (sum.east);
+\draw[arrow] (sum.north) -- (out);
+
+\end{tikzpicture}
+\caption{Computational graph of Low-Rank Adaptation (LoRA). The original weight matrix $W_0$ is frozen during training. A parallel rank-decomposition path $B A$ computes the task-specific update, initialized to zero.}
+\label{fig:lora_architecture_reparameterization}
+\end{figure}
+
+\paragraph{Asymmetric Initialization Protocol.}
+To ensure optimization stability, LoRA enforces a strict asymmetric initialization protocol:
+\begin{itemize}
+    \item Matrix $A \in \mathbb{R}^{r \times k}$ is initialized from a zero-mean Gaussian distribution with variance $\sigma^2$: $A_{i,j} \sim \mathcal{N}\left(0, \frac{1}{r}\right)$.
+    \item Matrix $B \in \mathbb{R}^{d \times r}$ is initialized to \textbf{exact zeros}: $B = \mathbf{0}$.
+\end{itemize}
+Consequently, at optimization step $t = 0$:
+\begin{equation}
+\Delta W = \frac{\alpha}{r} B A = \frac{\alpha}{r} (\mathbf{0}) A = \mathbf{0}.
+\end{equation}
+The model begins fine-tuning from its exact pre-trained state without initial perturbation, bypassing warm-up instability.
+
+\paragraph{The Scaling Hyperparameter $\frac{\alpha}{r}$.}
+The scalar factor $\frac{\alpha}{r}$ stabilizes hyperparameter tuning when experimenting with different ranks $r$. In practice, $\alpha$ is set to a constant integer (typically $\alpha = 16$ or $\alpha = 32$). When scaling the rank $r$ from $8$ to $64$, the factor $\frac{\alpha}{r}$ automatically scales the magnitude of the low-rank update:
+\begin{equation}
+\Delta W \propto \frac{\alpha}{r}.
+\end{equation}
+This prevents the magnitude of activations in $B A x$ from exploding when increasing rank $r$, allowing practitioners to vary $r$ without aggressively retuning the learning rate $\eta$.
+
+\paragraph{Target Modules.}
+In a standard Transformer architecture, LoRA can theoretically be applied to any weight matrix. In practice, Hu et al.~\citep{hu2021lora} investigated adapting:
+\begin{itemize}
+    \item Query projection $W_Q$ and Value projection $W_V$ in Multi-Head Attention.
+    \item All attention projections: $W_Q, W_K, W_V, W_O$.
+    \item Feed-forward network projections: $W_{\text{gate}}, W_{\text{up}}, W_{\text{down}}$.
+\end{itemize}
+Adapting $W_Q$ and $W_V$ alone is often sufficient to recover full fine-tuning performance. However, adapting all linear layers with a smaller rank $r$ (e.g., $r=4$ across all layers) generally yields superior performance to adapting only $W_Q, W_V$ with a larger rank (e.g., $r=32$).
+
+\subsection{LoRA Systems and Serving Advantages}
+\label{subsec:lora_systems_advantages}
+
+LoRA introduces profound system-level advantages over both full fine-tuning and bottleneck adapters:
+
+\paragraph{1. Zero Inference Latency via Offline Weight Merging.}
+Unlike adapters, which introduce non-linearities and require sequential layer execution during inference, LoRA updates are purely linear. Prior to deploying the model for production inference, the low-rank delta $\Delta W$ can be computed once and directly added into the frozen base matrix $W_0$:
+\begin{equation}
+\label{eq:lora_weight_merging}
+W_{\text{merged}} = W_0 + \frac{\alpha}{r} B A \in \mathbb{R}^{d \times k}.
+\end{equation}
+Because matrix addition is associative:
+\begin{equation}
+W_{\text{merged}} x = \left(W_0 + \frac{\alpha}{r} B A\right) x = W_0 x + \frac{\alpha}{r} B A x.
+\end{equation}
+The deployed computational graph is identical in depth, parameter count, and execution speed to the original foundation model, introducing \textbf{exactly $0\%$ inference latency overhead}.
+
+\paragraph{2. Multi-Tenant Serving and Hot-Swapping.}
+In enterprise platforms serving dozens of customized client models (e.g., specialized legal, medical, and financial assistants), deploying full models would require hosting separate multi-gigabyte GPU instances. With LoRA, a single base model $W_0$ is maintained in GPU VRAM. When a request for task $t$ arrives, the server simply swaps the compact low-rank matrices $A_t, B_t$ (measuring tens of megabytes) into GPU memory, dynamically computing:
+\begin{equation}
+h = W_0 x + \frac{\alpha}{r} B_t A_t x.
+\end{equation}
+This architecture enables instant task hot-swapping and multi-tenant batching with minimal memory overhead.
+
+\paragraph{3. Training VRAM Savings via Optimizer Elimination.}
+During training, gradients $\nabla_\theta \mathcal{L}$ are computed exclusively for $A$ and $B$. Because $W_0$ is frozen, no gradients or optimizer moments are instantiated for the vast majority of network weights. For a 70B parameter model adapted with LoRA ($r=16$, representing $0.2\%$ trainable parameters), optimizer memory collapses from:
+\begin{equation}
+\text{Memory}_{\text{Adam}}^{\text{Full}} = 8 \times 70 \times 10^9 \text{ bytes} \approx 560\text{ GB} \implies \text{Memory}_{\text{Adam}}^{\text{LoRA}} = 8 \times 0.14 \times 10^9 \text{ bytes} \approx 1.12\text{ GB}.
+\end{equation}
+This allows fine-tuning large foundation models on standard consumer hardware.
+
+\subsection{Prompt Tuning and Soft Prompts}
+\label{subsec:prompt_tuning_soft}
+
+Distinct from structural parameter modification, \textbf{Prompt Tuning}~\citep{lester2021power} explores adaptation entirely within the input embedding space.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    scale=0.92, transform shape,
+    tok/.style={draw=politoNavy, fill=skyBlue!15, rounded corners=3pt, font=\scriptsize\sffamily, align=center, inner sep=4pt},
+    soft/.style={draw=crimsonRed!80, fill=crimsonRed!10, rounded corners=3pt, font=\scriptsize\bfseries\sffamily, align=center, inner sep=4pt},
+    model/.style={draw=politoNavy, fill=politoNavy!10, rounded corners=6pt, font=\small\bfseries\sffamily, align=center, minimum width=8.5cm, minimum height=1.5cm, thick},
+    arrow/.style={->, >=stealth, thick, politoNavy}
+]
+
+% Frozen Model
+\node[model] (llm) at (3.5, 2.5) {Pre-Trained Frozen LLM ($\theta_0$)\\\scriptsize($\nabla_{\theta_0} \mathcal{L} = 0$)};
+
+% Hard Prompt Tokens
+\node[tok] (t1) at (2.0, 0.5) {Token $x_1$};
+\node[tok] (t2) at (3.5, 0.5) {Token $x_2$};
+\node[tok] (t3) at (5.0, 0.5) {$\dots$};
+\node[tok] (t4) at (6.5, 0.5) {Token $x_N$};
+
+% Soft Prompt Tokens
+\node[soft] (p1) at (-0.8, 0.5) {Virtual $P_1$};
+\node[soft] (p2) at (0.5, 0.5) {Virtual $P_2$};
+
+% Labels
+\node[font=\footnotesize\sffamily, text=crimsonRed!80] at (-0.15, -0.2) {Trainable Soft Prompt ($P \in \mathbb{R}^{p \times d}$)};
+\node[font=\footnotesize\sffamily, text=politoNavy] at (4.25, -0.2) {Frozen Input Embeddings ($X \in \mathbb{R}^{N \times d}$)};
+
+% Output
+\node[font=\small\sffamily] (out) at (3.5, 4.2) {Task Output Prediction $\hat{y}$};
+
+% Connections
+\draw[arrow] (p1.north) -- ++(0, 0.8) -| (-0.8, 1.75);
+\draw[arrow] (p2.north) -- ++(0, 0.8) -| (0.5, 1.75);
+\draw[arrow] (t1.north) -- (2.0, 1.75);
+\draw[arrow] (t2.north) -- (3.5, 1.75);
+\draw[arrow] (t4.north) -- (6.5, 1.75);
+\draw[arrow] (llm.north) -- (out);
+
+\end{tikzpicture}
+\caption{Architecture of Prompt Tuning. A sequence of continuous, trainable virtual tokens $P$ is prepended to the input embeddings while the entire pre-trained language model remains completely frozen.}
+\label{fig:prompt_tuning_architecture}
+\end{figure}
+
+\paragraph{Hard Prompts versus Soft Prompts.}
+In conventional in-context learning and prompt engineering, prompts consist of \textbf{discrete tokens} drawn from the pre-trained vocabulary $\mathcal{V}$ (e.g., \texttt{"Translate English to French: "}). Discrete prompt design is inherently brittle: minor phrasing perturbations alter model completions unpredictably, and searching for optimal discrete tokens is a non-differentiable combinatorial problem.
+
+Prompt Tuning replaces discrete words with \textbf{continuous soft prompts}:
+\begin{itemize}
+    \item A sequence of $p$ virtual continuous prompt vectors $P = [p_1, p_2, \dots, p_p] \in \mathbb{R}^{p \times d}$ is prepended to the embedded input sequence $X \in \mathbb{R}^{N \times d}$.
+    \item The model operates on the concatenated representation $[P; X] \in \mathbb{R}^{(p + N) \times d}$.
+    \item The entire language model backbone $\theta_0$ is frozen. Only the soft prompt matrix $P$ is updated via gradient descent:
+    \begin{equation}
+    P^* = \arg\min_P \sum_{(X, Y) \in \mathcal{D}} \mathcal{L}(f_{\theta_0}([P; X]), Y).
+    \end{equation}
+\end{itemize}
+
+\paragraph{Scale Convergence.}
+Lester et al.~\citep{lester2021power} demonstrated an important scaling phenomenon: while prompt tuning underperforms full fine-tuning on small models ($\le 1\text{B}$ parameters), its performance rapidly converges as model scale increases. At $\mathbf{11\text{B}}$ parameters (T5-XXL), prompt tuning \textbf{matches full fine-tuning performance} across diverse tasks while training less than $0.01\%$ of model parameters.
+
+% ==============================================================================
+% SECTION 10.3: QUANTIZATION AND NUMERICAL PRECISION
+% ==============================================================================
+\section{Quantization and Numerical Precision}
+\label{sec:quantization_numerical_precision}
+
+While PEFT slashes the computational footprint of adaptation, serving multi-billion parameter models in production remains bottlenecked by hardware memory and bandwidth. Model quantization addresses this challenge by compressing continuous representations into discrete low-bit integer grids.
+
+\subsection{Numerical Representations in Deep Learning}
+\label{subsec:numerical_representations}
+
+Standard deep learning frameworks historically represent weights and activations in single-precision floating-point format:
+\begin{itemize}
+    \item \textbf{FP32 (IEEE 754 Single Precision)}: Consists of 1 sign bit ($s$), 8 exponent bits ($e$), and 23 mantissa/fraction bits ($m$), providing a dynamic range of approximately $1.18 \times 10^{-38}$ to $3.4 \times 10^{38}$. Each parameter consumes 4 bytes.
+    \item \textbf{FP16 (IEEE 754 Half Precision)}: Consists of 1 sign bit, 5 exponent bits, and 10 mantissa bits. With only 5 exponent bits, the positive normalized dynamic range is strictly bounded:
+    \begin{equation}
+    \text{Min}_{\text{normalized}} \approx 6.10 \times 10^{-5}, \quad \text{Max} = 65{,}504.
+    \end{equation}
+    This narrow dynamic range introduces extreme vulnerability to \textbf{underflow} (gradients smaller than $6.1 \times 10^{-5}$ flush to zero) and \textbf{overflow} (activations exceeding $65{,}504$ become $\text{NaN}$ or $\infty$), requiring loss scaling tricks during training.
+    \item \textbf{BF16 (Brain Floating Point 16)}: Engineered by Google Brain, BF16 reallocates bitwidths to feature 1 sign bit, \textbf{8 exponent bits} (matching FP32), and 7 mantissa bits. By preserving the 8-bit exponent, BF16 provides the identical dynamic range as FP32 ($\approx 10^{\pm 38}$), completely eliminating overflow/underflow hazards while reducing memory by $50\%$ compared to FP32.
+    \item \textbf{INT8 (8-bit Signed Integer)}: Represents discrete integers in the range $[-128, 127]$ (or symmetric range $[-127, 127]$). Each parameter consumes exactly 1 byte.
+\end{itemize}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    scale=0.95, transform shape,
+    bit/.style={draw=politoNavy, fill=white, minimum height=0.6cm, font=\scriptsize\sffamily, align=center},
+    sign/.style={draw=politoNavy, fill=crimsonRed!20, minimum height=0.6cm, font=\scriptsize\bfseries\sffamily},
+    exp/.style={draw=politoNavy, fill=skyBlue!20, minimum height=0.6cm, font=\scriptsize\bfseries\sffamily},
+    man/.style={draw=politoNavy, fill=steelBlue!20, minimum height=0.6cm, font=\scriptsize\bfseries\sffamily}
+]
+
+% FP32
+\node[anchor=west, font=\small\bfseries\sffamily] at (0, 3.2) {FP32 (Single Precision - 32 bits / 4 bytes):};
+\node[sign, minimum width=0.6cm] at (0.3, 2.6) {s};
+\node[exp, minimum width=3.2cm] at (2.2, 2.6) {Exponent (8 bits)};
+\node[man, minimum width=8.5cm] at (8.05, 2.6) {Mantissa / Fraction (23 bits)};
+
+% FP16
+\node[anchor=west, font=\small\bfseries\sffamily] at (0, 1.8) {FP16 (Half Precision - 16 bits / 2 bytes):};
+\node[sign, minimum width=0.6cm] at (0.3, 1.2) {s};
+\node[exp, minimum width=2.0cm] at (1.6, 1.2) {Exp (5)};
+\node[man, minimum width=4.0cm] at (4.6, 1.2) {Fraction (10 bits)};
+
+% BF16
+\node[anchor=west, font=\small\bfseries\sffamily] at (7.0, 1.8) {BF16 (Brain Float - 16 bits / 2 bytes):};
+\node[sign, minimum width=0.6cm] at (7.3, 1.2) {s};
+\node[exp, minimum width=3.2cm] at (9.2, 1.2) {Exponent (8 bits)};
+\node[man, minimum width=2.8cm] at (12.2, 1.2) {Fraction (7)};
+
+% INT8
+\node[anchor=west, font=\small\bfseries\sffamily] at (0, 0.4) {INT8 (Signed Integer - 8 bits / 1 byte):};
+\node[draw=politoNavy, fill=politoNavy!15, minimum width=3.2cm, minimum height=0.6cm, font=\scriptsize\bfseries\sffamily] at (1.6, -0.2) {Two's Complement: $[-128, 127]$};
+
+\end{tikzpicture}
+\caption{Bit-level memory allocation of standard deep learning numerical formats: FP32, FP16, BF16, and INT8.}
+\label{fig:numerical_bit_formats}
+\end{figure}
+
+\paragraph{Reduced Floating-Point Precision Baseline.}
+Before applying discrete quantization, converting a model from FP32 to half-precision (FP16 or BF16) via PyTorch (\texttt{model.half()} or \texttt{model.to(torch.bfloat16)}) immediately cuts the model's memory footprint by $50\%$ with negligible degradation in generation fidelity. Because values remain on continuous real manifolds, floating-point down-casting is not technically quantization.
+
+\subsection{Quantization Mechanics: Symmetric versus Asymmetric}
+\label{subsec:quantization_mechanics}
+
+Quantization is the mapping of continuous floating-point values $x \in [\alpha, \beta] \subset \mathbb{R}$ to a discrete grid of $b$-bit integer values $q \in [q_{\min}, q_{\max}] \subset \mathbb{Z}$. This mapping is governed by two fundamental parameters: the \textbf{scale factor} $S \in \mathbb{R}^+$ and the integer \textbf{zero-point} $Z \in \mathbb{Z}$.
+
+\paragraph{1. Symmetric (Absmax) Quantization.}
+In symmetric quantization, the continuous range is mirrored symmetrically around zero: $[-\gamma, \gamma]$, where $\gamma = \max(|x|)$. The continuous zero maps strictly to the integer zero ($Z = 0$).
+
+For an 8-bit signed integer target with symmetric range $[-127, 127]$ (leaving $-128$ unused to preserve exact symmetry):
+\begin{align}
+\label{eq:absmax_scale}
+S &= \frac{\max(|x|)}{127}, \\
+\label{eq:absmax_quant}
+q &= \text{clamp}\left(\left\lfloor \frac{x}{S} \right\rceil, -127, 127\right), \\
+\label{eq:absmax_dequant}
+\hat{x} &= q \cdot S,
+\end{align}
+where $\lfloor \cdot \rceil$ denotes rounding to the nearest integer, and $\text{clamp}(v, l, u) = \max(l, \min(v, u))$.
+
+\begin{intuition}[Preserving Zero in Symmetric Quantization]
+In deep learning activations produced by ReLU or zero-padded tensors, exact zeros occur with high frequency. Symmetric quantization guarantees that $x = 0$ maps identically to $q = 0$ with zero quantization error. This simplifies hardware computation, as sparse zero-skipping logic in Tensor Cores remains fully functional without offset corrections.
+\end{intuition}
+
+\paragraph{2. Asymmetric (Zero-Point) Quantization.}
+When tensor values are heavily skewed or non-negative (e.g., activations following a ReLU or GeLU function), symmetric quantization wastes nearly half of the representable integer range on empty negative regions. Asymmetric quantization maps the exact empirical minimum and maximum of the tensor $[\alpha, \beta] = [\min(x), \max(x)]$ across the full integer span $[q_{\min}, q_{\max}] = [-128, 127]$:
+\begin{align}
+\label{eq:zeropoint_scale}
+S &= \frac{\max(x) - \min(x)}{q_{\max} - q_{\min}} = \frac{\beta - \alpha}{255}, \\
+\label{eq:zeropoint_z}
+Z &= \text{round}\left(\frac{-\alpha}{S}\right) + q_{\min} = \text{round}\left(\frac{-255 \cdot \alpha}{\beta - \alpha}\right) - 128, \\
+\label{eq:zeropoint_quant}
+q &= \text{clamp}\left(\left\lfloor \frac{x}{S} \right\rceil + Z, -128, 127\right), \\
+\label{eq:zeropoint_dequant}
+\hat{x} &= S \cdot (q - Z).
+\end{align}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    scale=0.95, transform shape,
+    axis/.style={thick, ->, >=stealth, politoNavy},
+    grid_line/.style={thin, dashed, steelBlue!40},
+    point/.style={circle, fill=crimsonRed, inner sep=2pt}
+]
+
+% Continuous Number Line
+\draw[axis] (-6, 3) -- (6, 3) node[right, font=\small\sffamily] {Float32 Domain};
+\draw[thick] (-5.2, 3.15) -- (-5.2, 2.85) node[below, font=\scriptsize\sffamily] {$-5.2$};
+\draw[thick] (0, 3.15) -- (0, 2.85) node[below, font=\scriptsize\sffamily] {$0.0$};
+\draw[thick] (1.1, 3.15) -- (1.1, 2.85) node[below, font=\scriptsize\sffamily] {$1.1$};
+\draw[thick] (4.3, 3.15) -- (4.3, 2.85) node[below, font=\scriptsize\sffamily] {$4.3$};
+
+% Absmax Grid
+\draw[axis] (-6, 1.2) -- (6, 1.2) node[right, font=\small\sffamily] {Absmax (Symmetric)};
+\draw[thick] (-5.2, 1.35) -- (-5.2, 1.05) node[below, font=\scriptsize\sffamily] {$-127$};
+\draw[thick] (0, 1.35) -- (0, 1.05) node[below, font=\scriptsize\sffamily] {$0$ (Exact)};
+\draw[thick] (1.1, 1.35) -- (1.1, 1.05) node[below, font=\scriptsize\sffamily] {$27$};
+\draw[thick] (4.3, 1.35) -- (4.3, 1.05) node[below, font=\scriptsize\sffamily] {$105$};
+\draw[thick] (5.2, 1.35) -- (5.2, 1.05) node[below, font=\scriptsize\sffamily] {$+127$};
+
+% Zero-point Grid
+\draw[axis] (-6, -0.6) -- (6, -0.6) node[right, font=\small\sffamily] {Zero-Point (Asymmetric)};
+\draw[thick] (-5.2, -0.45) -- (-5.2, -0.75) node[below, font=\scriptsize\sffamily] {$-128$};
+\draw[thick] (0, -0.45) -- (0, -0.75) node[below, font=\scriptsize\sffamily] {$12$ ($Z$)};
+\draw[thick] (1.1, -0.45) -- (1.1, -0.75) node[below, font=\scriptsize\sffamily] {$41$};
+\draw[thick] (4.3, -0.45) -- (4.3, -0.75) node[below, font=\scriptsize\sffamily] {$+127$};
+
+% Mapping arrows
+\draw[->, dashed, steelBlue] (-5.2, 2.8) -- (-5.2, 1.4);
+\draw[->, dashed, steelBlue] (0, 2.8) -- (0, 1.4);
+\draw[->, dashed, steelBlue] (1.1, 2.8) -- (1.1, 1.4);
+\draw[->, dashed, steelBlue] (4.3, 2.8) -- (4.3, 1.4);
+
+\draw[->, dashed, steelBlue] (-5.2, 1.0) -- (-5.2, -0.4);
+\draw[->, dashed, steelBlue] (0, 1.0) -- (0, -0.4);
+\draw[->, dashed, steelBlue] (1.1, 1.0) -- (1.1, -0.4);
+\draw[->, dashed, steelBlue] (4.3, 1.0) -- (4.3, -0.4);
+
+\end{tikzpicture}
+\caption{Visual comparison of Absmax (symmetric) versus Zero-Point (asymmetric) quantization mappings for the continuous vector $[-5.2, 4.3, 1.1, 0.0]$.}
+\label{fig:quantization_grid_comparison}
+\end{figure}
+
+\paragraph{Complete Numerical Walkthrough (The Lecture Example).}
+To ground these formulas, consider the exact numerical vector examined in the lecture slides:
+\begin{equation}
+X = [-5.2, \; 4.3, \; 1.1, \; 0.0].
+\end{equation}
+
+\noindent\textbf{1. Absmax Quantization Walkthrough:}
+\begin{itemize}
+    \item Identify the maximum absolute magnitude: $\gamma = \max(|-5.2|, |4.3|, |1.1|, |0.0|) = 5.2$.
+    \item Compute the scale factor $S$:
+    \begin{equation}
+    S = \frac{5.2}{127} \approx 0.04094488.
+    \end{equation}
+    \item Quantize each continuous coordinate $q_i = \text{round}\left(\frac{x_i}{S}\right)$:
+    \begin{align}
+    q_1 &= \text{round}\left(\frac{-5.2}{0.04094488}\right) = \text{round}(-127.0) = \mathbf{-127}, \\
+    q_2 &= \text{round}\left(\frac{4.3}{0.04094488}\right) = \text{round}(105.019) = \mathbf{105}, \\
+    q_3 &= \text{round}\left(\frac{1.1}{0.04094488}\right) = \text{round}(26.865) = \mathbf{27}, \\
+    q_4 &= \text{round}\left(\frac{0.0}{0.04094488}\right) = \mathbf{0}.
+    \end{align}
+    \item Dequantize to reconstruct floating-point approximations $\hat{x}_i = q_i \cdot S$:
+    \begin{align}
+    \hat{x}_1 &= -127 \times 0.04094488 = -5.200, \quad (\text{Error} = 0.000) \\
+    \hat{x}_2 &= 105 \times 0.04094488 = 4.2992, \quad (\text{Error} = 0.0008) \\
+    \hat{x}_3 &= 27 \times 0.04094488 = 1.1055, \quad (\text{Error} = 0.0055) \\
+    \hat{x}_4 &= 0 \times 0.04094488 = 0.000, \quad (\text{Error} = 0.000).
+    \end{align}
+\end{itemize}
+
+\noindent\textbf{2. Zero-Point Quantization Walkthrough:}
+\begin{itemize}
+    \item Identify domain bounds: $\alpha = \min(X) = -5.2$, $\beta = \max(X) = 4.3$.
+    \item Compute asymmetric scale factor $S$:
+    \begin{equation}
+    S = \frac{4.3 - (-5.2)}{255} = \frac{9.5}{255} \approx 0.0372549.
+    \end{equation}
+    \item Compute integer zero-point $Z$:
+    \begin{equation}
+    Z = \text{round}\left(\frac{-(-5.2)}{0.0372549}\right) - 128 = \text{round}(139.579) - 128 = 140 - 128 = \mathbf{12}.
+    \end{equation}
+    \item Quantize each coordinate $q_i = \text{round}\left(\frac{x_i}{S}\right) + Z$:
+    \begin{align}
+    q_1 &= \text{round}\left(\frac{-5.2}{0.0372549}\right) + 12 = -140 + 12 = \mathbf{-128}, \\
+    q_2 &= \text{round}\left(\frac{4.3}{0.0372549}\right) + 12 = 115 + 12 = \mathbf{127}, \\
+    q_3 &= \text{round}\left(\frac{1.1}{0.0372549}\right) + 12 = 30 + 12 = \mathbf{42}, \\
+    q_4 &= \text{round}\left(\frac{0.0}{0.0372549}\right) + 12 = 0 + 12 = \mathbf{12}.
+    \end{align}
+    \item Dequantize to reconstruct approximations $\hat{x}_i = S \cdot (q_i - Z)$:
+    \begin{align}
+    \hat{x}_1 &= 0.0372549 \times (-128 - 12) = -5.2157 \approx -5.200, \\
+    \hat{x}_2 &= 0.0372549 \times (127 - 12) = 4.2843 \approx 4.300, \\
+    \hat{x}_3 &= 0.0372549 \times (42 - 12) = 1.1176, \quad (\text{Error} = 0.0176) \\
+    \hat{x}_4 &= 0.0372549 \times (12 - 12) = 0.000.
+    \end{align}
+\end{itemize}
+
+\subsection{Quantization Paradigms: PTQ and QAT}
+\label{subsec:ptq_vs_qat}
+
+Depending on when quantization parameters are derived, quantization pipelines are categorized into Post-Training Quantization and Quantization-Aware Training:
+
+\paragraph{Post-Training Quantization (PTQ).}
+In PTQ, a model is trained to convergence in standard full precision ($\text{FP32}$ or $\text{BF16}$). Afterward, weights and activation tensors are mapped into low-bit integers without modifying the underlying weights through backpropagation. PTQ is computationally instantaneous and requires no training pipeline, but exhibits noticeable accuracy degradation when quantizing below 8 bits (e.g., 4-bit or 3-bit weights).
+
+\paragraph{Quantization-Aware Training (QAT).}
+QAT incorporates the distortion introduced by quantization directly into the training loop:
+\begin{itemize}
+    \item \textbf{Forward Pass with Fake Quantization}: Model weights and activations are stored in full precision ($\text{FP32}$), but passed through a non-differentiable "fake quantization" operator $q_{\text{fake}}(x) = S \cdot \text{clamp}\left(\lfloor x/S \rceil, q_{\min}, q_{\max}\right)$. Computations simulate discrete clamping and rounding errors while preserving high-precision accumulators.
+    \item \textbf{Backward Pass with Straight-Through Estimators (STE)}: Because the rounding function $\lfloor v \rceil$ has a derivative of zero almost everywhere and is undefined at half-integers, standard gradient backpropagation fails ($\frac{\partial \lfloor v \rceil}{\partial v} = 0$). QAT resolves this by deploying the **Straight-Through Estimator**~\citep{bengio2013estimating}:
+    \begin{equation}
+    \label{eq:ste_derivative}
+    \frac{\partial q_{\text{fake}}(x)}{\partial x} \approx \begin{cases} 1 & \text{if } x \in [\alpha, \beta], \\ 0 & \text{otherwise}. \end{cases}
+    \end{equation}
+    Gradients pass straight through the rounding operator to update underlying floating-point weights, adapting the model to compensate for rounding noise.
+\end{itemize}
+
+\subsection{Activation Quantization: Static versus Dynamic}
+\label{subsec:static_vs_dynamic_quant}
+
+Quantizing weights is straightforward because weight tensors are static post-training; their minimum and maximum values can be analyzed offline. In contrast, **activation tensors** depend dynamically on input tokens passed through the network during inference. Handling activation quantization involves two distinct strategies:
+
+\paragraph{1. Static Quantization.}
+In static quantization, activation scales $S$ and zero-points $Z$ are precomputed offline and frozen:
+\begin{itemize}
+    \item A representative unlabeled calibration dataset (typically a few thousand sequences) is passed through the model.
+    \item Observers record the empirical distribution, histograms, and dynamic ranges of activation tensors at each layer.
+    \item Fixed values for $S$ and $Z$ are written into the model graph.
+    \item \textbf{Trade-off}: Inference is extremely fast because scale constants are static, but if runtime inputs diverge from the calibration distribution, clipping and saturation degrade model performance.
+\end{itemize}
+
+\paragraph{2. Dynamic Quantization.}
+In dynamic quantization, scale and zero-point parameters are computed dynamically on-the-fly for every individual activation tensor during the forward pass:
+\begin{itemize}
+    \item As hidden state $X_l$ arrives at layer $l$, the hardware immediately computes $\min(X_l)$ and $\max(X_l)$, derives $S_{X_l}$, quantizes $X_l \to Q_{X_l}$, performs integer matrix multiplication with quantized weights, and dequantizes the result.
+    \item \textbf{Trade-off}: Dynamic quantization eliminates calibration sets and provides superior accuracy across diverse inputs, but calculating scale factors dynamically during inference introduces non-negligible computational overhead.
+\end{itemize}
+
+\subsection{Outlier Features and LLM.int8()}
+\label{subsec:llm_int8_outliers}
+
+When scaling Post-Training Quantization to multi-billion parameter foundation models, researchers observed a catastrophic phenomenon: while INT8 quantization works flawlessly on small models ($\le 2.7\text{B}$ parameters), it causes \textbf{complete performance collapse} on models exceeding $6.7\text{B}$ parameters.
+
+\paragraph{The Emergent Outlier Dimension Phenomenon.}
+Dettmers et al.~\citep{dettmers2022llmint8} discovered the root cause of this failure: as Transformer language models scale beyond $6.7\text{B}$ parameters, they exhibit the emergence of **extreme outlier features**. In approximately $0.1\%$ of hidden state dimensions, activation values suddenly spike to magnitudes exceeding $\pm 6.0$, reaching up to $\pm 100$ (over $20\times$ the standard deviation of remaining coordinates). 
+
+Crucially, these outliers are not random noise: they consistently concentrate in the identical coordinate channels across all sequence positions and coordinate dimensions, encoding essential cross-attention syntactic markers and core reasoning patterns.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    scale=0.92, transform shape,
+    box/.style={draw=politoNavy, fill=skyBlue!15, rounded corners=4pt, font=\small\sffamily, align=center, thick},
+    outlier/.style={draw=crimsonRed!80, fill=crimsonRed!15, rounded corners=4pt, font=\small\bfseries\sffamily, align=center, thick},
+    int8/.style={draw=steelBlue, fill=steelBlue!15, rounded corners=4pt, font=\small\sffamily, align=center, thick},
+    arrow/.style={->, >=stealth, thick, politoNavy}
+]
+
+% Input Activation Matrix X
+\node[font=\small\bfseries\sffamily] at (1.5, 4.2) {Activation Matrix $X \in \mathbb{R}^{T \times d}$};
+\draw[draw=politoNavy, fill=white, thick] (0, 0.5) rectangle (3.0, 3.8);
+\draw[fill=crimsonRed!30, draw=crimsonRed!80, thick] (0.8, 0.5) rectangle (1.2, 3.8) node[midway, rotate=90, font=\scriptsize\bfseries] {Outlier Ch};
+\draw[fill=crimsonRed!30, draw=crimsonRed!80, thick] (2.2, 0.5) rectangle (2.6, 3.8) node[midway, rotate=90, font=\scriptsize\bfseries] {Outlier Ch};
+\node[font=\scriptsize\sffamily] at (1.5, 0.1) {$99.9\%$ Standard / $0.1\%$ Outlier};
+
+% Weight Matrix W
+\node[font=\small\bfseries\sffamily] at (6.5, 4.2) {Weight Matrix $W \in \mathbb{R}^{d \times k}$};
+\draw[draw=politoNavy, fill=white, thick] (5.0, 0.5) rectangle (8.0, 3.8);
+\draw[fill=crimsonRed!30, draw=crimsonRed!80, thick] (5.0, 2.7) rectangle (8.0, 2.3) node[midway, font=\scriptsize\bfseries] {Outlier Row};
+\draw[fill=crimsonRed!30, draw=crimsonRed!80, thick] (5.0, 1.3) rectangle (8.0, 0.9) node[midway, font=\scriptsize\bfseries] {Outlier Row};
+
+% Decomposition split
+\node[outlier, text width=4.5cm] (fp16_mult) at (11.8, 3.0) {\textbf{FP16 Matrix Multiply}\\$X_{\text{outlier}} \cdot W_{\text{outlier}}$\\($\approx 0.1\%$ coordinate columns)};
+\node[int8, text width=4.5cm] (int8_mult) at (11.8, 1.2) {\textbf{INT8 Matrix Multiply}\\$Q_X \cdot Q_W \cdot S$\\($\approx 99.9\%$ standard channels)};
+
+% Addition
+\node[circle, draw=politoNavy, fill=white, thick, inner sep=2pt] (sum) at (15.0, 2.1) {$+$};
+\node[font=\small\bfseries\sffamily] (out) at (17.5, 2.1) {Exact Output\\$Y \in \mathbb{R}^{T \times k}$};
+
+\draw[arrow] (3.1, 2.8) -- (fp16_mult.west);
+\draw[arrow] (3.1, 1.5) -- (int8_mult.west);
+\draw[arrow] (fp16_mult.east) -| (sum.north);
+\draw[arrow] (int8_mult.east) -| (sum.south);
+\draw[arrow] (sum.east) -- (out);
+
+\end{tikzpicture}
+\caption{Mixed-precision decomposition in LLM.int8(). Activations and weights are decomposed into a 16-bit floating-point stream for the $0.1\%$ outlier coordinate channels and an 8-bit integer stream for the remaining $99.9\%$ standard channels.}
+\label{fig:llm_int8_decomposition}
+\end{figure}
+
+\paragraph{Why Outliers Break Standard INT8 Quantization.}
+If a tensor coordinate reaches $x_{\max} = 100$ while typical features hover in $[-1.0, 1.0]$, Absmax quantization sets:
+\begin{equation}
+S = \frac{100}{127} \approx 0.787.
+\end{equation}
+When standard features $x \in [-1.0, 1.0]$ are divided by $S \approx 0.787$, they all collapse into integer bins $\{-1, 0, 1\}$. Truncating continuous variance across $99.9\%$ of hidden features obliterates representational resolution, causing generation perplexity to diverge.
+
+\paragraph{LLM.int8(): Mixed-Precision Matrix Decomposition.}
+To solve this, Dettmers et al.~\citep{dettmers2022llmint8} introduced two structural innovations:
+\begin{enumerate}
+    \item \textbf{Vector-Wise Quantization}: Instead of computing a single global scale factor $S$ for an entire activation matrix, scale constants are calculated per-row for activations and per-column for weights, isolating variance across tokens.
+    \item \textbf{Mixed-Precision Decomposition}: For any feature dimension where coordinate magnitude exceeds a threshold $\alpha = 6.0$, that entire channel is extracted into a sparse sub-matrix:
+    \begin{equation}
+    \label{eq:llm_int8_decomp}
+    X W = \underbrace{X_{\text{outlier}} W_{\text{outlier}}}_{\text{16-bit Floating-Point (FP16)}} + \underbrace{S_X S_W \left(Q_{X_{\text{standard}}} \cdot Q_{W_{\text{standard}}}\right)}_{\text{8-bit Integer (INT8)}}.
+    \end{equation}
+\end{enumerate}
+By handling the $0.1\%$ outlier coordinates in FP16 and executing the remaining $99.9\%$ in INT8 via Tensor Cores, LLM.int8() recovers \textbf{$100\%$ of full FP16 performance} on models up to 175B parameters while reducing GPU memory consumption by exactly half ($2\times$ memory reduction).
+
+% ==============================================================================
+% SECTION 10.4: KNOWLEDGE DISTILLATION & SERVING OPTIMIZATION
+% ==============================================================================
+\section{Knowledge Distillation and Serving Optimization}
+\label{sec:distillation_serving_optimization}
+
+Beyond altering numerical representations of a single model, machine learning provides methods to train inherently smaller student architectures via knowledge distillation, and to eliminate hardware latency walls during autoregressive serving.
+
+\subsection{Teacher-Student Knowledge Distillation}
+\label{subsec:teacher_student_distillation}
+
+\begin{definition}{Knowledge Distillation}{def_knowledge_distill}
+\textbf{Knowledge Distillation}~\citep{hinton2015distilling} is a compression technique wherein a compact "Student" model $S_\theta$ is trained under the supervision of a larger, highly parameterized "Teacher" model $T_\phi$ (or ensemble of teachers), transferring learned representational capacity without duplicating network depth or width.
+\end{definition}
+
+\paragraph{Hard Labels versus Soft Targets ("Dark Knowledge").}
+In standard supervised training, models learn from one-hot target vectors where the ground truth class has probability $1.0$ and all non-target classes have probability $0.0$:
+\begin{equation}
+y = [0, \; 0, \; 1, \; 0, \; \dots, \; 0]^T.
+\end{equation}
+One-hot hard targets provide zero information regarding semantic relationships across non-target tokens. In contrast, the output probability distribution of a well-trained teacher model contains rich inter-class affinities:
+\begin{equation}
+p_T = [\text{dog}: 0.05, \; \text{kitten}: 0.25, \; \text{cat}: 0.60, \; \text{automobile}: 10^{-7}].
+\end{equation}
+Hinton et al. coined these non-target probabilities \textbf{"dark knowledge"}: they inform the student that a "cat" is semantically similar to a "kitten" and completely dissimilar to an "automobile", providing substantially denser gradient signals than binary ground-truth labels.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    scale=0.92, transform shape,
+    teacher/.style={draw=politoNavy, fill=skyBlue!15, rounded corners=6pt, font=\small\bfseries\sffamily, align=center, thick, minimum width=3.8cm, minimum height=1.6cm},
+    student/.style={draw=crimsonRed!80, fill=crimsonRed!10, rounded corners=6pt, font=\small\bfseries\sffamily, align=center, thick, minimum width=3.8cm, minimum height=1.6cm},
+    loss_box/.style={draw=steelBlue, fill=white, rounded corners=4pt, font=\scriptsize\sffamily, align=center, thick, inner sep=5pt},
+    arrow/.style={->, >=stealth, thick, politoNavy}
+]
+
+% Input
+\node[font=\small\sffamily] (input) at (0, 2) {Input Sequence $x$};
+
+% Teacher and Student Nodes
+\node[teacher] (T) at (3.5, 3.5) {Teacher Model $T_\phi$\\\scriptsize(Large / Frozen Backbone)};
+\node[student] (S) at (3.5, 0.5) {Student Model $S_\theta$\\\scriptsize(Compact / Trainable)};
+
+% Logits
+\node[font=\scriptsize\sffamily] (zT) at (6.8, 3.5) {Teacher Logits $z_T$\\Temp Scaling $T$};
+\node[font=\scriptsize\sffamily] (zS) at (6.8, 0.5) {Student Logits $z_S$\\Temp Scaling $T$};
+
+% Soft Probabilities
+\node[font=\scriptsize\sffamily] (pT) at (9.8, 3.5) {Soft Probabilities\\$p_T = \text{Softmax}(z_T / T)$};
+\node[font=\scriptsize\sffamily] (pS) at (9.8, 0.5) {Soft Probabilities\\$p_S = \text{Softmax}(z_S / T)$};
+
+% Loss Nodes
+\node[loss_box, text width=3.5cm] (kl_loss) at (13.5, 2.0) {\textbf{Distillation Loss}\\$\mathcal{L}_{\text{KD}} = T^2 \cdot \mathcal{D}_{\text{KL}}(p_T \parallel p_S)$};
+\node[loss_box, text width=3.5cm] (ce_loss) at (9.8, -1.2) {\textbf{Supervised Hard Loss}\\$\mathcal{L}_{\text{CE}} = -\log p_S(y \mid x)$};
+
+% Connections
+\draw[arrow] (input) |- (T.west);
+\draw[arrow] (input) |- (S.west);
+\draw[arrow] (T.east) -- (zT);
+\draw[arrow] (zT) -- (pT);
+\draw[arrow] (S.east) -- (zS);
+\draw[arrow] (zS) -- (pS);
+\draw[arrow] (pT) -| (kl_loss.north);
+\draw[arrow] (pS) -| (kl_loss.south);
+\draw[arrow] (zS.south) |- (ce_loss.west);
+
+\end{tikzpicture}
+\caption{Knowledge Distillation framework. The student is trained simultaneously to minimize Kullback-Leibler divergence against the temperature-softened probabilities of the teacher and cross-entropy loss against hard ground-truth labels.}
+\label{fig:knowledge_distillation_pipeline}
+\end{figure}
+
+\paragraph{Temperature Scaling and Loss Formulation.}
+Standard Softmax distributions on well-trained models are highly peaked, assigning probabilities near zero to all non-target classes. To reveal the dark knowledge in non-target logits, Hinton et al. introduced a **temperature hyperparameter** $T \ge 1$:
+\begin{equation}
+\label{eq:softmax_temperature}
+p_i(T) = \frac{\exp(z_i / T)}{\sum_j \exp(z_j / T)}.
+\end{equation}
+As $T \to \infty$, the output distribution smooths out, exposing the fine-grained relative affinities across classes.
+
+The complete training objective combines the distillation loss (Kullback-Leibler divergence between softened teacher and student distributions) with standard cross-entropy loss against ground truth labels:
+\begin{equation}
+\label{eq:kd_complete_loss}
+\mathcal{L}_{\text{Total}} = (1 - \alpha) \mathcal{L}_{\text{CE}}(y, \text{Softmax}(z_S)) + \alpha T^2 \mathcal{D}_{\text{KL}}\left(\text{Softmax}\left(\frac{z_T}{T}\right) \;\Big\|\; \text{Softmax}\left(\frac{z_S}{T}\right)\right).
+\end{equation}
+
+\begin{intuition}[Why Multiply the KL Term by $T^2$?]
+When calculating gradients of the KL divergence with respect to the student logits $z_S$ under temperature $T$, applying the chain rule introduces a scaling factor of $\frac{1}{T^2}$ in the magnitude of the gradients:
+\begin{equation}
+\frac{\partial \mathcal{D}_{\text{KL}}}{\partial z_{S,i}} \approx \frac{1}{T^2} (z_{S,i} - z_{T,i}) \quad (\text{for large } T).
+\end{equation}
+Multiplying the distillation loss by $T^2$ balances gradient magnitudes between the distillation objective and the standard cross-entropy objective, preventing the soft target signal from vanishing when high temperatures are selected.
+\end{intuition}
+
+\subsection{Distillation in Large Language Models}
+\label{subsec:distillation_in_llms}
+
+In language modeling, distillation has yielded foundational compact architectures:
+\begin{itemize}
+    \item \textbf{DistilBERT}~\citep{sanh2019distilbert}: Distills BERT-Base (12 layers) into a 6-layer student by initializing student weights from alternating layers of the teacher. Trained on a triple objective: distillation loss on softened logits, masked language modeling loss on hard tokens, and cosine embedding distance loss between hidden representations. DistilBERT is \textbf{$40\%$ smaller}, \textbf{$60\%$ faster}, and retains \textbf{$97\%$ of BERT's language understanding performance}.
+    \item \textbf{TinyBERT}~\citep{jiao2020tinybert}: Performs intermediate layer distillation, aligning attention matrices and hidden states layer-by-layer between teacher and student. A 4-layer TinyBERT achieves \textbf{$7.5\times$ parameter reduction} and \textbf{$9.4\times$ faster inference} while retaining $96.8\%$ performance on GLUE.
+    \item \textbf{MiniLM}~\citep{wang2020minilm}: Distills self-attention relation distributions (query-query, key-key, and value-value dot products) rather than raw hidden states, freeing the student architecture from matching the exact hidden dimensionality of the teacher.
+    \item \textbf{Sequence-Level Distillation}: In generative foundation models (e.g., distilling frontier models like GPT-4 into open-weights models like Llama or Mistral), distillation often operates at the dataset level: the teacher generates complex step-by-step reasoning chains, synthetic instructions, or multi-turn dialogues, which the student ingests via supervised fine-tuning.
+\end{itemize}
+
+\subsection{Inference Serving Dynamics and Memory Bottlenecks}
+\label{subsec:serving_dynamics_kv_cache}
+
+Deploying compressed models in production requires understanding the physical hardware constraints of modern GPUs (e.g., NVIDIA H100/A100).
+
+\paragraph{Arithmetic Intensity and the Memory Wall.}
+The performance of any deep learning computation on hardware is governed by its \textbf{arithmetic intensity}:
+\begin{equation}
+\label{eq:arithmetic_intensity}
+\text{Arithmetic Intensity} = \frac{\text{Total Floating-Point Operations (FLOPs)}}{\text{Total Memory Transferred (Bytes)}}.
+\end{equation}
+A workload is **compute-bound** if arithmetic intensity is high (the hardware tensor cores operate at peak capacity). It is **memory-bandwidth bound** if arithmetic intensity is low (the tensor cores spend most cycles idling while waiting for weights and activations to transfer from High-Bandwidth Memory / HBM across the memory bus into on-chip SRAM).
+
+\paragraph{The Two Phases of LLM Inference.}
+Autoregressive generation naturally divides into two fundamentally distinct operating regimes:
+\begin{enumerate}
+    \item \textbf{Prefill Phase (Prompt Ingestion)}: The model ingests all $N$ tokens of the input prompt simultaneously. Self-attention executes full matrix-matrix multiplications ($Q K^T$), which has high arithmetic intensity ($\mathcal{O}(N)$ FLOPs per byte transferred). The prefill phase is \textbf{compute-bound}.
+    \item \textbf{Decoding Phase (Autoregressive Generation)}: To generate token $t+1$, the model passes only a single query token vector $q_t \in \mathbb{R}^{1 \times d}$ through the network. Multiplying a single vector against large weight matrices $W \in \mathbb{R}^{d \times d}$ yields an arithmetic intensity of roughly $\frac{2 d^2}{2 d^2} \approx 1\text{ FLOP/byte}$. The decoding phase is severely \textbf{memory-bandwidth bound}.
+\end{enumerate}
+
+\paragraph{The Key-Value (KV) Cache.}
+Because generating token $t+1$ depends causally on all preceding tokens $1, \dots, t$, naive generation would require recomputing attention keys $K$ and values $V$ for all past tokens at every forward step, scaling computational complexity quadratically $\mathcal{O}(T^2)$.
+
+To eliminate redundant computation, inference engines store past key and value vectors in GPU VRAM, maintaining the **Key-Value (KV) Cache**. At step $t$, the network computes keys and values only for the newly generated token, concatenating them to the cache.
+
+\begin{theorem}{KV Cache Memory Footprint}{thm_kv_cache_memory}
+For a Transformer model with $L$ layers, $h_{\text{KV}}$ key-value attention heads, per-head dimension $d_k$, context window length $T$, batch size $B$, and numerical precision $b$ bytes per parameter, the GPU memory consumed exclusively by the KV cache is:
+\begin{equation}
+\label{eq:kv_cache_formula}
+\text{Memory}_{\text{KV}} = 2 \cdot b \cdot B \cdot L \cdot h_{\text{KV}} \cdot d_k \cdot T \quad \text{bytes},
+\end{equation}
+where the leading factor of $2$ accounts for storing both key and value tensors.
+\end{theorem}
+
+\paragraph{Worked Sizing Example.}
+Consider serving a LLaMA-2 70B model ($L = 80$, $h = 64$ attention heads, $d_k = 128$) at half precision ($b = 2$ bytes for $\text{FP16}$):
+\begin{itemize}
+    \item For a single sequence ($B = 1$) at context length $T = 4096$:
+    \begin{equation}
+    \text{Memory}_{\text{KV}} = 2 \times 2 \times 1 \times 80 \times 64 \times 128 \times 4096 = 10{,}737{,}418{,}240 \text{ bytes} \approx 10.74\text{ GB}.
+    \end{equation}
+    \item For a concurrent production batch of $B = 32$ requests at full context length $T = 4096$:
+    \begin{equation}
+    \text{Memory}_{\text{KV}}^{\text{Batch}} = 32 \times 10.74\text{ GB} \approx \mathbf{343.68\text{ GB of VRAM}}.
+    \end{equation}
+\end{itemize}
+At scale, the dynamic KV cache rapidly outgrows the static weight memory of the model itself. This memory wall directly motivates architectural innovations studied throughout modern systems engineering:
+\begin{itemize}
+    \item \textbf{Grouped-Query Attention (GQA)}: Sharing single key-value heads across multiple query heads ($h_{\text{KV}} \ll h_Q$), reducing KV cache memory by $8\times$.
+    \item \textbf{KV Cache Quantization}: Storing cached keys and values in 8-bit or 4-bit integers ($b = 1$ or $b = 0.5$), cutting serving footprint in half.
+    \item \textbf{PagedAttention and vLLM}: Managing KV cache memory via virtual memory paging to eliminate external fragmentation.
+\end{itemize}
+
+\end{document}
+"""
+
+out_file.write_text(content.strip() + "\n", encoding="utf-8")
+print(f"Successfully generated {out_file} ({len(content.split())} words, {len(content.splitlines())} lines)")

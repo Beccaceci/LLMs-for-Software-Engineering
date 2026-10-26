@@ -1,4 +1,4 @@
-\documentclass[../../main.tex]{subfiles}
+\documentclass[../../../main.tex]{subfiles}
 
 \begin{document}
 
@@ -1380,55 +1380,6 @@ To safeguard evaluation integrity, modern foundation model research employs rigo
     \item \textbf{Dynamic and synthetic benchmarks}: Generating novel evaluation instances on-the-fly (e.g., dynamic arithmetic problems or continuous human evaluation arenas like Chatbot Arena) that can never appear in static training crawls.
 \end{itemize}
 
-\clearpage
-% ==============================================================================
-% SECTION 7.4: SYNTHESIS & COMPARATIVE LANDSCAPE
-% ==============================================================================
-\section{Evaluation Challenges and Synthesis}
-\label{sec:evaluation_synthesis}
 
-To provide a comprehensive reference for researchers and software engineers, Table~\ref{tab:evaluation_comprehensive_matrix} synthesizes the entire hierarchy of language model evaluation examined in this chapter, connecting evaluation paradigms, operational metrics, canonical benchmark datasets, and primary failure modes.
-
-\begin{table}[htbp]
-\centering
-\scriptsize
-\caption{Comprehensive synthesis of language model evaluation paradigms, tasks, canonical datasets, standard metrics, and structural failure modes.}
-\label{tab:evaluation_comprehensive_matrix}
-\begin{tabularx}{\textwidth}{l p{2.8cm} p{3.2cm} p{2.8cm} X}
-\toprule
-\textbf{Paradigm} & \textbf{Core Task} & \textbf{Canonical Datasets} & \textbf{Standard Metrics} & \textbf{Primary Failure Modes} \\
-\midrule
-\textbf{Intrinsic Likelihood} 
-    & Next-token prediction & Raw text corpora & Perplexity ($\PPL$), Cross-Entropy & Incomparable across tokenizers; rewards surface familiarity over truth. \\
-\addlinespace
-\textbf{Lexical Surface Matching} 
-    & Machine translation, summarization & WMT, CNN/Daily Mail & BLEU-$n$, ROUGE-$N$, ROUGE-L, METEOR & Semantic blindness; penalizes valid paraphrasing; negation insensitivity. \\
-\addlinespace
-\textbf{Semantic Embeddings} 
-    & Paraphrase generation, open dialogue & General NLG corpora & BERTScore ($P_{\text{BERT}}, R_{\text{BERT}}, F_{\text{BERT}}$) & High computational cost; opaque interpretability (``BERT says so''). \\
-\addlinespace
-\textbf{Exact Match \& Ranking} 
-    & Extractive QA, multiple choice & SQuAD, Natural Questions & Exact Match ($\EM$), MRR, NDCG@$k$, Hit@$k$ & Zero partial credit; sensitive to superficial formatting discrepancies. \\
-\addlinespace
-\textbf{Linguistic Inference} 
-    & NLI, grammatical acceptability & SNLI, MultiNLI, CoLA & Accuracy, Macro-$F_1$, MCC & Susceptible to lexical overlap heuristics; dataset artifact exploitation. \\
-\addlinespace
-\textbf{Multi-Step Reasoning} 
-    & Grade-school \& competition math & GSM8K, MATH & Exact Match on final answer, $\PassAtK{1}$ & Calculation brittleness; superficial step hallucination; CoT drift. \\
-\addlinespace
-\textbf{Commonsense \& Causality} 
-    & Ambiguity resolution, if-then causality & Winograd, Winogrande, COPA, ATOMIC & Accuracy, Choice Log-Likelihood & Memorized associative priors override true physical/temporal reasoning. \\
-\addlinespace
-\textbf{Holistic Benchmarks} 
-    & Multi-task understanding, professional knowledge & GLUE, SuperGLUE, MMLU & Aggregate Score, Mean Macro-$F_1$ & Rapid benchmark saturation; severe vulnerability to data contamination. \\
-\addlinespace
-\textbf{Qualitative \& Human} 
-    & Open-ended chat, instruction following & Chatbot Arena, MT-Bench & Elo rating, Pairwise win rate, LLM-as-a-judge & Human judge fatigue and calibration drift; evaluator LLM verbosity and position bias. \\
-\bottomrule
-\end{tabularx}
-\end{table}
-
-
-Language model evaluation has evolved from simple probabilistic uncertainty metrics ($\PPL$) into multi-faceted empirical benchmarking across thousands of specialized tasks. As foundation models approach and surpass human performance across standard benchmarks, evaluation methodology itself becomes the central engineering frontier: moving from static public test sets toward dynamic, synthetic, and adversarial evaluation protocols capable of discriminating between superficial web memorization and genuine machine intelligence.
 
 \end{document}

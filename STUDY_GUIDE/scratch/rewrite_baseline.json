@@ -1,7 +1,7 @@
 {
   "chapters": [
     {
-      "path": "STUDY_GUIDE/chapters/part1_foundations/01_deep_learning_foundations.tex",
+      "path": "STUDY_GUIDE/chapters/part1_foundations/chapter01/01_deep_learning_foundations.tex",
       "structure": [
         "\\chapter{Deep Learning Foundations}",
         "\\section{Historical Context and Theoretical Origins}",
@@ -138,7 +138,7 @@
       }
     },
     {
-      "path": "STUDY_GUIDE/chapters/part1_foundations/02_recurrent_neural_networks.tex",
+      "path": "STUDY_GUIDE/chapters/part1_foundations/chapter02/02_recurrent_neural_networks.tex",
       "structure": [
         "\\chapter{Recurrent Neural Networks}",
         "\\section{Sequential Data and Feed-Forward Limits}",
@@ -254,7 +254,7 @@
       }
     },
     {
-      "path": "STUDY_GUIDE/chapters/part1_foundations/03_language_models_intro.tex",
+      "path": "STUDY_GUIDE/chapters/part1_foundations/chapter03/03_language_models_intro.tex",
       "structure": [
         "\\chapter{Language Modeling Fundamentals}",
         "\\section{Probabilistic Language Modeling}",
@@ -325,7 +325,7 @@
       }
     },
     {
-      "path": "STUDY_GUIDE/chapters/part1_foundations/04_word_embeddings.tex",
+      "path": "STUDY_GUIDE/chapters/part1_foundations/chapter04/04_word_embeddings.tex",
       "structure": [
         "\\chapter{Word Embeddings and Word2Vec}",
         "\\section{The Word Representation Problem}",
@@ -555,7 +555,7 @@
       }
     },
     {
-      "path": "STUDY_GUIDE/chapters/part1_foundations/05_transformer_architecture.tex",
+      "path": "STUDY_GUIDE/chapters/part1_foundations/chapter05/05_transformer_architecture.tex",
       "structure": [
         "\\chapter{The Transformer Architecture}",
         "\\section{Tokenization and Subword Algorithms}",
@@ -747,7 +747,7 @@
       }
     },
     {
-      "path": "STUDY_GUIDE/chapters/part1_foundations/06_transformer_variants.tex",
+      "path": "STUDY_GUIDE/chapters/part1_foundations/chapter06/06_transformer_variants.tex",
       "structure": [
         "\\chapter{Transformer Variants and Decoding}",
         "\\section{Encoder-Decoder Models}",
@@ -866,7 +866,7 @@
       }
     },
     {
-      "path": "STUDY_GUIDE/chapters/part1_foundations/07_scaling_laws_pretraining.tex",
+      "path": "STUDY_GUIDE/chapters/part1_foundations/chapter07/07_scaling_laws_pretraining.tex",
       "structure": [
         "\\chapter{Pre-Training, Scaling Laws, and Model Evolution}",
         "\\section{GPT-1: Generative Pre-Training}",
@@ -978,7 +978,7 @@
       }
     },
     {
-      "path": "STUDY_GUIDE/chapters/part1_foundations/08_evaluation_metrics_benchmarks.tex",
+      "path": "STUDY_GUIDE/chapters/part1_foundations/chapter08/08_evaluation_metrics_benchmarks.tex",
       "structure": [
         "\\chapter{Model Evaluation and Benchmarks}",
         "\\section{Evaluation Metrics and Principles}",
@@ -1047,8 +1047,7 @@
         "\\subsubsection{Taxonomy and levels of benchmark contamination}",
         "\\subsubsection{Consequences: Memorization vs. reasoning}",
         "\\subsubsection{The closed-model auditing barrier}",
-        "\\subsubsection{Decontamination protocols and countermeasures}",
-        "\\section{Evaluation Challenges and Synthesis}"
+        "\\subsubsection{Decontamination protocols and countermeasures}"
       ],
       "labels": [
         "\\label{ch:evaluation_metrics_benchmarks}",
@@ -1125,9 +1124,7 @@
         "\\label{subsec:mmlu}",
         "\\label{eq:mmlu_scoring}",
         "\\label{subsec:hle_benchmark}",
-        "\\label{subsec:contamination_crisis}",
-        "\\label{sec:evaluation_synthesis}",
-        "\\label{tab:evaluation_comprehensive_matrix}"
+        "\\label{subsec:contamination_crisis}"
       ],
       "citations": [
         "banerjee2005meteor",
@@ -1164,12 +1161,12 @@
         "zheng2023judging"
       ],
       "equations": 59,
-      "tables": 4,
+      "tables": 3,
       "figures": 2,
       "listings": 0,
       "counts": {
         "equations": 59,
-        "tables": 4,
+        "tables": 3,
         "figures": 2,
         "listings": 0
       }

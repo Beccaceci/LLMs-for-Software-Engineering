@@ -32,7 +32,8 @@ for row in manifest['chapters']:
     row['structure'] = structure
     row['labels'] = labels
     row['citations'] = citations
-    row['counts'] = counts
+    for artifact, count in counts.items():
+        row[artifact] = count
 
 BASELINE.write_text(json.dumps(manifest, indent=2), encoding='utf-8')
 print("Successfully synchronized rewrite_baseline.json")
