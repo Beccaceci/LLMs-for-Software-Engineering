@@ -6,15 +6,149 @@
 \label{ch:instruction_tuning_alignment}
 
 % ==============================================================================
-% SECTION 9.1: THE ALIGNMENT PROBLEM: FROM NEXT-TOKEN PREDICTION TO ASSISTANTS
+% CHAPTER INTRODUCTION & FOUNDATIONS OF MODEL ALIGNMENT
 % ==============================================================================
-\section{The Alignment Problem}
-\label{sec:alignment_problem_assistant_paradigm}
+In modern natural language processing, the concept of \textbf{alignment} has undergone a profound historical transformation. In classical computational linguistics, alignment referred strictly to structural mappings between discrete symbolic sets---such as bipartite word-alignment links between source and target tokens in statistical machine translation. In the era of Large Language Models (LLMs), however, alignment denotes the imperative task of \textbf{steering model outputs to conform faithfully to human expectations, communicative intentions, and ethical values} \citep{xiao2025}.
+
+While self-supervised autoregressive pre-training on trillions of tokens equips a foundation model with vast factual knowledge, syntactic mastery, and statistical grammar, pre-training alone is structurally incapable of producing a helpful, reliable, or safe conversational assistant. A pre-trained base model is fundamentally an unconditional text predictor: when prompted with a question, its training objective encourages it to continue the text as if completing an uncurated web document (generating further questions, forum arguments, or machine-generated spam) rather than executing the user's directive. Furthermore, internet text contains toxic diatribes, uncalibrated biases, and factual fallacies; standard pre-training replicates these pathologies with equal fidelity.
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[
+    >=Stealth,
+    node distance=1.2cm and 1.5cm,
+    stage/.style={rectangle, draw=politoNavy, fill=skyBlue!20, rounded corners=4pt, thick, align=center, inner sep=8pt, font=\small\sffamily},
+    substage/.style={rectangle, draw=steelBlue, fill=cardBg, rounded corners=3pt, thick, align=center, inner sep=6pt, font=\footnotesize\sffamily},
+    lifecycle/.style={rectangle, draw=thmGreenLine, fill=thmGreenBg, rounded corners=4pt, dashed, thick, inner sep=10pt},
+    arrow/.style={->, thick, draw=politoNavy}
+]
+    % Stages
+    \node[stage, fill=amberGold!25, draw=amberGold!80!black] (pretrain) {\textbf{Pre-training Stage}\\\textit{Large-scale Self-Supervised Learning}\\$\max_\theta \sum \log P_\theta(w_t \mid w_{<t})$\\Consumes $\approx 98\%$ Compute};
+
+    \node[stage, right=2.0cm of pretrain, fill=skyBlue!30] (align) {\textbf{Alignment Stage}\\\textit{Adapting to Human Intent \& Values}\\Instruction Following, Safety, Utility\\Consumes $\approx 2\%$ Compute};
+
+    % Alignment Taxonomy Sub-nodes
+    \node[substage, below=0.6cm of align] (rlhf) {\textbf{Human Preference Alignment}\\(e.g., RLHF / DPO)\\Reinforcement learning with reward models};
+    \node[substage, above=0.6cm of align] (sft) {\textbf{Instruction Alignment}\\(e.g., Supervised Fine-Tuning / SFT)\\Prefix-conditioned likelihood maximization};
+    \node[substage, right=1.5cm of align, fill=intuitionPurpleBg, draw=intuitionPurpleLine] (infer) {\textbf{Inference-Time Alignment}\\(e.g., Prompting, Best-of-$N$)\\Zero-parameter runtime steering};
+
+    % Connectors
+    \draw[arrow, line width=1.5pt] (pretrain) -- (align) node[midway, above, font=\scriptsize\sffamily\bfseries] {Base LLM};
+    \draw[arrow] (align) -- (sft);
+    \draw[arrow] (sft) -- (rlhf);
+    \draw[arrow] (rlhf) -| (infer);
+    \draw[arrow] (align) -- (infer);
+
+\end{tikzpicture}
+\caption{The foundational \textit{pre-train-then-align} paradigm for developing large language models (faithfully adapted from Xiao \& Zhu \citep{xiao2025} Figure 4.1). In the pre-training stage, a massive foundation model learns statistical representations from raw web text. In the subsequent alignment stage, the model is adapted through three complementary paradigms: instruction alignment (SFT), human preference alignment (RLHF/DPO), and inference-time steering.}
+\label{fig:pretrain_then_align_lifecycle}
+\end{figure}
+
+To address this multidimensional challenge, alignment techniques can be systematically organized along a rigorous **operational taxonomy based on the execution stage at which alignment is performed** (Figure~\ref{fig:pretrain_then_align_lifecycle}):
+\begin{enumerate}
+    \item \textbf{Inference-Time Alignment}: Operating entirely without gradient backpropagation or weight updates. The behavior of a frozen model is steered dynamically at runtime via in-context prompt engineering, demonstration exemplars, system prefixes, or test-time candidate reranking (such as Best-of-$N$ sampling).
+    \item \textbf{Instruction Alignment via Supervised Fine-Tuning (SFT)}: Adapting model weights directly on curated datasets of instruction-response pairs using masked cross-entropy, training the network to execute natural language commands.
+    \item \textbf{Human Preference Alignment via Reward Modeling (RLHF)}: Aligning the model with subtle, non-deterministic human values and qualitative trade-offs using learned neural reward surrogates and reinforcement learning.
+\end{enumerate}
+
+To establish a principled engineering objective, Askell et al. \citep{askell2021} formalized the **HHH Alignment Criteria**:
+\begin{definition}{The HHH Alignment Criteria}{hhh_criteria}
+A language model is considered aligned if its behavior simultaneously satisfies:
+\begin{enumerate}
+    \item \textbf{Helpfulness}: The model makes an active, high-fidelity effort to resolve the user's objective. It adheres strictly to formatting, length, and stylistic constraints, asks for clarification when requests are genuinely underspecified, avoids unsolicited conversational preamble, and maintains appropriate conciseness.
+    \item \textbf{Honesty}: The model produces claims that are factually grounded and accurate. Crucially, it must exhibit calibrated uncertainty, explicitly stating when information is unknown or ambiguous rather than fabricating plausible-sounding hallucinations or false citations.
+    \item \textbf{Harmlessness}: The model refuses to generate content that facilitates physical harm, cyberattacks, weapons synthesis, illegal acts, or severe psychological harassment, while avoiding unjustified refusals on benign, academic, or adjacent safety queries.
+\end{enumerate}
+\end{definition}
+
+% ==============================================================================
+% SECTION 9.1: INFERENCE-TIME ALIGNMENT AND ITS LIMITS
+% ==============================================================================
+\section{Inference-Time Alignment and Its Limitations}
+\label{sec:inference_time_alignment_limits}
+
+\subsection{The mechanics of inference-time steering}
+\label{subsec:mechanics_inference_alignment}
+
+The most immediate and computationally economical approach to alignment is **inference-time alignment** \citep{xiao2025}. Rather than executing costly gradient updates over billions of parameters, inference-time methods preserve the pre-trained weights $\theta$ in a frozen state and guide the model's generation trajectory dynamically at test time.
+
+Inference-time alignment operates primarily through two distinct mechanisms:
+\begin{enumerate}
+    \item \textbf{Contextual Conditioning and Prompt Steerability}: Prepended input tokens act as activation vectors in the self-attention key-value cache, biasing the autoregressive sampling distribution toward desired linguistic styles, reasoning patterns (e.g., Chain-of-Thought), or persona constraints.
+    \item \textbf{Inference-Time Output Reranking (Best-of-$N$ Sampling)}: Rather than accepting a single greedy or stochastic generation, the frozen model samples $N$ independent candidate completions $\{\hat{y}_1, \dots, \hat{y}_N\} \sim P_\theta(\cdot \mid x)$ using temperature or nucleus sampling. An external scoring mechanism (such as an automated heuristic or a trained reward model $r(x, y)$) evaluates each candidate, selecting the optimal output:
+    \begin{equation}
+    \hat{y}_{\text{best}} = \arg\max_{y \in \{\hat{y}_1, \dots, \hat{y}_N\}} r(x, y).
+    \end{equation}
+\end{enumerate}
+While Best-of-$N$ reranking can dramatically improve test-time accuracy on mathematical reasoning and safety checks, its computational cost scales linearly with $N$, creating severe latency and throughput overhead for interactive real-time systems.
+
+\subsection{In-context few-shot learning and its three fundamental limitations}
+\label{subsec:in_context_limitations}
+
+The primary vehicle for prompt-based inference-time alignment in raw foundation models is **in-context few-shot learning** \citep{brown2020}. By prepending $K$ input-output demonstration exemplars to the prompt:
+\begin{equation}
+\label{eq:few_shot_context_structure}
+x_{\text{prompt}} = \left( x_{\text{demo}}^{(1)}, y_{\text{demo}}^{(1)} \right) \circ \left( x_{\text{demo}}^{(2)}, y_{\text{demo}}^{(2)} \right) \circ \dots \circ \left( x_{\text{demo}}^{(K)}, y_{\text{demo}}^{(K)} \right) \circ x_{\text{query}},
+\end{equation}
+the internal self-attention heads track the demonstration pattern, guiding the model to generate completion $y_{\text{query}}$ without modifying network weights $\theta$.
+
+While few-shot prompting demonstrated that foundation models possess latent multi-task capabilities, relying on in-context learning to build conversational assistants suffers from **three fundamental limitations**:
+\begin{enumerate}
+    \item \textbf{Severe Instability and Format Brittleness}: In-context few-shot predictions are notoriously unstable. Empirical evaluations show that accuracy fluctuates drastically depending on the arbitrary ordering of exemplars, minor variations in whitespace or delimiter tokens, and the frequency of class labels within the prompt. Few-shot models exhibit severe **recency bias** (disproportionately predicting the label of the final exemplar) and **majority-class bias**, making production deployments unreliable.
+    \item \textbf{Complete Failure for Instructions Lacking Natural Exemplars}: Many real-world human interactions intrinsically do not admit few-shot demonstrations. Prompts involving open-ended creative synthesis (e.g., \texttt{"Draft a persuasive diplomatic communique regarding deep-sea mining rights"}), dynamic full-codebase refactoring, or bespoke multi-turn conversational troubleshooting cannot be preceded by realistic exemplars without either pre-solving the unique task or consuming the entire context window. Expecting users to write $K=5$ expert demonstrations before asking a question defeats the purpose of an automated assistant.
+    \item \textbf{Complete Failure to Generalize to Unseen Tasks in Zero-Shot Regimes}: In the true zero-shot setting ($K=0$)---where the model receives an instruction without demonstration pairs---base models fail completely. Because they were never trained to associate imperative natural language with task execution, base models revert to document continuation, echoing the prompt or drifting into irrelevant topics.
+\end{enumerate}
+
+\subsection{Empirical case study: T5 prefix conditioning and format fragility}
+\label{subsec:t5_empirical_brittleness}
+
+The limitations of early sequence-to-sequence conditioning were brought to light by the **Text-to-Text Transfer Transformer (T5)** \citep{raffel2020t5}. T5 sought to unify all natural language processing tasks under a single text-to-text encoder-decoder framework by prepending a rigid, hardcoded prefix string to every input:
+\begin{align*}
+\text{Translation:} & \quad \texttt{"translate English to German: That is good."} \longrightarrow \texttt{"Das ist gut."} \\
+\text{Classification:} & \quad \texttt{"cola sentence: The course is terrible."} \longrightarrow \texttt{"unacceptable"} \\
+\text{Summarization:} & \quad \texttt{"summarize: State authorities announced..."} \longrightarrow \texttt{"Authorities issued a state..."}
+\end{align*}
+
+While T5 proved that diverse tasks could share identical model weights, digging deeply into its behavior reveals that T5 was fundamentally \textbf{unaligned and brittle}. T5 did not learn generalized instruction comprehension. Instead, the prefix strings acted merely as fixed associative lookup keys that routed activations through specific parameters. The moment user inputs deviated even slightly from the exact syntax seen during training, T5's execution collapsed catastrophically.
+
+\begin{tcolorbox}[colback=cardBg,colframe=cardLine,arc=2pt,boxrule=0.5pt,title=\textbf{Pedagogical Example: T5 Prompt Brittleness and Format Fragility}]
+\label{box:t5_brittleness_examples}
+The empirical fragility of T5's prefix mechanism is evident in three canonical failure modes (documented in course lecture slides):
+\begin{enumerate}
+    \item \textbf{Canonical Pre-trained Prefix (Exact Syntax)}:
+    \begin{align*}
+    \text{Input:} & \quad \texttt{"can you translate from English to German, What is your profession?"} \\
+    \text{Output:} & \quad \texttt{"Was ist Ihr Beruf?"} \quad \text{(Correct execution)}
+    \end{align*}
+    \item \textbf{Minor Natural Language Paraphrase}:
+    \begin{align*}
+    \text{Input:} & \quad \texttt{"can you translate from English to German the following sentence? What is your profession?"} \\
+    \text{Output:} & \quad \texttt{"<unk> <unk> <unk>..."} \quad \text{(Catastrophic failure into unknown tokens)}
+    \end{align*}
+    \item \textbf{Novel Task Directive}:
+    \begin{align*}
+    \text{Input:} & \quad \texttt{"compute: 2+2 ="} \\
+    \text{Output:} & \quad \texttt{":2+2+2+2+2+2+2+2+2+..."} \quad \text{(Degeneration into an infinite loop)}
+    \end{align*}
+\end{enumerate}
+\end{tcolorbox}
+
+The failure cases in Box~\ref{box:t5_brittleness_examples} demonstrate that T5 lacked both **cross-task generalization** and **phrasing robustness**. Adding subordinate clauses (such as \texttt{"the following sentence?"}) broke the associative key, causing the network to assign probability mass to out-of-vocabulary tokens. Furthermore, T5 could not generalize to tasks outside its pre-defined prefix dictionary (such as performing arithmetic via \texttt{"compute:"}), generating degenerative repetitive patterns instead.
+
+These fundamental limits establish that inference-time conditioning cannot substitute for **parametric alignment**: permanently adapting network weights to follow arbitrary natural language instructions.
+
+% ==============================================================================
+% SECTION 9.2: SUPERVISED FINE-TUNING AND INSTRUCTION ALIGNMENT
+% ==============================================================================
+\section{Supervised Fine-Tuning and Instruction Alignment}
+\label{sec:instruction_tuning_t0_flan}
 
 \subsection{Why autoregressive pre-training yields unaligned models}
 \label{subsec:why_autoregressive_yields_unaligned}
 
-Autoregressive pre-training optimizes the log-likelihood of sequential text tokens over massive, uncurated web corpora. From a philosophical perspective, this objective forces the model to perform statistical pattern matching across linguistic surfaces rather than acquire genuine semantic comprehension, epistemic awareness, or communicative intent. As formalized in information theory and natural language philosophy, predicting the statistically most probable continuation token is fundamentally distinct from understanding the meaning of a communicative act or recognizing the pragmatic role of an assistant. The network learns the statistical distribution of strings as they appear in the wild---encompassing internet debates, fictional dialogues, academic worksheets, and machine-generated spam---without grounding those strings in external reality or attributing agency to the user. Consequently, when prompted, an autoregressive base model operates strictly under the paradigm of unconditional document completion, remaining completely oblivious to whether the prompt constitutes a query, an imperative command, or an unfinished thought.
+Autoregressive pre-training optimizes the log-likelihood of sequential text tokens over massive, uncurated web corpora. From a philosophical perspective, this objective forces the model to perform statistical pattern matching across linguistic surfaces rather than acquire genuine semantic comprehension, epistemic awareness, or communicative intent. The network learns the statistical distribution of strings as they appear in the wild---encompassing internet debates, fictional dialogues, academic worksheets, and machine-generated spam---without grounding those strings in external reality or attributing agency to the user. 
+
+Consequently, when prompted, an autoregressive base model operates strictly under the paradigm of unconditional document completion. When requested to summarize an article, a base model does not summarize; it continues the article with more prose. When asked a question, it generates subsequent questions.
 
 From a mathematical perspective, standard pre-training minimizes the negative log-likelihood (NLL) over sequence tokens:
 \begin{equation}
@@ -25,12 +159,12 @@ where $P_\theta(w_t \mid w_{<t}) = \softmax\left(W_{\text{unembed}} h_t\right)$ 
 
 Equation~\eqref{eq:nll_loss_critique} exhibits critical mathematical deficiencies when viewed as an alignment objective:
 \begin{enumerate}
-    \item \textbf{Equal Penalty for Semantically Divergent Errors}: The cross-entropy loss penalizes every token $w \neq w_t^*$ based purely on its predictive probability mass, treating all non-target tokens with equal mathematical hostility. If the ground-truth token is a valid word, predicting an elegant, factually accurate synonym receives a substantial cross-entropy penalty simply because it does not match the exact surface token of the training document. Conversely, predicting a catastrophic factual lie, a dangerous hallucination, or an aggressive insult receives the exact same magnitude of penalty as a harmless lexical variation. Equation~\eqref{eq:nll_loss_critique} possesses no mathematical metric for truthfulness, helpfulness, or qualitative severity.
-    \item \textbf{Imitation of Statistical Modes across Heterogeneous Quality}: Internet text is inherently noisy, containing conflicting viewpoints, logical fallacies, offensive diatribes, and unverified rumors. Because maximum likelihood estimation forces the network to minimize the forward Kullback--Leibler divergence $\KL{P_{\text{data}}}{P_\theta}$, the model is mathematically penalized if it fails to place probability mass on all modes of the training distribution. It learns to mimic low-quality, untruthful, and toxic text with the exact same fidelity that it mimics rigorous scientific discourse.
-    \item \textbf{Absence of Intent and Communicative Conditioning}: The loss function contains no term that models the user's implicit goal or communicative intention. The model optimizes sequence continuation conditioned exclusively on the prefix tokens, lacking any loss gradient that rewards task completion, conciseness, or user satisfaction.
+    \item \textbf{Equal Penalty for Semantically Divergent Errors}: Cross-entropy penalizes every non-target token $w \neq w_t^*$ based purely on predictive probability mass. Predicting an accurate, elegant synonym receives a heavy loss penalty, whereas predicting a dangerous factual hallucination or offensive slur receives the identical penalty. It possesses no metric for truthfulness or qualitative severity.
+    \item \textbf{Imitation of Statistical Modes across Heterogeneous Quality}: Because MLE forces the model to minimize forward KL divergence $\KL{P_{\text{data}}}{P_\theta}$, the network is mathematically penalized if it omits any mode of the training distribution. It learns to mimic low-quality, untruthful text with the exact same fidelity that it mimics scientific prose.
+    \item \textbf{Absence of Intent and Communicative Conditioning}: The loss contains no term modeling user satisfaction, brevity, or directive execution.
 \end{enumerate}
 
-This profound structural discrepancy is termed the \textbf{intent gap} \citep{ouyang2022}: the divergence between what the human prompter wants the model to accomplish and what the autoregressive loss trains the model to do.
+This discrepancy is termed the \textbf{intent gap} \citep{ouyang2022}: the divide between human intent and autoregressive next-token loss.
 
 \begin{tcolorbox}[colback=cardBg,colframe=cardLine,arc=2pt,boxrule=0.5pt,title=\textbf{Pedagogical Example: Base Model Prompt Continuation versus Assistant Directive Execution}]
 \label{box:base_model_continuation_failure}
@@ -80,109 +214,114 @@ In contrast, an instruction-aligned assistant interprets the communicative inten
 \label{fig:next_token_vs_assistant_paradigm}
 \end{figure}
 
-As illustrated in Figure~\ref{fig:next_token_vs_assistant_paradigm}, increasing parameter capacity from 7B to 175B does not bridge this gap. An unaligned 175B model generates more fluent, grammatically sophisticated worksheet questions, but still fails to execute the communicative directive.
+\subsection{Supervised fine-tuning mechanics and prompt-loss masking}
+\label{subsec:sft_mechanics_loss_masking}
 
-\subsection{Empirical demonstration of non-alignment: the format fragility of T5}
-\label{subsec:t5_empirical_brittleness}
+To bridge the intent gap, **Supervised Fine-Tuning (SFT)** adapts the pre-trained weights $\hat{\theta}$ on an annotated dataset $\mathcal{D}_{\text{SFT}} = \{(x, y)\}$ of instruction prompts $x$ paired with gold-standard responses $y$ \citep{xiao2025}. 
 
-The limitations of early sequence-to-sequence conditioning were brought to light by the **Text-to-Text Transfer Transformer (T5)** \citep{raffel2020t5}. T5 sought to unify all natural language processing tasks under a single text-to-text encoder-decoder framework by prepending a rigid, hardcoded prefix string to every input:
-\begin{align*}
-\text{Translation:} & \quad \texttt{"translate English to German: That is good."} \longrightarrow \texttt{"Das ist gut."} \\
-\text{Classification:} & \quad \texttt{"cola sentence: The course is terrible."} \longrightarrow \texttt{"unacceptable"} \\
-\text{Summarization:} & \quad \texttt{"summarize: State authorities announced..."} \longrightarrow \texttt{"Authorities issued a state..."}
-\end{align*}
-
-While T5 proved that diverse tasks could share identical model weights, digging deeply into its behavior reveals that T5 was fundamentally \textbf{unaligned and brittle}. T5 did not learn generalized instruction comprehension. Instead, the prefix strings acted merely as fixed associative lookup keys that routed activations through specific parameters. The moment user inputs deviated even slightly from the exact syntax seen during training, T5's execution collapsed catastrophically.
-
-\begin{tcolorbox}[colback=cardBg,colframe=cardLine,arc=2pt,boxrule=0.5pt,title=\textbf{Pedagogical Example: T5 Prompt Brittleness and Format Fragility}]
-\label{box:t5_brittleness_examples}
-The empirical fragility of T5's prefix mechanism is evident in three canonical failure modes (documented in course lecture slides):
-\begin{enumerate}
-    \item \textbf{Canonical Pre-trained Prefix (Exact Syntax)}:
-    \begin{align*}
-    \text{Input:} & \quad \texttt{"can you translate from English to German, What is your profession?"} \\
-    \text{Output:} & \quad \texttt{"Was ist Ihr Beruf?"} \quad \text{(Correct execution)}
-    \end{align*}
-    \item \textbf{Minor Natural Language Paraphrase}:
-    \begin{align*}
-    \text{Input:} & \quad \texttt{"can you translate from English to German the following sentence? What is your profession?"} \\
-    \text{Output:} & \quad \texttt{"<unk> <unk> <unk>..."} \quad \text{(Catastrophic failure into unknown tokens)}
-    \end{align*}
-    \item \textbf{Novel Task Directive}:
-    \begin{align*}
-    \text{Input:} & \quad \texttt{"compute: 2+2 ="} \\
-    \text{Output:} & \quad \texttt{":2+2+2+2+2+2+2+2+2+..."} \quad \text{(Degeneration into an infinite loop)}
-    \end{align*}
-\end{enumerate}
-\end{tcolorbox}
-
-The failure cases in Box~\ref{box:t5_brittleness_examples} demonstrate that T5 lacked both **cross-task generalization** and **phrasing robustness**. Adding subordinate clauses (such as \texttt{"the following sentence?"}) broke the associative key, causing the network to assign probability mass to out-of-vocabulary tokens. Furthermore, T5 could not generalize to tasks outside its pre-defined prefix dictionary (such as performing arithmetic via \texttt{"compute:"}), generating degenerative repetitive patterns instead.
-
-\subsection{Defining alignment: the HHH framework}
-\label{subsec:defining_alignment_hhh}
-
-To establish a principled engineering foundation for transforming unaligned predictors into effective assistants, Askell et al. \citep{askell2021} formulated the **HHH alignment framework**. An aligned model is defined as an agent whose outputs satisfy three complementary criteria:
-
-\begin{definition}{The HHH Alignment Criteria}{hhh_criteria}
-A language model is considered aligned if its behavior simultaneously satisfies:
-\begin{enumerate}
-    \item \textbf{Helpfulness}: The model makes an active, high-fidelity effort to resolve the user's objective. It adheres strictly to formatting, length, and stylistic constraints, asks for clarification when requests are genuinely underspecified, avoids unsolicited conversational preamble, and maintains appropriate conciseness.
-    \item \textbf{Honesty}: The model produces claims that are factually grounded and accurate. Crucially, it must exhibit calibrated uncertainty, explicitly stating when information is unknown or ambiguous rather than fabricating plausible-sounding hallucinations or false citations.
-    \item \textbf{Harmlessness}: The model refuses to generate content that facilitates physical harm, cyberattacks, weapons synthesis, illegal acts, or severe psychological harassment, while avoiding unjustified refusals on benign, academic, or adjacent safety queries.
-\end{enumerate}
-\end{definition}
-
-In practical alignment engineering, the HHH criteria exist in Pareto tension. An uncalibrated focus on harmlessness leads to **over-refusal pathologies**, where the assistant rejects benign coding queries (such as debugging network socket code or parsing vulnerability signatures). Conversely, naive helpfulness can assist malicious users in dangerous activities. Alignment techniques must navigate this Pareto frontier to balance safety with functional utility.
-
-\subsection{In-context few-shot learning and its three fundamental limitations}
-\label{subsec:in_context_limitations}
-
-Before the advent of parametric instruction tuning, researchers attempted to steer base models toward task execution using **in-context few-shot learning** \citep{brown2020}. By prepending $K$ demonstration exemplars to the prompt:
+Unlike standard pre-training, where loss is computed over the entire sequence, SFT seeks to maximize the \textbf{conditional probability of the response given the prompt}:
 \begin{equation}
-\label{eq:few_shot_context_structure}
-x_{\text{prompt}} = \left( x_{\text{demo}}^{(1)}, y_{\text{demo}}^{(1)} \right) \circ \left( x_{\text{demo}}^{(2)}, y_{\text{demo}}^{(2)} \right) \circ \dots \circ \left( x_{\text{demo}}^{(K)}, y_{\text{demo}}^{(K)} \right) \circ x_{\text{query}},
-\end{equation}
-the internal self-attention heads track the demonstration pattern, guiding the model to generate completion $y_{\text{query}}$ without modifying network weights $\theta$.
-
-While few-shot prompting demonstrated that foundation models possess latent multi-task capabilities, relying on in-context learning to build conversational assistants suffers from **three fundamental limitations**:
-
-\begin{enumerate}
-    \item \textbf{Severe Instability and Format Brittleness}: In-context few-shot predictions are notoriously unstable. Empirical evaluations show that accuracy fluctuates drastically depending on the arbitrary ordering of exemplars, minor variations in whitespace or delimiter tokens, and the frequency of class labels within the prompt. Few-shot models exhibit severe **recency bias** (disproportionately predicting the label of the final exemplar) and **majority-class bias**, making production deployments unreliable.
-    \item \textbf{Complete Failure for Instructions Lacking Natural Exemplars}: Many real-world human interactions intrinsically do not admit few-shot demonstrations. Prompts involving open-ended creative synthesis (e.g., \texttt{"Draft a persuasive diplomatic communique regarding deep-sea mining rights"}), dynamic full-codebase refactoring, or bespoke multi-turn conversational troubleshooting cannot be preceded by realistic exemplars without either pre-solving the unique task or consuming the entire context window. Expecting users to write $K=5$ expert demonstrations before asking a question defeats the purpose of an automated assistant.
-    \item \textbf{Complete Failure to Generalize to Unseen Tasks in Zero-Shot Regimes}: In the true zero-shot setting ($K=0$)---where the model receives an instruction without demonstration pairs---base models fail completely. Because they were never trained to associate imperative natural language with task execution, base models revert to document continuation, echoing the prompt or drifting into irrelevant topics.
-\end{enumerate}
-
-These three bottlenecks established the urgent necessity of **parametric instruction tuning**: permanently modifying the neural network weights $\theta$ so that the model comprehends and executes instructions in zero-shot mode.
-
-% ==============================================================================
-% SECTION 9.2: INSTRUCTION TUNING: T0, FLAN, AND CROSS-TASK GENERALIZATION
-% ==============================================================================
-\section{Instruction Tuning: T0 and FLAN}
-\label{sec:instruction_tuning_t0_flan}
-
-\subsection{The mechanics of instruction tuning: multi-templates and task inversion}
-\label{subsec:mechanics_instruction_tuning}
-
-**Instruction tuning** reframes supervised learning by converting traditional, tabular NLP datasets (classification, extraction, inference) into natural language prompt-response pairs. Instead of training separate heads on numeric labels, every task is expressed as a conversational command.
-
-From a philosophical perspective, instruction tuning forces the neural network to move beyond surface-level lexical memorization. In natural human language, an underlying communicative intent can be expressed through infinitely many syntactic permutations. By training a model on multiple, diverse phrasings of the exact same underlying task, the network is compelled to abstract the **semantic essence** of the instruction, disentangling the operation to be performed from the surface idiosyncrasies of word choice.
-
-From a mathematical perspective, multi-template instruction tuning serves as a powerful form of **semantic data augmentation and gradient regularization**. Let $\mathcal{D}_k$ denote a supervised task dataset, and let $\{\mathcal{T}_{k, 1}, \mathcal{T}_{k, 2}, \dots, \mathcal{T}_{k, M_k}\}$ represent a collection of $M_k$ distinct natural language templates that map an input-output pair $(x, y) \in \mathcal{D}_k$ into a prompt sequence $\tilde{x} = \mathcal{T}_{k, m}(x)$ and target completion $y$. The multitask instruction tuning objective is:
-\begin{equation}
-\label{eq:multitask_instruction_loss}
-\Loss_{\text{IT}}(\theta) = -\sum_{k=1}^K \frac{1}{M_k} \sum_{m=1}^{M_k} \E_{(x, y) \sim \mathcal{D}_k} \left[ \sum_{t=1}^{|y|} \log P_\theta\left(y_t \;\middle|\; \mathcal{T}_{k, m}(x), y_{<t}\right) \right].
+\label{eq:sft_conditional_objective}
+\theta^* = \arg\max_\theta \sum_{(x, y) \in \mathcal{D}_{\text{SFT}}} \log P_\theta(y \mid x) = \arg\max_\theta \sum_{(x, y) \in \mathcal{D}_{\text{SFT}}} \sum_{t=1}^{|y|} \log P_\theta(y_t \mid x, y_{<t}).
 \end{equation}
 
-When trained on a single template ($M_k = 1$), the gradient update $\nabla_\theta \Loss$ couples the task logic to specific function words present in the template. The self-attention projection matrices $W_Q, W_K$ learn to attend heavily to fixed trigger tokens. Conversely, when $M_k \ge 10$, the model is exposed to varied grammatical structures (imperative commands, interrogative questions, affirmative assertions). The loss forces the intermediate hidden representations $h_t$ to converge to an invariant task manifold $\mathbf{z}_{\text{task}}$, ensuring that:
+In modern autoregressive decoder-only Transformer architectures, computing Equation~\eqref{eq:sft_conditional_objective} is elegantly implemented via **Prompt Loss Masking**. When concatenating the prompt $x = (x_0, \dots, x_m)$ and completion $y = (y_1, \dots, y_n)$ into a single sequence $[x, y]$, the joint log-probability decomposes via the probability chain rule as:
 \begin{equation}
-\norm{h(\mathcal{T}_{k, m}(x)) - h(\mathcal{T}_{k, j}(x))}_2 \ll \norm{h(\mathcal{T}_{k, m}(x)) - h(\mathcal{T}_{l, m}(x))}_2 \quad \forall m \neq j, \; k \neq l.
+\log P_\theta(x, y) = \underbrace{\log P_\theta(x)}_{\text{Force loss to } 0} + \underbrace{\log P_\theta(y \mid x)}_{\text{Active Loss Computation}}.
 \end{equation}
 
-A crucial component of this methodology is **task inversion** (or "task flipping"). In task inversion, the standard input-output relationship is reversed: the model is provided with the target label or answer and instructed to reconstruct a plausible input query:
-\begin{center}
-\texttt{"Given the answer '<answer>', what would be a logical question that produced it?"}
-\end{center}
-Task inversion prevents the model from developing unidirectional heuristic shortcuts, enforcing bidirectional semantic consistency across the latent representation space.
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[
+    >=Stealth,
+    node distance=0.8cm and 0.4cm,
+    tokbox/.style={rectangle, draw=politoNavy, fill=white, rounded corners=2pt, minimum width=1.1cm, minimum height=0.7cm, align=center, font=\footnotesize\ttfamily},
+    prompttok/.style={rectangle, draw=steelBlue, fill=skyBlue!15, rounded corners=2pt, minimum width=1.1cm, minimum height=0.7cm, align=center, font=\footnotesize\ttfamily},
+    targettok/.style={rectangle, draw=thmGreenLine, fill=thmGreenBg, rounded corners=2pt, minimum width=1.1cm, minimum height=0.7cm, align=center, font=\footnotesize\ttfamily\bfseries},
+    arrow/.style={->, thick, draw=politoNavy}
+]
+    % Forward Pass
+    \node[font=\small\sffamily\bfseries] (fwd_label) at (-1.5, 1.2) {(a) Forward Pass:};
+    \node[prompttok] (x0) at (0.5, 1.2) {$x_0$};
+    \node[prompttok] (x1) at (1.8, 1.2) {$x_1$};
+    \node[prompttok] (x2) at (3.1, 1.2) {$x_2$};
+    \node[prompttok] (x3) at (4.4, 1.2) {$x_3$};
+    \node[targettok] (y1) at (5.7, 1.2) {$y_1$};
+    \node[targettok] (y2) at (7.0, 1.2) {$y_2$};
+    \node[font=\footnotesize\sffamily, text=steelBlue] at (2.45, 1.9) {Input Prompt $x$};
+    \node[font=\footnotesize\sffamily, text=thmGreenLine] at (6.35, 1.9) {Target Output $y$};
+
+    % Backward Pass
+    \node[font=\small\sffamily\bfseries] (bwd_label) at (-1.5, -0.4) {(b) Backward Pass:};
+    \node[tokbox, draw=crimsonRed, fill=crimsonRed!10] (l0) at (0.5, -0.4) {$\Loss=0$};
+    \node[tokbox, draw=crimsonRed, fill=crimsonRed!10] (l1) at (1.8, -0.4) {$\Loss=0$};
+    \node[tokbox, draw=crimsonRed, fill=crimsonRed!10] (l2) at (3.1, -0.4) {$\Loss=0$};
+    \node[tokbox, draw=crimsonRed, fill=crimsonRed!10] (l3) at (4.4, -0.4) {$\Loss=0$};
+    \node[tokbox, draw=thmGreenLine, fill=thmGreenBg] (ly1) at (5.7, -0.4) {$\Loss \neq 0$};
+    \node[tokbox, draw=thmGreenLine, fill=thmGreenBg] (ly2) at (7.0, -0.4) {$\Loss \neq 0$};
+
+    \draw[arrow, dashed] (x0) -- (l0);
+    \draw[arrow, dashed] (x1) -- (l1);
+    \draw[arrow, dashed] (x2) -- (l2);
+    \draw[arrow, dashed] (x3) -- (l3);
+    \draw[arrow, draw=thmGreenLine] (y1) -- (ly1);
+    \draw[arrow, draw=thmGreenLine] (y2) -- (ly2);
+
+\end{tikzpicture}
+\caption{Supervised fine-tuning with prompt-loss masking (adapted from Xiao \& Zhu \citep{xiao2025} Figure 4.2). During the forward pass, the model processes the concatenated sequence $[x, y]$ using standard causal self-attention. During the backward pass, loss gradients are masked to zero for all prompt tokens $x$, computing backpropagation exclusively on the target response tokens $y$.}
+\label{fig:sft_prompt_loss_masking}
+\end{figure}
+
+As illustrated in Figure~\ref{fig:sft_prompt_loss_masking}, the standard forward pass is executed across all sequence positions so that the output tokens can attend to the full contextual prompt. During the backward pass, gradients corresponding to $x$ are set to zero (masked with label $-100$ in PyTorch cross-entropy). The network updates its weights exclusively to generate correct completions $y$ conditioned on $x$.
+
+For multi-turn conversational interactions with $K$ conversation rounds $\{x_1, y_1, x_2, y_2, \dots, x_K, y_K\}$, the loss masking generalizes across alternating dialogue turns:
+\begin{equation}
+\label{eq:multiturn_sft_loss}
+\Loss_{\text{multi-turn}}(\theta) = -\sum_{k=1}^K \sum_{t=1}^{|y_k|} \log P_\theta\left(y_{k, t} \;\middle|\; x_1, y_1, \dots, x_{k-1}, y_{k-1}, x_k, y_{k, <t}\right),
+\end{equation}
+where loss is masked for all user inputs $x_k$ and computed exclusively on assistant turns $y_k$.
+
+\paragraph{Limitations of Supervised Fine-Tuning}
+Despite its widespread success, SFT suffers from two major limitations:
+\begin{enumerate}
+    \item \textbf{Extravagant Data Annotation Bottlenecks}: High-quality SFT requires thousands of diverse, expert-authored prompt-response pairs. Creating datasets that capture complex formatting, reasoning chains, and specialized domains requires skilled human labor that is difficult to scale.
+    \item \textbf{Computational Expense on Frontier LLMs}: Fine-tuning all parameters of a 70B+ parameter model requires substantial GPU memory and compute, introducing the persistent danger of \textbf{catastrophic forgetting} of pre-trained linguistic features and world knowledge.
+\end{enumerate}
+
+\subsection{Fine-tuning data acquisition: manual vs. automatic generation}
+\label{subsec:sft_data_acquisition_taxonomy}
+
+Given the pivotal role of instruction data, the literature has developed two distinct paradigms for acquiring SFT datasets \citep{xiao2025}:
+
+\subsubsection{Manually Generated Data}
+Human-authored data remains the gold standard for quality and conversational naturalness:
+\begin{itemize}
+    \item \textbf{Human Expert Authoring}: Recruited annotators author both the prompt instructions and the target answers. While producing high-fidelity outputs, this approach is exceptionally slow and expensive.
+    \item \textbf{Prompt Templates over Existing NLP Datasets}: Pre-existing, high-quality academic benchmarks (SuperGLUE, SQuAD, MultiNLI) are repurposed into conversational instructions using templating engines (e.g., PromptSource \citep{bach2022promptsource}). For example, translation sentence pairs are mapped into: \texttt{"Instruction: Translate to French. Input: \{source\} Output: \{target\}"}.
+    \item \textbf{Organic Web and Forum Extraction}: Crawling question-and-answer archives (such as StackOverflow, Reddit threads, and Quora). However, web-mined data often contains noise, slang, or sarcastic non-answers that must be heavily filtered.
+\end{itemize}
+
+\subsubsection{Automatically Generated Data}
+To scale data volume without exorbitant human cost, modern pipelines synthesize SFT datasets automatically:
+\begin{itemize}
+    \item \textbf{Self-Instruct Tuning} \citep{wang2023selfinstruct}: Starting from a small seed set of hand-crafted tasks ($\approx 175$ tasks), a powerful teacher LLM iteratively bootstraps new instructions, classifies them by task type, generates corresponding inputs and outputs, and filters candidates based on heuristic quality and novelty.
+    \item \textbf{Task Inversion (Input Flipping)}: Reversing traditional input-output relationships to enforce bidirectional semantic comprehension:
+    \begin{center}
+    \texttt{"Given the target summary '\{summary\}', draft a plausible source article that produced it."}
+    \end{center}
+    \item \textbf{Teacher LLM Generation and Best-of-$N$ Filtering}: Using a frontier model (such as GPT-4) to generate responses to diverse prompts, followed by automated rejection sampling to retain only responses meeting strict quality criteria.
+\end{itemize}
+
+\subsection{Data efficiency, LIMA, and emergent instruction generalization}
+\label{subsec:data_efficiency_emergence_t0_flan}
+
+\paragraph{Fine-Tuning with Less Data: The LIMA Hypothesis}
+A natural question arises: how much SFT data is truly required to align an LLM? Zhou et al. \citep{zhou2024lima} addressed this in their landmark study **LIMA (Less Is More for Alignment)**. They demonstrated that fine-tuning a 65B base LLaMA model on just **1,000 meticulously curated instruction-response pairs** produced conversational performance competitive with GPT-4 and InstructGPT.
+
+This established the **Superfly Alignment Hypothesis**: almost all knowledge and world reasoning capabilities are acquired entirely during pre-training. Alignment is not about teaching the model new facts; rather, it is a superficial formatting process that teaches the model the sub-distribution of conversational style, dialogue framing, and task obedience.
+
+\paragraph{Instruction Generalization across Multi-Task Models}
+When instruction tuning is executed across diverse task mixtures, it unlocks dramatic cross-task generalization:
 
 \begin{figure}[t]
 \centering
@@ -225,18 +364,14 @@ Task inversion prevents the model from developing unidirectional heuristic short
 \label{fig:t0_multitask_workflow}
 \end{figure}
 
-\subsection{T0: multitask prompted training and prompt robustness}
-\label{subsec:t0_multitask_prompt_robustness}
+\subsubsection{T0: Multitask Prompted Training and Prompt Robustness}
+Sanh et al. \citep{sanh2022} implemented this vision in **T0**, utilizing an 11-billion parameter T5 encoder-decoder backbone (Figure~\ref{fig:t0_multitask_workflow}). T0 was fine-tuned across dozens of datasets formatted with $M_k \approx 8-10$ crowdsourced prompt templates per task:
+\begin{equation}
+\label{eq:multitask_instruction_loss}
+\Loss_{\text{IT}}(\theta) = -\sum_{k=1}^K \frac{1}{M_k} \sum_{m=1}^{M_k} \E_{(x, y) \sim \mathcal{D}_k} \left[ \sum_{t=1}^{|y|} \log P_\theta\left(y_t \;\middle|\; \mathcal{T}_{k, m}(x), y_{<t}\right) \right].
+\end{equation}
 
-Sanh et al. \citep{sanh2022} implemented this vision in **T0**, utilizing an 11-billion parameter T5 encoder-decoder backbone. T0 investigated two central hypotheses:
-\begin{enumerate}
-    \item Can fine-tuning on a massively diverse mixture of prompted tasks enable zero-shot generalization to unobserved, held-out task families?
-    \item Does training on multiple prompt formulations per dataset confer robustness against arbitrary prompt wording?
-\end{enumerate}
-
-To evaluate cross-task generalization without data leakage, Sanh et al. established a strict **held-out task evaluation protocol**. All datasets belonging to an entire capability cluster---specifically Natural Language Inference (NLI), Coreference Resolution, and Word Sense Disambiguation---were completely excluded from the fine-tuning mixture. T0 was fine-tuned exclusively on question answering, summarization, and sentiment classification benchmarks using crowdsourced templates from the *PromptSource* repository ($\approx 8-10$ templates per dataset).
-
-When evaluated on the held-out NLI datasets (such as RTE, CB, and ANLI), T0-11B demonstrated massive zero-shot generalization. It outperformed its untuned T5-11B baseline by over $15\%$ absolute accuracy and decisively surpassed the zero-shot performance of the 175-billion parameter GPT-3 model, despite operating with $16\times$ fewer parameters.
+T0 evaluated generalization by completely withholding entire task clusters (such as Natural Language Inference) from training. When evaluated zero-shot on held-out NLI datasets (RTE, CB, ANLI), T0-11B outperformed untuned T5-11B by $>15\%$ and outperformed the 175B base GPT-3 model.
 
 \begin{figure}[t]
 \centering
@@ -301,12 +436,10 @@ When evaluated on the held-out NLI datasets (such as RTE, CB, and ANLI), T0-11B 
 \label{fig:prompt_robustness_scaling}
 \end{figure}
 
-Furthermore, T0 established the empirical law of **prompt robustness**. As plotted in Figure~\ref{fig:prompt_robustness_scaling}, when models are fine-tuned with only a single prompt template per dataset ($p=1$), they remain highly sensitive to evaluation phrasing, exhibiting a broad variance envelope ($>13\%$ spread). Scaling the number of templates to $p=5.7$ and $p=8.03$ simultaneously increases median zero-shot performance and compresses the variance envelope to less than $4.2\%$. Multi-template instruction tuning effectively inoculates the model against syntactic perturbations.
+Crucially, T0 revealed the empirical law of **prompt robustness** (Figure~\ref{fig:prompt_robustness_scaling}): scaling the number of prompt templates from $p=1$ to $p=8$ per dataset compressed the evaluation variance envelope from $13.2\%$ down to $4.2\%$, insulating the model against arbitrary phrasing perturbations.
 
-\subsection{FLAN: instruction tuning at scale and scale emergence}
-\label{subsec:flan_scale_emergence}
-
-Concurrently, Wei et al. \citep{wei2022finetuned} developed **FLAN (Finetuned Language Net)** at Google Research. FLAN investigated instruction tuning within dense, decoder-only architectures (based on LaMDA) across 62 NLP datasets grouped into **12 task clusters**, scaling model parameters from 420M up to 137B.
+\subsubsection{FLAN: Instruction Tuning at Scale and Scale Emergence}
+Wei et al. \citep{wei2022finetuned} investigated instruction tuning across dense decoder-only models (LaMDA) from 420M up to 137B parameters across 62 datasets in 12 task clusters.
 
 \begin{figure}[t]
 \centering
@@ -369,13 +502,11 @@ Concurrently, Wei et al. \citep{wei2022finetuned} developed **FLAN (Finetuned La
 \label{fig:flan_scale_emergence}
 \end{figure}
 
-FLAN evaluated zero-shot generalization by holding out entire clusters (e.g., holding out reading comprehension while training on the other 11 clusters). As plotted faithfully in Figure~\ref{fig:flan_scale_emergence}, FLAN uncovered the **scale emergence phenomenon** of instruction tuning:
+As shown in Figure~\ref{fig:flan_scale_emergence}, FLAN uncovered the **scale emergence phenomenon**:
 \begin{itemize}
-    \item \textbf{Negative Transfer on Small Scales ($<8\text{B}$)}: For models with 420M and 2B parameters, instruction tuning actually \emph{degraded} zero-shot performance on unseen tasks relative to the untuned base models. Small networks possess limited capacity; forcing them to memorize diverse multi-task prompts saturated their weights, inducing catastrophic forgetting of pre-trained linguistic features.
-    \item \textbf{Emergent Generalization Surge on Large Scales ($>68\text{B}$)}: At 68B and 137B parameters, instruction tuning unlocked dramatic generalization leaps. FLAN-137B improved by nearly $10\%$ absolute accuracy over its untuned counterpart, outperforming zero-shot GPT-3 175B on 20 out of 25 evaluated tasks and matching or exceeding few-shot GPT-3 (with $K=32$ exemplars) on the majority of benchmarks.
+    \item \textbf{Negative Transfer on Small Models ($<8\text{B}$)}: For models with 420M and 2B parameters, instruction tuning degraded held-out task accuracy relative to base models due to parameter capacity saturation.
+    \item \textbf{Emergence on Large Models ($>68\text{B}$)}: At 68B and 137B parameters, instruction tuning unlocked a surge in generalization ($+9.4\%$ gain), outperforming zero-shot GPT-3 175B on 20 out of 25 evaluated tasks.
 \end{itemize}
-
-Instruction tuning proved that zero-shot instruction following is an emergent ability of parameter scale. However, supervised instruction tuning alone cannot optimize for human preference, qualitative nuance, or safety guardrails.
 
 % ==============================================================================
 % SECTION 9.3: REINFORCEMENT LEARNING FROM HUMAN FEEDBACK: THE REDDIT TL;DR FRAMEWORK
@@ -447,21 +578,21 @@ These bottlenecks necessitate **Step 2**: training a neural **Reward Model** to 
 \subsection{Step 2: Training the reward model}
 \label{subsec:step2_training_reward_model}
 
-To automate human evaluation, a language model is converted into a **Reward Model (RM)** $r_\theta(x, y)$. The network is initialized from an SFT model checkpoint, the final unembedding vocabulary matrix is removed, and a scalar projection head $W_r \in \R^{d_{\text{model}} \times 1}$ is attached. Given prompt $x$ and response $y$, the scalar reward is extracted from the hidden activation at the final sequence token:
+To automate human evaluation, a language model is converted into a **Reward Model (RM)** $r_\phi(x, y)$ \citep{xiao2025}. The network is initialized from an SFT model checkpoint, the final unembedding vocabulary matrix is removed, and a scalar projection head $W_r \in \R^{d_{\text{model}} \times 1}$ is attached. Given prompt $x$ and response $y$, the scalar reward is extracted from the hidden activation at the final sequence token:
 \begin{equation}
-r_\theta(x, y) = W_r^\top h_{|x \circ y|}.
+r_\phi(x, y) = W_r^\top h_{|x \circ y|}.
 \end{equation}
 
-To train $r_\theta$, Stiennon et al. leveraged the **Bradley--Terry preference model** \citep{bradley1952}. The probability that completion $y_w$ (the winner) is preferred over $y_l$ (the loser) is formulated as:
+To train $r_\phi$, Stiennon et al. leveraged the **Bradley--Terry preference model** \citep{bradley1952}. The probability that completion $y_w$ (the winner) is preferred over $y_l$ (the loser) is formulated as:
 \begin{equation}
 \label{eq:bradley_terry_probability_formula}
-P(y_w \succ y_l \mid x) = \sigma\left(r_\theta(x, y_w) - r_\theta(x, y_l)\right) = \frac{1}{1 + \exp\left(-\left(r_\theta(x, y_w) - r_\theta(x, y_l)\right)\right)}.
+P(y_w \succ y_l \mid x) = \sigma\left(r_\phi(x, y_w) - r_\phi(x, y_l)\right) = \frac{1}{1 + \exp\left(-\left(r_\phi(x, y_w) - r_\phi(x, y_l)\right)\right)}.
 \end{equation}
 
 The Reward Model is optimized by minimizing the negative log-likelihood of pairwise preferences:
 \begin{equation}
 \label{eq:rm_ranking_loss_explicit}
-\Loss_{\text{RM}}(\theta) = -\E_{(x, y_w, y_l) \sim \mathcal{D}_{\text{pair}}} \left[ \log \sigma\left( r_\theta(x, y_w) - r_\theta(x, y_l) \right) \right].
+\Loss_{\text{RM}}(\phi) = -\E_{(x, y_w, y_l) \sim \mathcal{D}_{\text{pair}}} \left[ \log \sigma\left( r_\phi(x, y_w) - r_\phi(x, y_l) \right) \right].
 \end{equation}
 
 \begin{figure}[t]
@@ -709,6 +840,17 @@ R(x, y) &= \sum_{t=1}^4 r_t^{\text{step}} = -0.01 - 0.02 - 0.17 + 2.39 \\
 The active policy receives a net return of $+2.19$, successfully balancing the reward model's high utility score ($+2.40$) against the cumulative KL drift penalty ($-0.21$).
 \end{tcolorbox}
 
+\subsection{The four-model architecture and algorithmic pipeline of RLHF}
+\label{subsec:four_model_architecture_algorithm}
+
+As formalized in Xiao \& Zhu \citep{xiao2025}, implementing online PPO-based RLHF requires orchestrating \textbf{four distinct neural models} simultaneously in GPU memory:
+\begin{enumerate}
+    \item \textbf{Active Policy (Target LLM)} $\pi_\theta(y_t \mid x, y_{<t})$: The generative Transformer model undergoing active reinforcement learning. It samples trajectories $y \sim \pi_\theta(\cdot \mid x)$ and updates its weights $\theta$ via clipped policy gradients.
+    \item \textbf{Reference Policy} $\pi_{\text{ref}}(y_t \mid x, y_{<t})$: A frozen copy of the supervised fine-tuned model ($\pi_{\text{ref}} \equiv \pi_{\text{SFT}}$). It provides baseline token probabilities to compute the per-token KL drift penalty, ensuring $\pi_\theta$ does not collapse into reward hacking.
+    \item \textbf{Reward Model} $r_\phi(x, y)$: A frozen Transformer decoder equipped with a scalar projection head $W_r$, trained on human pairwise comparison datasets $\mathcal{D}_{\text{pair}}$ via Bradley--Terry ranking loss to output scalar quality scores.
+    \item \textbf{Value Function (Critic)} $V_\omega(x, y_{<t})$: A parameterized Transformer network initialized from the reward model, trained via Mean Squared Error (MSE) to predict the expected cumulative return from the current partial sequence state. The Critic computes Generalized Advantage Estimation (GAE) to reduce gradient variance.
+\end{enumerate}
+
 \paragraph{Policy Optimization Mechanics via PPO Clipping}
 To optimize policy parameters $\theta$ under returns $R(x, y)$, standard vanilla policy gradients $\nabla_\theta \E[\sum R]$ exhibit extreme variance and catastrophic step collapse. Proximal Policy Optimization (PPO) \citep{schulman2017ppo} stabilizes optimization by defining a **probability ratio** between the updated policy $\pi_\theta$ and the policy used to collect the batch rollout $\pi_{\theta_{\text{old}}}$:
 \begin{equation}
@@ -720,16 +862,58 @@ The clipped surrogate objective function is formulated as:
 \label{eq:ppo_clipping_formula}
 \Loss_{\text{CLIP}}(\theta) = \hat{\E}_t \left[ \min\left( \rho_t(\theta)\hat{A}_t, \; \operatorname{clip}\left(\rho_t(\theta), 1-\epsilon, 1+\epsilon\right)\hat{A}_t \right) \right],
 \end{equation}
-where $\epsilon \approx 0.2$ is the clipping boundary, and $\hat{A}_t$ is the Generalized Advantage Estimation (GAE) computed by a learned value function (Critic) $V_\psi(x, y_{<t})$ trained via mean-squared error to predict cumulative future returns:
+where $\epsilon \approx 0.2$ is the clipping boundary, and $\hat{A}_t$ is the Generalized Advantage Estimation (GAE) computed by the Critic network $V_\omega$:
 \begin{equation}
-\hat{A}_t = \sum_{l=0}^{\infty} (\gamma \lambda)^l \delta_{t+l}^V, \quad \delta_t^V = r_t^{\text{step}} + \gamma V_\psi(s_{t+1}) - V_\psi(s_t).
+\hat{A}_t = \sum_{l=0}^{\infty} (\gamma \lambda)^l \delta_{t+l}^V, \quad \delta_t^V = r_t^{\text{step}} + \gamma V_\omega(x, y_{\le t+1}) - V_\omega(x, y_{\le t}).
 \end{equation}
 The $\min(\cdot, \cdot)$ operator acts as a **pessimistic lower bound**:
 \begin{itemize}
     \item When the advantage is positive ($\hat{A}_t > 0$), the action was better than average. PPO increases $\rho_t(\theta)$, but clipping caps the objective at $(1+\epsilon)\hat{A}_t$, preventing the optimizer from making an overly optimistic update that ruins language fluency.
     \item When the advantage is negative ($\hat{A}_t < 0$), the action yielded lower returns than expected. PPO decreases $\rho_t(\theta)$, with clipping bounding the gradient at $(1-\epsilon)\hat{A}_t$.
 \end{itemize}
-By bounding policy updates within a localized trust region $[1-\epsilon, 1+\epsilon]$, PPO enables multiple epochs of stochastic gradient descent on sampled rollouts without suffering destructive gradient explosion.
+
+Simultaneously, the Critic network parameters $\omega$ are updated by minimizing the mean squared Bellman temporal difference error:
+\begin{equation}
+\label{eq:critic_mse_loss}
+\Loss_{\text{Critic}}(\omega) = \hat{\E}_t \left[ \left( V_\omega(x, y_{\le t}) - \left(r_t^{\text{step}} + \gamma V_{\omega_{\text{old}}}(x, y_{\le t+1})\right) \right)^2 \right].
+\end{equation}
+
+\begin{tcolorbox}[colback=cardBg,colframe=cardLine,arc=2pt,boxrule=0.5pt,title=\textbf{Algorithmic Pipeline: Complete Execution Workflow of PPO-RLHF}]
+\label{box:rlhf_algorithmic_pipeline}
+\small\sffamily
+\textbf{Input}: Unlabeled prompt distribution $\mathcal{D}_x$, human preference dataset $\mathcal{D}_{\text{pair}} = \{(x, y_w, y_l)\}$, SFT checkpoint $\pi_{\text{SFT}}$.\\
+\textbf{Output}: Aligned policy $\pi_\theta$.
+\begin{enumerate}
+    \item \textbf{Stage 1 (Initialization)}:
+    \begin{itemize}
+        \item Initialize Active Policy $\pi_\theta \leftarrow \pi_{\text{SFT}}$ and Reference Model $\pi_{\text{ref}} \leftarrow \pi_{\text{SFT}}$ (freeze $\pi_{\text{ref}}$).
+        \item Initialize Reward Model $r_\phi$ and Value Function $V_\omega$ from $\pi_{\text{SFT}}$ with linear scalar heads.
+    \end{itemize}
+    \item \textbf{Stage 2 (Reward Model Training)}:
+    \begin{itemize}
+        \item Train $r_\phi$ by minimizing Bradley--Terry loss over $\mathcal{D}_{\text{pair}}$:
+        $$\phi^* = \arg\min_\phi -\E_{(x, y_w, y_l)} \left[ \log \sigma\left( r_\phi(x, y_w) - r_\phi(x, y_l) \right) \right].$$
+        \item Freeze the optimized reward model $r_\phi$.
+    \end{itemize}
+    \item \textbf{Stage 3 (Iterative PPO Online Loop)}:
+    \begin{itemize}
+        \item \textbf{For} each training epoch \textbf{do}:
+        \begin{enumerate}
+            \item Sample a mini-batch of prompts $x \sim \mathcal{D}_x$.
+            \item \textit{Rollout Generation}: Autoregressively sample completions $y \sim \pi_\theta(\cdot \mid x)$.
+            \item \textit{Reward \& Penalty Evaluation}:
+            \begin{itemize}
+                \item Query frozen reward model for terminal score: $r_{\text{term}} = r_\phi(x, y)$.
+                \item Query reference model for baseline log-probs: $\log \pi_{\text{ref}}(y_t \mid x, y_{<t})$.
+                \item Compute token-level step rewards $r_t^{\text{step}}$ with KL penalty via Eq.~\eqref{eq:step_reward_formulation}.
+            \end{itemize}
+            \item \textit{Advantage Estimation}: Compute values $V_\omega(x, y_{\le t})$ and GAE advantages $\hat{A}_t$.
+            \item \textit{Gradient Optimization}: For $K_{\text{ppo}}$ sub-epochs, update policy $\theta$ via $\Loss_{\text{CLIP}}(\theta)$ (Eq.~\eqref{eq:ppo_clipping_formula}) and critic $\omega$ via $\Loss_{\text{Critic}}(\omega)$ (Eq.~\eqref{eq:critic_mse_loss}).
+        \end{enumerate}
+        \item \textbf{End For}
+    \end{itemize}
+\end{enumerate}
+\end{tcolorbox}
 
 \subsection{Empirical preference results on Reddit TL;DR}
 \label{subsec:preference_results_reddit_tldr}

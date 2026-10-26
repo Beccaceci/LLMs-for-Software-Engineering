@@ -1,0 +1,1306 @@
+import re
+
+content = r'''\documentclass[../../main.tex]{subfiles}
+
+\begin{document}
+
+\chapter{Instruction Tuning and Alignment}
+\label{ch:instruction_tuning_alignment}
+
+% ==============================================================================
+% CHAPTER INTRODUCTION & FOUNDATIONS OF MODEL ALIGNMENT
+% ==============================================================================
+In modern natural language processing, the concept of \textbf{alignment} has undergone a profound historical transformation. In classical computational linguistics, alignment referred strictly to structural mappings between discrete symbolic sets---such as bipartite word-alignment links between source and target tokens in statistical machine translation. In the era of Large Language Models (LLMs), however, alignment denotes the imperative task of \textbf{steering model outputs to conform faithfully to human expectations, communicative intentions, and ethical values} \citep{xiao2025foundations}.
+
+While self-supervised autoregressive pre-training on trillions of tokens equips a foundation model with vast factual knowledge, syntactic mastery, and statistical grammar, pre-training alone is structurally incapable of producing a helpful, reliable, or safe conversational assistant. A pre-trained base model is fundamentally an unconditional text predictor: when prompted with a question, its training objective encourages it to continue the text as if completing an uncurated web document (generating further questions, forum arguments, or machine-generated spam) rather than executing the user's directive. Furthermore, internet text contains toxic diatribes, uncalibrated biases, and factual fallacies; standard pre-training replicates these pathologies with equal fidelity.
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[
+    >=Stealth,
+    node distance=1.2cm and 1.5cm,
+    stage/.style={rectangle, draw=politoNavy, fill=skyBlue!20, rounded corners=4pt, thick, align=center, inner sep=8pt, font=\small\sffamily},
+    substage/.style={rectangle, draw=steelBlue, fill=cardBg, rounded corners=3pt, thick, align=center, inner sep=6pt, font=\footnotesize\sffamily},
+    lifecycle/.style={rectangle, draw=thmGreenLine, fill=thmGreenBg, rounded corners=4pt, dashed, thick, inner sep=10pt},
+    arrow/.style={->, thick, draw=politoNavy}
+]
+    % Stages
+    \node[stage, fill=amberGold!25, draw=amberGold!80!black] (pretrain) {\textbf{Pre-training Stage}\\\textit{Large-scale Self-Supervised Learning}\\$\max_\theta \sum \log P_\theta(w_t \mid w_{<t})$\\Consumes $\approx 98\%$ Compute};
+
+    \node[stage, right=2.0cm of pretrain, fill=skyBlue!30] (align) {\textbf{Alignment Stage}\\\textit{Adapting to Human Intent \& Values}\\Instruction Following, Safety, Utility\\Consumes $\approx 2\%$ Compute};
+
+    % Alignment Taxonomy Sub-nodes
+    \node[substage, below=0.6cm of align] (rlhf) {\textbf{Human Preference Alignment}\\(e.g., RLHF / DPO)\\Reinforcement learning with reward models};
+    \node[substage, above=0.6cm of align] (sft) {\textbf{Instruction Alignment}\\(e.g., Supervised Fine-Tuning / SFT)\\Prefix-conditioned likelihood maximization};
+    \node[substage, right=1.5cm of align, fill=intuitionPurpleBg, draw=intuitionPurpleLine] (infer) {\textbf{Inference-Time Alignment}\\(e.g., Prompting, Best-of-$N$)\\Zero-parameter runtime steering};
+
+    % Connectors
+    \draw[arrow, line width=1.5pt] (pretrain) -- (align) node[midway, above, font=\scriptsize\sffamily\bfseries] {Base LLM};
+    \draw[arrow] (align) -- (sft);
+    \draw[arrow] (sft) -- (rlhf);
+    \draw[arrow] (rlhf) -| (infer);
+    \draw[arrow] (align) -- (infer);
+
+\end{tikzpicture}
+\caption{The foundational \textit{pre-train-then-align} paradigm for developing large language models (faithfully adapted from Xiao \& Zhu \citep{xiao2025foundations} Figure 4.1). In the pre-training stage, a massive foundation model learns statistical representations from raw web text. In the subsequent alignment stage, the model is adapted through three complementary paradigms: instruction alignment (SFT), human preference alignment (RLHF/DPO), and inference-time steering.}
+\label{fig:pretrain_then_align_lifecycle}
+\end{figure}
+
+To address this multidimensional challenge, alignment techniques can be systematically organized along a rigorous **operational taxonomy based on the execution stage at which alignment is performed** (Figure~\ref{fig:pretrain_then_align_lifecycle}):
+\begin{enumerate}
+    \item \textbf{Inference-Time Alignment}: Operating entirely without gradient backpropagation or weight updates. The behavior of a frozen model is steered dynamically at runtime via in-context prompt engineering, demonstration exemplars, system prefixes, or test-time candidate reranking (such as Best-of-$N$ sampling).
+    \item \textbf{Instruction Alignment via Supervised Fine-Tuning (SFT)}: Adapting model weights directly on curated datasets of instruction-response pairs using masked cross-entropy, training the network to execute natural language commands.
+    \item \textbf{Human Preference Alignment via Reward Modeling (RLHF)}: Aligning the model with subtle, non-deterministic human values and qualitative trade-offs using learned neural reward surrogates and reinforcement learning.
+\end{enumerate}
+
+To establish a principled engineering objective, Askell et al. \citep{askell2021} formalized the **HHH Alignment Criteria**:
+\begin{definition}{The HHH Alignment Criteria}{hhh_criteria}
+A language model is considered aligned if its behavior simultaneously satisfies:
+\begin{enumerate}
+    \item \textbf{Helpfulness}: The model makes an active, high-fidelity effort to resolve the user's objective. It adheres strictly to formatting, length, and stylistic constraints, asks for clarification when requests are genuinely underspecified, avoids unsolicited conversational preamble, and maintains appropriate conciseness.
+    \item \textbf{Honesty}: The model produces claims that are factually grounded and accurate. Crucially, it must exhibit calibrated uncertainty, explicitly stating when information is unknown or ambiguous rather than fabricating plausible-sounding hallucinations or false citations.
+    \item \textbf{Harmlessness}: The model refuses to generate content that facilitates physical harm, cyberattacks, weapons synthesis, illegal acts, or severe psychological harassment, while avoiding unjustified refusals on benign, academic, or adjacent safety queries.
+\end{enumerate}
+\end{definition}
+
+% ==============================================================================
+% SECTION 9.1: INFERENCE-TIME ALIGNMENT AND ITS LIMITS
+% ==============================================================================
+\section{Inference-Time Alignment and Its Limitations}
+\label{sec:inference_time_alignment_limits}
+
+\subsection{The mechanics of inference-time steering}
+\label{subsec:mechanics_inference_alignment}
+
+The most immediate and computationally economical approach to alignment is **inference-time alignment** \citep{xiao2025foundations}. Rather than executing costly gradient updates over billions of parameters, inference-time methods preserve the pre-trained weights $\theta$ in a frozen state and guide the model's generation trajectory dynamically at test time.
+
+Inference-time alignment operates primarily through two distinct mechanisms:
+\begin{enumerate}
+    \item \textbf{Contextual Conditioning and Prompt Steerability}: Prepended input tokens act as activation vectors in the self-attention key-value cache, biasing the autoregressive sampling distribution toward desired linguistic styles, reasoning patterns (e.g., Chain-of-Thought), or persona constraints.
+    \item \textbf{Inference-Time Output Reranking (Best-of-$N$ Sampling)}: Rather than accepting a single greedy or stochastic generation, the frozen model samples $N$ independent candidate completions $\{\hat{y}_1, \dots, \hat{y}_N\} \sim P_\theta(\cdot \mid x)$ using temperature or nucleus sampling. An external scoring mechanism (such as an automated heuristic or a trained reward model $r(x, y)$) evaluates each candidate, selecting the optimal output:
+    \begin{equation}
+    \hat{y}_{\text{best}} = \arg\max_{y \in \{\hat{y}_1, \dots, \hat{y}_N\}} r(x, y).
+    \end{equation}
+\end{enumerate}
+While Best-of-$N$ reranking can dramatically improve test-time accuracy on mathematical reasoning and safety checks, its computational cost scales linearly with $N$, creating severe latency and throughput overhead for interactive real-time systems.
+
+\subsection{In-context few-shot learning and its three fundamental limitations}
+\label{subsec:in_context_limitations}
+
+The primary vehicle for prompt-based inference-time alignment in raw foundation models is **in-context few-shot learning** \citep{brown2020}. By prepending $K$ input-output demonstration exemplars to the prompt:
+\begin{equation}
+\label{eq:few_shot_context_structure}
+x_{\text{prompt}} = \left( x_{\text{demo}}^{(1)}, y_{\text{demo}}^{(1)} \right) \circ \left( x_{\text{demo}}^{(2)}, y_{\text{demo}}^{(2)} \right) \circ \dots \circ \left( x_{\text{demo}}^{(K)}, y_{\text{demo}}^{(K)} \right) \circ x_{\text{query}},
+\end{equation}
+the internal self-attention heads track the demonstration pattern, guiding the model to generate completion $y_{\text{query}}$ without modifying network weights $\theta$.
+
+While few-shot prompting demonstrated that foundation models possess latent multi-task capabilities, relying on in-context learning to build conversational assistants suffers from **three fundamental limitations**:
+\begin{enumerate}
+    \item \textbf{Severe Instability and Format Brittleness}: In-context few-shot predictions are notoriously unstable. Empirical evaluations show that accuracy fluctuates drastically depending on the arbitrary ordering of exemplars, minor variations in whitespace or delimiter tokens, and the frequency of class labels within the prompt. Few-shot models exhibit severe **recency bias** (disproportionately predicting the label of the final exemplar) and **majority-class bias**, making production deployments unreliable.
+    \item \textbf{Complete Failure for Instructions Lacking Natural Exemplars}: Many real-world human interactions intrinsically do not admit few-shot demonstrations. Prompts involving open-ended creative synthesis (e.g., \texttt{"Draft a persuasive diplomatic communique regarding deep-sea mining rights"}), dynamic full-codebase refactoring, or bespoke multi-turn conversational troubleshooting cannot be preceded by realistic exemplars without either pre-solving the unique task or consuming the entire context window. Expecting users to write $K=5$ expert demonstrations before asking a question defeats the purpose of an automated assistant.
+    \item \textbf{Complete Failure to Generalize to Unseen Tasks in Zero-Shot Regimes}: In the true zero-shot setting ($K=0$)---where the model receives an instruction without demonstration pairs---base models fail completely. Because they were never trained to associate imperative natural language with task execution, base models revert to document continuation, echoing the prompt or drifting into irrelevant topics.
+\end{enumerate}
+
+\subsection{Empirical case study: T5 prefix conditioning and format fragility}
+\label{subsec:t5_empirical_brittleness}
+
+The limitations of early sequence-to-sequence conditioning were brought to light by the **Text-to-Text Transfer Transformer (T5)** \citep{raffel2020t5}. T5 sought to unify all natural language processing tasks under a single text-to-text encoder-decoder framework by prepending a rigid, hardcoded prefix string to every input:
+\begin{align*}
+\text{Translation:} & \quad \texttt{"translate English to German: That is good."} \longrightarrow \texttt{"Das ist gut."} \\
+\text{Classification:} & \quad \texttt{"cola sentence: The course is terrible."} \longrightarrow \texttt{"unacceptable"} \\
+\text{Summarization:} & \quad \texttt{"summarize: State authorities announced..."} \longrightarrow \texttt{"Authorities issued a state..."}
+\end{align*}
+
+While T5 proved that diverse tasks could share identical model weights, digging deeply into its behavior reveals that T5 was fundamentally \textbf{unaligned and brittle}. T5 did not learn generalized instruction comprehension. Instead, the prefix strings acted merely as fixed associative lookup keys that routed activations through specific parameters. The moment user inputs deviated even slightly from the exact syntax seen during training, T5's execution collapsed catastrophically.
+
+\begin{tcolorbox}[colback=cardBg,colframe=cardLine,arc=2pt,boxrule=0.5pt,title=\textbf{Pedagogical Example: T5 Prompt Brittleness and Format Fragility}]
+\label{box:t5_brittleness_examples}
+The empirical fragility of T5's prefix mechanism is evident in three canonical failure modes (documented in course lecture slides):
+\begin{enumerate}
+    \item \textbf{Canonical Pre-trained Prefix (Exact Syntax)}:
+    \begin{align*}
+    \text{Input:} & \quad \texttt{"can you translate from English to German, What is your profession?"} \\
+    \text{Output:} & \quad \texttt{"Was ist Ihr Beruf?"} \quad \text{(Correct execution)}
+    \end{align*}
+    \item \textbf{Minor Natural Language Paraphrase}:
+    \begin{align*}
+    \text{Input:} & \quad \texttt{"can you translate from English to German the following sentence? What is your profession?"} \\
+    \text{Output:} & \quad \texttt{"<unk> <unk> <unk>..."} \quad \text{(Catastrophic failure into unknown tokens)}
+    \end{align*}
+    \item \textbf{Novel Task Directive}:
+    \begin{align*}
+    \text{Input:} & \quad \texttt{"compute: 2+2 ="} \\
+    \text{Output:} & \quad \texttt{":2+2+2+2+2+2+2+2+2+..."} \quad \text{(Degeneration into an infinite loop)}
+    \end{align*}
+\end{enumerate}
+\end{tcolorbox}
+
+The failure cases in Box~\ref{box:t5_brittleness_examples} demonstrate that T5 lacked both **cross-task generalization** and **phrasing robustness**. Adding subordinate clauses (such as \texttt{"the following sentence?"}) broke the associative key, causing the network to assign probability mass to out-of-vocabulary tokens. Furthermore, T5 could not generalize to tasks outside its pre-defined prefix dictionary (such as performing arithmetic via \texttt{"compute:"}), generating degenerative repetitive patterns instead.
+
+These fundamental limits establish that inference-time conditioning cannot substitute for **parametric alignment**: permanently adapting network weights to follow arbitrary natural language instructions.
+
+% ==============================================================================
+% SECTION 9.2: SUPERVISED FINE-TUNING AND INSTRUCTION ALIGNMENT
+% ==============================================================================
+\section{Supervised Fine-Tuning and Instruction Alignment}
+\label{sec:instruction_tuning_t0_flan}
+
+\subsection{Why autoregressive pre-training yields unaligned models}
+\label{subsec:why_autoregressive_yields_unaligned}
+
+Autoregressive pre-training optimizes the log-likelihood of sequential text tokens over massive, uncurated web corpora. From a philosophical perspective, this objective forces the model to perform statistical pattern matching across linguistic surfaces rather than acquire genuine semantic comprehension, epistemic awareness, or communicative intent. The network learns the statistical distribution of strings as they appear in the wild---encompassing internet debates, fictional dialogues, academic worksheets, and machine-generated spam---without grounding those strings in external reality or attributing agency to the user. 
+
+Consequently, when prompted, an autoregressive base model operates strictly under the paradigm of unconditional document completion. When requested to summarize an article, a base model does not summarize; it continues the article with more prose. When asked a question, it generates subsequent questions.
+
+From a mathematical perspective, standard pre-training minimizes the negative log-likelihood (NLL) over sequence tokens:
+\begin{equation}
+\label{eq:nll_loss_critique}
+\Loss_{\text{NLL}}(\theta) = -\sum_{t=1}^N \log P_\theta(w_t \mid w_{<t}),
+\end{equation}
+where $P_\theta(w_t \mid w_{<t}) = \softmax\left(W_{\text{unembed}} h_t\right)$ represents the categorical distribution over the vocabulary $\vocab$. 
+
+Equation~\eqref{eq:nll_loss_critique} exhibits critical mathematical deficiencies when viewed as an alignment objective:
+\begin{enumerate}
+    \item \textbf{Equal Penalty for Semantically Divergent Errors}: Cross-entropy penalizes every non-target token $w \neq w_t^*$ based purely on predictive probability mass. Predicting an accurate, elegant synonym receives a heavy loss penalty, whereas predicting a dangerous factual hallucination or offensive slur receives the identical penalty. It possesses no metric for truthfulness or qualitative severity.
+    \item \textbf{Imitation of Statistical Modes across Heterogeneous Quality}: Because MLE forces the model to minimize forward KL divergence $\KL{P_{\text{data}}}{P_\theta}$, the network is mathematically penalized if it omits any mode of the training distribution. It learns to mimic low-quality, untruthful text with the exact same fidelity that it mimics scientific prose.
+    \item \textbf{Absence of Intent and Communicative Conditioning}: The loss contains no term modeling user satisfaction, brevity, or directive execution.
+\end{enumerate}
+
+This discrepancy is termed the \textbf{intent gap} \citep{ouyang2022}: the divide between human intent and autoregressive next-token loss.
+
+\begin{tcolorbox}[colback=cardBg,colframe=cardLine,arc=2pt,boxrule=0.5pt,title=\textbf{Pedagogical Example: Base Model Prompt Continuation versus Assistant Directive Execution}]
+\label{box:base_model_continuation_failure}
+To observe the practical manifestation of the intent gap, consider submitting an elementary factual query to a base language model (such as base LLaMA-2 7B prior to instruction tuning):
+\begin{center}
+\texttt{"what is 2 + 2?"}
+\end{center}
+Because the model was trained exclusively to continue web documents, it does not interpret the string as an imperative request to calculate an arithmetic sum. Instead, observing that short mathematical expressions on the internet frequently occur within repetitive worksheets, exam practice tests, or FAQ forum posts, the unaligned base model continues the text with statistically correlated questions:
+\begin{center}
+\texttt{What is 2 plus 2? What is the answer to 2 plus 2? What is the answer to 2 plus 2 in math?}
+\end{center}
+In contrast, an instruction-aligned assistant interprets the communicative intent behind the prompt, suppresses prompt repetition, and outputs the direct, helpful answer:
+\begin{center}
+\texttt{The answer to 2 + 2 is 4.}
+\end{center}
+\end{tcolorbox}
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[
+    >=Stealth,
+    node distance=1.5cm and 2.0cm,
+    box/.style={rectangle, draw=politoNavy, fill=skyBlue!30, rounded corners=4pt, thick, align=center, inner sep=8pt, font=\small\sffamily},
+    basebox/.style={rectangle, draw=crimsonRed, fill=crimsonRed!10, rounded corners=4pt, thick, align=left, inner sep=8pt, font=\small\ttfamily},
+    alignbox/.style={rectangle, draw=thmGreenLine, fill=thmGreenBg, rounded corners=4pt, thick, align=left, inner sep=8pt, font=\small\ttfamily},
+    arrow/.style={->, thick, draw=politoNavy}
+]
+    % Central Input Node
+    \node[box] (prompt) {\textbf{User Input Prompt} $x$\\\texttt{"What is 2 + 2?"}};
+
+    % Base Model Path
+    \node[box, above right=1.0cm and 1.8cm of prompt, draw=crimsonRed, fill=crimsonRed!15] (baselm) {\textbf{Pre-trained Base Model}\\$\max_\theta \sum \log P_\theta(w_t \mid w_{<t})$\\Unconditional Text Continuator};
+    \node[basebox, right=1.5cm of baselm] (baseout) {\textbf{Statistical Web Continuation:}\\What is 2 plus 2?\\What is the answer to 2 plus 2?\\What is the answer to 2 plus 2 in math?};
+
+    % Aligned Assistant Path
+    \node[box, below right=1.0cm and 1.8cm of prompt, draw=thmGreenLine, fill=thmGreenBg] (alignlm) {\textbf{Instruction-Aligned Model}\\$\pi_\theta(y \mid x) \text{ conditioned on intent}$\\Helpful Conversational Agent};
+    \node[alignbox, right=1.5cm of alignlm] (alignout) {\textbf{Directive Execution:}\\The answer to 2 + 2 is 4.};
+
+    % Connectors
+    \draw[arrow, draw=crimsonRed] (prompt) |- (baselm);
+    \draw[arrow, draw=crimsonRed] (baselm) -- (baseout);
+    \draw[arrow, draw=thmGreenLine] (prompt) |- (alignlm);
+    \draw[arrow, draw=thmGreenLine] (alignlm) -- (alignout);
+
+\end{tikzpicture}
+\caption{The intent gap between autoregressive next-token prediction and instruction alignment. When prompted with an elementary arithmetic query, an unaligned base foundation model treats the prompt as an open-ended document prefix and synthesizes statistically correlated worksheet questions. Conversely, an aligned assistant interprets the prompt as an imperative task directive, returning the exact communicative answer.}
+\label{fig:next_token_vs_assistant_paradigm}
+\end{figure}
+
+\subsection{Supervised fine-tuning mechanics and prompt-loss masking}
+\label{subsec:sft_mechanics_loss_masking}
+
+To bridge the intent gap, **Supervised Fine-Tuning (SFT)** adapts the pre-trained weights $\hat{\theta}$ on an annotated dataset $\mathcal{D}_{\text{SFT}} = \{(x, y)\}$ of instruction prompts $x$ paired with gold-standard responses $y$ \citep{xiao2025foundations}. 
+
+Unlike standard pre-training, where loss is computed over the entire sequence, SFT seeks to maximize the \textbf{conditional probability of the response given the prompt}:
+\begin{equation}
+\label{eq:sft_conditional_objective}
+\theta^* = \arg\max_\theta \sum_{(x, y) \in \mathcal{D}_{\text{SFT}}} \log P_\theta(y \mid x) = \arg\max_\theta \sum_{(x, y) \in \mathcal{D}_{\text{SFT}}} \sum_{t=1}^{|y|} \log P_\theta(y_t \mid x, y_{<t}).
+\end{equation}
+
+In modern autoregressive decoder-only Transformer architectures, computing Equation~\eqref{eq:sft_conditional_objective} is elegantly implemented via **Prompt Loss Masking**. When concatenating the prompt $x = (x_0, \dots, x_m)$ and completion $y = (y_1, \dots, y_n)$ into a single sequence $[x, y]$, the joint log-probability decomposes via the probability chain rule as:
+\begin{equation}
+\log P_\theta(x, y) = \underbrace{\log P_\theta(x)}_{\text{Force loss to } 0} + \underbrace{\log P_\theta(y \mid x)}_{\text{Active Loss Computation}}.
+\end{equation}
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[
+    >=Stealth,
+    node distance=0.8cm and 0.4cm,
+    tokbox/.style={rectangle, draw=politoNavy, fill=white, rounded corners=2pt, minimum width=1.1cm, minimum height=0.7cm, align=center, font=\footnotesize\ttfamily},
+    prompttok/.style={rectangle, draw=steelBlue, fill=skyBlue!15, rounded corners=2pt, minimum width=1.1cm, minimum height=0.7cm, align=center, font=\footnotesize\ttfamily},
+    targettok/.style={rectangle, draw=thmGreenLine, fill=thmGreenBg, rounded corners=2pt, minimum width=1.1cm, minimum height=0.7cm, align=center, font=\footnotesize\ttfamily\bfseries},
+    arrow/.style={->, thick, draw=politoNavy}
+]
+    % Forward Pass
+    \node[font=\small\sffamily\bfseries] (fwd_label) at (-1.5, 1.2) {(a) Forward Pass:};
+    \node[prompttok] (x0) at (0.5, 1.2) {$x_0$};
+    \node[prompttok] (x1) at (1.8, 1.2) {$x_1$};
+    \node[prompttok] (x2) at (3.1, 1.2) {$x_2$};
+    \node[prompttok] (x3) at (4.4, 1.2) {$x_3$};
+    \node[targettok] (y1) at (5.7, 1.2) {$y_1$};
+    \node[targettok] (y2) at (7.0, 1.2) {$y_2$};
+    \node[font=\footnotesize\sffamily, text=steelBlue] at (2.45, 1.9) {Input Prompt $x$};
+    \node[font=\footnotesize\sffamily, text=thmGreenLine] at (6.35, 1.9) {Target Output $y$};
+
+    % Backward Pass
+    \node[font=\small\sffamily\bfseries] (bwd_label) at (-1.5, -0.4) {(b) Backward Pass:};
+    \node[tokbox, draw=crimsonRed, fill=crimsonRed!10] (l0) at (0.5, -0.4) {$\Loss=0$};
+    \node[tokbox, draw=crimsonRed, fill=crimsonRed!10] (l1) at (1.8, -0.4) {$\Loss=0$};
+    \node[tokbox, draw=crimsonRed, fill=crimsonRed!10] (l2) at (3.1, -0.4) {$\Loss=0$};
+    \node[tokbox, draw=crimsonRed, fill=crimsonRed!10] (l3) at (4.4, -0.4) {$\Loss=0$};
+    \node[tokbox, draw=thmGreenLine, fill=thmGreenBg] (ly1) at (5.7, -0.4) {$\Loss \neq 0$};
+    \node[tokbox, draw=thmGreenLine, fill=thmGreenBg] (ly2) at (7.0, -0.4) {$\Loss \neq 0$};
+
+    \draw[arrow, dashed] (x0) -- (l0);
+    \draw[arrow, dashed] (x1) -- (l1);
+    \draw[arrow, dashed] (x2) -- (l2);
+    \draw[arrow, dashed] (x3) -- (l3);
+    \draw[arrow, draw=thmGreenLine] (y1) -- (ly1);
+    \draw[arrow, draw=thmGreenLine] (y2) -- (ly2);
+
+\end{tikzpicture}
+\caption{Supervised fine-tuning with prompt-loss masking (adapted from Xiao \& Zhu \citep{xiao2025foundations} Figure 4.2). During the forward pass, the model processes the concatenated sequence $[x, y]$ using standard causal self-attention. During the backward pass, loss gradients are masked to zero for all prompt tokens $x$, computing backpropagation exclusively on the target response tokens $y$.}
+\label{fig:sft_prompt_loss_masking}
+\end{figure}
+
+As illustrated in Figure~\ref{fig:sft_prompt_loss_masking}, the standard forward pass is executed across all sequence positions so that the output tokens can attend to the full contextual prompt. During the backward pass, gradients corresponding to $x$ are set to zero (masked with label $-100$ in PyTorch cross-entropy). The network updates its weights exclusively to generate correct completions $y$ conditioned on $x$.
+
+For multi-turn conversational interactions with $K$ conversation rounds $\{x_1, y_1, x_2, y_2, \dots, x_K, y_K\}$, the loss masking generalizes across alternating dialogue turns:
+\begin{equation}
+\label{eq:multiturn_sft_loss}
+\Loss_{\text{multi-turn}}(\theta) = -\sum_{k=1}^K \sum_{t=1}^{|y_k|} \log P_\theta\left(y_{k, t} \;\middle|\; x_1, y_1, \dots, x_{k-1}, y_{k-1}, x_k, y_{k, <t}\right),
+\end{equation}
+where loss is masked for all user inputs $x_k$ and computed exclusively on assistant turns $y_k$.
+
+\paragraph{Limitations of Supervised Fine-Tuning}
+Despite its widespread success, SFT suffers from two major limitations:
+\begin{enumerate}
+    \item \textbf{Extravagant Data Annotation Bottlenecks}: High-quality SFT requires thousands of diverse, expert-authored prompt-response pairs. Creating datasets that capture complex formatting, reasoning chains, and specialized domains requires skilled human labor that is difficult to scale.
+    \item \textbf{Computational Expense on Frontier LLMs}: Fine-tuning all parameters of a 70B+ parameter model requires substantial GPU memory and compute, introducing the persistent danger of \textbf{catastrophic forgetting} of pre-trained linguistic features and world knowledge.
+\end{enumerate}
+
+\subsection{Fine-tuning data acquisition: manual vs. automatic generation}
+\label{subsec:sft_data_acquisition_taxonomy}
+
+Given the pivotal role of instruction data, the literature has developed two distinct paradigms for acquiring SFT datasets \citep{xiao2025foundations}:
+
+\subsubsection{Manually Generated Data}
+Human-authored data remains the gold standard for quality and conversational naturalness:
+\begin{itemize}
+    \item \textbf{Human Expert Authoring}: Recruited annotators author both the prompt instructions and the target answers. While producing high-fidelity outputs, this approach is exceptionally slow and expensive.
+    \item \textbf{Prompt Templates over Existing NLP Datasets}: Pre-existing, high-quality academic benchmarks (SuperGLUE, SQuAD, MultiNLI) are repurposed into conversational instructions using templating engines (e.g., PromptSource \citep{bach2022promptsource}). For example, translation sentence pairs are mapped into: \texttt{"Instruction: Translate to French. Input: \{source\} Output: \{target\}"}.
+    \item \textbf{Organic Web and Forum Extraction}: Crawling question-and-answer archives (such as StackOverflow, Reddit threads, and Quora). However, web-mined data often contains noise, slang, or sarcastic non-answers that must be heavily filtered.
+\end{itemize}
+
+\subsubsection{Automatically Generated Data}
+To scale data volume without exorbitant human cost, modern pipelines synthesize SFT datasets automatically:
+\begin{itemize}
+    \item \textbf{Self-Instruct Tuning} \citep{wang2023selfinstruct}: Starting from a small seed set of hand-crafted tasks ($\approx 175$ tasks), a powerful teacher LLM iteratively bootstraps new instructions, classifies them by task type, generates corresponding inputs and outputs, and filters candidates based on heuristic quality and novelty.
+    \item \textbf{Task Inversion (Input Flipping)}: Reversing traditional input-output relationships to enforce bidirectional semantic comprehension:
+    \begin{center}
+    \texttt{"Given the target summary '\{summary\}', draft a plausible source article that produced it."}
+    \end{center}
+    \item \textbf{Teacher LLM Generation and Best-of-$N$ Filtering}: Using a frontier model (such as GPT-4) to generate responses to diverse prompts, followed by automated rejection sampling to retain only responses meeting strict quality criteria.
+\end{itemize}
+
+\subsection{Data efficiency, LIMA, and emergent instruction generalization}
+\label{subsec:data_efficiency_emergence_t0_flan}
+
+\paragraph{Fine-Tuning with Less Data: The LIMA Hypothesis}
+A natural question arises: how much SFT data is truly required to align an LLM? Zhou et al. \citep{zhou2024lima} addressed this in their landmark study **LIMA (Less Is More for Alignment)**. They demonstrated that fine-tuning a 65B base LLaMA model on just **1,000 meticulously curated instruction-response pairs** produced conversational performance competitive with GPT-4 and InstructGPT.
+
+This established the **Superfly Alignment Hypothesis**: almost all knowledge and world reasoning capabilities are acquired entirely during pre-training. Alignment is not about teaching the model new facts; rather, it is a superficial formatting process that teaches the model the sub-distribution of conversational style, dialogue framing, and task obedience.
+
+\paragraph{Instruction Generalization across Multi-Task Models}
+When instruction tuning is executed across diverse task mixtures, it unlocks dramatic cross-task generalization:
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[
+    >=Stealth,
+    node distance=1.2cm and 1.5cm,
+    rawbox/.style={rectangle, draw=politoNavy, fill=skyBlue!20, rounded corners=3pt, thick, align=center, inner sep=6pt, font=\small\sffamily},
+    templatebox/.style={rectangle, draw=intuitionPurpleLine, fill=intuitionPurpleBg, rounded corners=3pt, thick, align=left, inner sep=6pt, font=\footnotesize\ttfamily},
+    modelbox/.style={rectangle, draw=thmGreenLine, fill=thmGreenBg, rounded corners=4pt, thick, align=center, inner sep=8pt, font=\small\sffamily\bfseries},
+    testbox/.style={rectangle, draw=crimsonRed, fill=crimsonRed!10, rounded corners=3pt, thick, align=center, inner sep=6pt, font=\small\sffamily},
+    arrow/.style={->, thick, draw=politoNavy}
+]
+    % Raw Datasets
+    \node[rawbox] (raw1) {\textbf{Standard NLP Dataset}\\(e.g., SuperGLUE / RTE)\\\textit{Premise, Hypothesis, Label}};
+
+    % Prompt Templates
+    \node[templatebox, above right=0.3cm and 1.2cm of raw1] (t1) {\textbf{Template 1 (Direct Query):}\\Does "\{premise\}" mean that\\ "\{hypothesis\}" is true? [Yes/No]};
+    \node[templatebox, right=1.2cm of raw1] (t2) {\textbf{Template 2 (Assertion Verification):}\\Based on: \{premise\}\\Can we conclude: \{hypothesis\}?};
+    \node[templatebox, below right=0.3cm and 1.2cm of raw1] (t3) {\textbf{Template 3 (Task Inversion):}\\Given that "\{hypothesis\}" is true,\\what premise justifies it?};
+
+    % Model Training
+    \node[modelbox, right=1.2cm of t2] (t0model) {T0-11B Backbone\\Multitask Prompted\\Supervised Fine-Tuning\\$\Loss_{\text{IT}}(\theta) = -\sum \log P_\theta(y_t \mid x, y_{<t})$};
+
+    % Evaluation Partition
+    \node[testbox, below=1.2cm of t0model] (heldout) {\textbf{Held-Out Task Evaluation}\\Entire Task Clusters Excluded from SFT\\(e.g., Unseen NLI, Winogrande, CB)\\\textbf{True Zero-Shot Generalization}};
+
+    % Connections
+    \draw[arrow] (raw1.east) -- ++(0.5,0) |- (t1.west);
+    \draw[arrow] (raw1.east) -- (t2.west);
+    \draw[arrow] (raw1.east) -- ++(0.5,0) |- (t3.west);
+
+    \draw[arrow] (t1.east) -| (t0model.north);
+    \draw[arrow] (t2.east) -- (t0model.west);
+    \draw[arrow] (t3.east) -| (t0model.south);
+
+    \draw[arrow, dashed, draw=crimsonRed] (t0model.south) -- (heldout.north);
+
+\end{tikzpicture}
+\caption{The T0 multitask prompted fine-tuning architecture \citep{sanh2022}. Conventional tabular NLP datasets are mapped into conversational queries through a diverse collection of crowdsourced prompt templates, including direct questions, verification assertions, and task inversions. Fine-tuning on these multi-prompt formulations enables the model to generalize zero-shot to entirely held-out task clusters without seeing task-specific exemplars.}
+\label{fig:t0_multitask_workflow}
+\end{figure}
+
+\subsubsection{T0: Multitask Prompted Training and Prompt Robustness}
+Sanh et al. \citep{sanh2022} implemented this vision in **T0**, utilizing an 11-billion parameter T5 encoder-decoder backbone (Figure~\ref{fig:t0_multitask_workflow}). T0 was fine-tuned across dozens of datasets formatted with $M_k \approx 8-10$ crowdsourced prompt templates per task:
+\begin{equation}
+\label{eq:multitask_instruction_loss}
+\Loss_{\text{IT}}(\theta) = -\sum_{k=1}^K \frac{1}{M_k} \sum_{m=1}^{M_k} \E_{(x, y) \sim \mathcal{D}_k} \left[ \sum_{t=1}^{|y|} \log P_\theta\left(y_t \;\middle|\; \mathcal{T}_{k, m}(x), y_{<t}\right) \right].
+\end{equation}
+
+T0 evaluated generalization by completely withholding entire task clusters (such as Natural Language Inference) from training. When evaluated zero-shot on held-out NLI datasets (RTE, CB, ANLI), T0-11B outperformed untuned T5-11B by $>15\%$ and outperformed the 175B base GPT-3 model.
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    width=11cm,
+    height=6.5cm,
+    xlabel={Average Number of Prompts per Dataset ($p$)},
+    ylabel={Zero-Shot Held-Out Accuracy (\%)},
+    xmin=0.5, xmax=9.0,
+    ymin=50, ymax=68,
+    xtick={1, 3, 5.7, 8.03},
+    xticklabels={$p=1$, $p=3$, $p=5.7$, $p=8.03$},
+    ytick={52, 54, 56, 58, 60, 62, 64, 66},
+    grid=both,
+    grid style={line width=.2pt, draw=gray!20},
+    major grid style={line width=.3pt, draw=gray!40},
+    legend style={at={(0.03,0.95)}, anchor=north west, font=\small\sffamily},
+    font=\small\sffamily
+]
+    % Shaded Fill for Variance Area
+    \addplot[fill=skyBlue!50, draw=none, opacity=0.4] coordinates {
+        (1, 62.0)
+        (3, 62.8)
+        (5.7, 64.2)
+        (8.03, 65.9)
+        (8.03, 61.7)
+        (5.7, 58.0)
+        (3, 53.6)
+        (1, 48.8)
+    } -- cycle;
+
+    % Median Performance Line
+    \addplot[color=politoNavy, mark=square*, thick, mark size=2.5pt] coordinates {
+        (1, 55.4)
+        (3, 58.2)
+        (5.7, 61.1)
+        (8.03, 63.8)
+    };
+    \addlegendentry{Median Held-Out Accuracy}
+
+    % Upper Bound of Variance
+    \addplot[color=steelBlue, dashed, line width=0.8pt] coordinates {
+        (1, 62.0)
+        (3, 62.8)
+        (5.7, 64.2)
+        (8.03, 65.9)
+    };
+    \addlegendentry{Prompt Variance Envelope}
+
+    % Lower Bound of Variance (forget plot so no duplicate legend entry)
+    \addplot[color=steelBlue, dashed, line width=0.8pt, forget plot] coordinates {
+        (1, 48.8)
+        (3, 53.6)
+        (5.7, 58.0)
+        (8.03, 61.7)
+    };
+
+\end{axis}
+\end{tikzpicture}
+\caption{Empirical prompt robustness dynamics as a function of template diversity in T0 \citep{sanh2022}. As the average number of prompt templates per dataset ($p$) scales from $p=1$ to $p=8.03$, median held-out task accuracy increases monotonically from $55.4\%$ to $63.8\%$. Concurrently, the performance variance across differing prompt formulations narrows substantially, demonstrating that diverse template training enforces syntactic invariance.}
+\label{fig:prompt_robustness_scaling}
+\end{figure}
+
+Crucially, T0 revealed the empirical law of **prompt robustness** (Figure~\ref{fig:prompt_robustness_scaling}): scaling the number of prompt templates from $p=1$ to $p=8$ per dataset compressed the evaluation variance envelope from $13.2\%$ down to $4.2\%$, insulating the model against arbitrary phrasing perturbations.
+
+\subsubsection{FLAN: Instruction Tuning at Scale and Scale Emergence}
+Wei et al. \citep{wei2022finetuned} investigated instruction tuning across dense decoder-only models (LaMDA) from 420M up to 137B parameters across 62 datasets in 12 task clusters.
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    width=11.5cm,
+    height=6.8cm,
+    xmode=log,
+    log basis x=10,
+    xlabel={Model Parameters (Log Scale)},
+    ylabel={Average Held-Out Cluster Accuracy (\%)},
+    xmin=300000000, xmax=200000000000,
+    ymin=35, ymax=65,
+    xtick={420000000, 2000000000, 8000000000, 68000000000, 137000000000},
+    xticklabels={420M, 2B, 8B, 68B, 137B},
+    ytick={35, 40, 45, 50, 55, 60, 65},
+    grid=both,
+    grid style={line width=.2pt, draw=gray!20},
+    major grid style={line width=.3pt, draw=gray!40},
+    legend style={at={(0.03,0.95)}, anchor=north west, font=\small\sffamily},
+    font=\small\sffamily
+]
+    % Untuned Base Model Line
+    \addplot[color=bodyGray, mark=o, thick, dashed] coordinates {
+        (420000000, 41.5)
+        (2000000000, 44.2)
+        (8000000000, 48.0)
+        (68000000000, 51.5)
+        (137000000000, 53.2)
+    };
+    \addlegendentry{Untuned Base Language Model}
+
+    % FLAN Instruction-Tuned Line
+    \addplot[color=politoNavy, mark=*, line width=1.5pt] coordinates {
+        (420000000, 37.8)
+        (2000000000, 42.1)
+        (8000000000, 48.2)
+        (68000000000, 57.4)
+        (137000000000, 62.6)
+    };
+    \addlegendentry{FLAN (Instruction-Tuned)}
+
+    % Emergence Threshold Vertical Divider
+    \draw[thick, dotted, draw=crimsonRed] (axis cs:8000000000,35) -- (axis cs:8000000000,65);
+    \node[above right, font=\footnotesize\sffamily\bfseries, text=crimsonRed] at (axis cs:8000000000,37) {Emergence Threshold ($\approx 8\text{B}$)};
+
+    % Annotation of Negative Transfer
+    \node[align=center, fill=white, draw=bodyGray, rounded corners=2pt, font=\scriptsize\sffamily, inner sep=3pt] at (axis cs:900000000,38.5) {
+        Negative Transfer\\(Capacity saturation)
+    };
+
+    % Annotation of Emergent Surge
+    \node[align=center, fill=white, draw=thmGreenLine, rounded corners=2pt, font=\scriptsize\sffamily, inner sep=3pt] at (axis cs:68000000000,61.0) {
+        Emergent Generalization\\Surge ($+9.4\%$ over base)
+    };
+
+\end{axis}
+\end{tikzpicture}
+\caption{The scale emergence phenomenon of instruction tuning in FLAN \citep{wei2022finetuned}. On small models ($<8\text{B}$ parameters), instruction tuning hurts held-out task accuracy compared to untuned base models due to parameter saturation and catastrophic forgetting. On large models ($>68\text{B}$ parameters), instruction tuning triggers a massive emergent performance leap, surpassing untuned baselines and matching few-shot GPT-3.}
+\label{fig:flan_scale_emergence}
+\end{figure}
+
+As shown in Figure~\ref{fig:flan_scale_emergence}, FLAN uncovered the **scale emergence phenomenon**:
+\begin{itemize}
+    \item \textbf{Negative Transfer on Small Models ($<8\text{B}$)}: For models with 420M and 2B parameters, instruction tuning degraded held-out task accuracy relative to base models due to parameter capacity saturation.
+    \item \textbf{Emergence on Large Models ($>68\text{B}$)}: At 68B and 137B parameters, instruction tuning unlocked a surge in generalization ($+9.4\%$ gain), outperforming zero-shot GPT-3 175B on 20 out of 25 evaluated tasks.
+\end{itemize}
+
+% ==============================================================================
+% SECTION 9.3: REINFORCEMENT LEARNING FROM HUMAN FEEDBACK: THE REDDIT TL;DR FRAMEWORK
+% ==============================================================================
+\section{RLHF and Human Preference Modeling}
+\label{sec:rlhf_reddit_tldr_framework}
+
+\subsection{Why scale and supervised tuning are not enough}
+\label{subsec:why_scale_supervised_not_enough}
+
+Even after pre-training on trillions of tokens and instruction tuning across dozens of task clusters, large language models exhibit severe alignment deficiencies. Scaling parameter count improves lexical fluency and benchmark accuracy, but does not eliminate untruthfulness, sycophancy, toxic hallucinations, or unhelpful verbosity. 
+
+The structural root of this problem was formally diagnosed by Stiennon et al. \citep{stiennon2020} in their foundational OpenAI treatise, *Learning to Summarize with Human Feedback*. Focusing on the **Reddit TL;DR dataset** (comprising 3 million diverse forum posts paired with user-authored \texttt{"TL;DR"} summaries), Stiennon et al. highlighted two fatal limitations of conventional language model training:
+\begin{enumerate}
+    \item \textbf{Poor Metrics}: Standard automated evaluation metrics, such as ROUGE and BLEU, rely strictly on n-gram overlap with a human reference. They correlate remarkably poorly with human qualitative judgment. A summary that repeats an identical sentence three times can achieve a high ROUGE score while being useless to a reader. Conversely, an insightful, concise summary that rephrases facts using different vocabulary receives severe ROUGE penalties. Most dangerously, n-gram metrics cannot detect factual contradictions: changing \texttt{"not guilty"} to \texttt{"guilty"} alters only one token, yet completely inverts truth.
+    \item \textbf{Poor Objectives}: As derived in Section~\ref{subsec:why_autoregressive_yields_unaligned}, token cross-entropy loss $\Loss_{\text{SFT}}$ treats valid synonyms identically to factual hallucinations and offensive outputs. Furthermore, supervised fine-tuning forces the model to fit all demonstration data equally. If human demonstrators write hurried, rambling, or inconsistent summaries, maximum likelihood forces the model to replicate those exact defects.
+\end{enumerate}
+
+To overcome these structural limitations, Stiennon et al. established the canonical **three-step RLHF framework**:
+\begin{enumerate}
+    \item \textbf{Step 1: Collect Human Feedback}: Collect pairwise preferences from human evaluators over candidate model completions.
+    \item \textbf{Step 2: Train a Reward Model}: Train a parameterized neural reward model $r_\theta(x, y)$ on the pairwise preferences using the Bradley--Terry logistic loss.
+    \item \textbf{Step 3: Fine-Tune the Policy via PPO}: Optimize the language model policy to maximize the predicted reward while regularizing with a per-token Kullback--Leibler (KL) divergence penalty.
+\end{enumerate}
+
+\subsection{Step 1: Collecting pairwise human feedback}
+\label{subsec:step1_collecting_human_feedback}
+
+The first operational phase of RLHF collects human qualitative preferences over candidate model outputs. However, designing this collection protocol requires confronting a fundamental trait of human cognition: **humans are notoriously poor at assigning absolute numerical scores, but remarkably proficient and consistent at making comparative, relative evaluations**.
+
+\paragraph{Why Absolute Scoring Fails in Practice}
+In early alignment experiments, evaluators were asked to grade completions on an absolute Likert scale (e.g., scoring a summary from $1$ to $10$). This approach fails due to three systemic pathologies:
+\begin{enumerate}
+    \item \textbf{Calibration Drift and Incompatible Internal Scales}: Different human evaluators calibrate numerical boundaries differently. A demanding annotator might grade a high-quality summary as a $6/10$, reserving $9$ or $10$ for idealized perfection. A lenient annotator might evaluate an average summary containing factual inaccuracies as an $8/10$. Consequently, merging scalar scores from multiple evaluators injects massive non-stationary label variance into the training target.
+    \item \textbf{Temporal Non-Stationarity (Intra-Annotator Drift)}: Even for a single evaluator, absolute scoring drifts throughout the day due to cognitive fatigue, hunger, and exposure to preceding examples. A completion scored as an $8/10$ in the morning may receive a $5/10$ in the late afternoon when the annotator's critical patience wanes.
+    \item \textbf{Lack of an Objective Anchor}: Absolute scores lack ground truth anchors. An evaluator grading a solitary summary has no reference baseline against which to judge whether a subtle omission was necessary for brevity or was an unacceptable hallucination.
+\end{enumerate}
+
+\paragraph{The Relative Comparison Breakthrough}
+Conversely, when presented with an input post $p$ and two candidate completions $(s_1, s_2)$ side by side, human evaluators do not need to invent an abstract numeric scale. Choosing whether $s_1 \succ s_2$ or $s_2 \succ s_1$ is intuitive, cognitively light, and yields exceptionally high inter-annotator agreement ($>75\%$).
+
+Mathematically, comparative evaluation models the human evaluator as a decision function:
+\begin{equation}
+f(p, s_1, s_2): \mathcal{C} \times \mathcal{C} \times \mathcal{C} \longrightarrow \{0, 1\},
+\end{equation}
+where $\mathcal{C}$ denotes the space of natural language text strings, $p$ is the prompt, and $s_1, s_2$ are candidate completions generated by two model snapshots (e.g., via different sampling temperatures or differing training checkpoints).
+
+Under the hood, cognitive theory posits the **Latent Reward Hypothesis**: human judgment is governed by an unobservable, latent utility function $r^*(p, s) \in \R$. When evaluating completions, the annotator implicitly assigns latent utilities $r^*(p, s_1)$ and $r^*(p, s_2)$ and applies an internal selector function:
+\begin{equation}
+f(p, s_1, s_2) = \begin{cases}
+1 & \text{if } r^*(p, s_1) > r^*(p, s_2) \quad (s_1 \succ s_2), \\
+0 & \text{if } r^*(p, s_2) \ge r^*(p, s_1) \quad (s_2 \succ s_1).
+\end{cases}
+\end{equation}
+By collecting binary preferences $y_w \succ y_l$, we directly sample the sign of the latent utility differential:
+\begin{equation}
+\operatorname{sign}\left(r^*(p, y_w) - r^*(p, y_l)\right) = +1.
+\end{equation}
+This formulation completely eliminates arbitrary scalar calibrations, transforming alignment data collection into a statistically robust pairwise classification problem.
+
+\paragraph{Annotator Bottlenecks and Surrogates}
+Despite their statistical superiority, human evaluators exhibit practical limitations:
+\begin{itemize}
+    \item \textbf{Financial and Throughput Limits}: High-quality annotation requires human reading time. Iterative reinforcement learning algorithms sample millions of rollouts; evaluating each rollout via human annotators would cost millions of dollars and require months of turnaround.
+    \item \textbf{Occasional Intransitivity}: Raters can occasionally exhibit cyclic preferences ($s_A \succ s_B$, $s_B \succ s_C$, but $s_C \succ s_A$) due to competing evaluation dimensions (e.g., conciseness vs. factual detail).
+\end{itemize}
+These bottlenecks necessitate **Step 2**: training a neural **Reward Model** to act as a frozen, infinitely scalable mathematical surrogate of collective human preferences.
+
+\subsection{Step 2: Training the reward model}
+\label{subsec:step2_training_reward_model}
+
+To automate human evaluation, a language model is converted into a **Reward Model (RM)** $r_\phi(x, y)$ \citep{xiao2025foundations}. The network is initialized from an SFT model checkpoint, the final unembedding vocabulary matrix is removed, and a scalar projection head $W_r \in \R^{d_{\text{model}} \times 1}$ is attached. Given prompt $x$ and response $y$, the scalar reward is extracted from the hidden activation at the final sequence token:
+\begin{equation}
+r_\phi(x, y) = W_r^\top h_{|x \circ y|}.
+\end{equation}
+
+To train $r_\phi$, Stiennon et al. leveraged the **Bradley--Terry preference model** \citep{bradley1952}. The probability that completion $y_w$ (the winner) is preferred over $y_l$ (the loser) is formulated as:
+\begin{equation}
+\label{eq:bradley_terry_probability_formula}
+P(y_w \succ y_l \mid x) = \sigma\left(r_\phi(x, y_w) - r_\phi(x, y_l)\right) = \frac{1}{1 + \exp\left(-\left(r_\phi(x, y_w) - r_\phi(x, y_l)\right)\right)}.
+\end{equation}
+
+The Reward Model is optimized by minimizing the negative log-likelihood of pairwise preferences:
+\begin{equation}
+\label{eq:rm_ranking_loss_explicit}
+\Loss_{\text{RM}}(\phi) = -\E_{(x, y_w, y_l) \sim \mathcal{D}_{\text{pair}}} \left[ \log \sigma\left( r_\phi(x, y_w) - r_\phi(x, y_l) \right) \right].
+\end{equation}
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    width=11.5cm,
+    height=6.8cm,
+    xmode=log,
+    log basis x=10,
+    xlabel={Reward Model Parameters (Log Scale)},
+    ylabel={Agreement with Human Labelers (\%)},
+    xmin=8000000, xmax=10000000000,
+    ymin=60, ymax=90,
+    xtick={10000000, 100000000, 1000000000, 6000000000},
+    xticklabels={10M, 100M, 1B, 6B},
+    ytick={60, 65, 70, 75, 80, 85, 90},
+    grid=both,
+    grid style={line width=.2pt, draw=gray!20},
+    major grid style={line width=.3pt, draw=gray!40},
+    legend style={at={(0.03,0.95)}, anchor=north west, font=\small\sffamily},
+    font=\small\sffamily
+]
+    % Ensemble Consensus Benchmark Line
+    \addplot[color=deepdiveTealLine, thick, dashdotted] coordinates {
+        (8000000, 86.0)
+        (10000000000, 86.0)
+    };
+    \addlegendentry{Ensemble Human Consensus ($\approx 86\%$)}
+
+    % Single Human Inter-Annotator Agreement Line
+    \addplot[color=crimsonRed, thick, dashed] coordinates {
+        (8000000, 75.5)
+        (10000000000, 75.5)
+    };
+    \addlegendentry{Single Human Agreement ($\approx 75.5\%$)}
+
+    % 60k Comparisons Curve
+    \addplot[color=politoNavy, mark=*, line width=1.5pt] coordinates {
+        (10000000, 66.8)
+        (100000000, 70.2)
+        (1000000000, 73.8)
+        (6000000000, 75.8)
+    };
+    \addlegendentry{RM trained on 60k pairs}
+
+    % 15k Comparisons Curve
+    \addplot[color=steelBlue, mark=square*, thick] coordinates {
+        (10000000, 64.5)
+        (100000000, 67.8)
+        (1000000000, 71.3)
+        (6000000000, 73.2)
+    };
+    \addlegendentry{RM trained on 15k pairs}
+
+    % 5k Comparisons Curve
+    \addplot[color=bodyGray, mark=triangle*, thick] coordinates {
+        (10000000, 62.1)
+        (100000000, 65.2)
+        (1000000000, 68.6)
+        (6000000000, 70.4)
+    };
+    \addlegendentry{RM trained on 5k pairs}
+
+\end{axis}
+\end{tikzpicture}
+\caption{Empirical scaling laws of Reward Models on the Reddit TL;DR summarization task (faithfully adapted from Stiennon et al. \citep{stiennon2020} Figure 3 and course slides). Doubling model capacity yields a consistent $+1.8\%$ accuracy gain, while doubling dataset volume yields $+1.1\%$. At 6B parameters with 60k comparisons, the Reward Model surpasses individual human inter-annotator agreement ($75.8\%$ vs. $75.5\%$), but remains below the ensemble human consensus ceiling ($86\%$).}
+\label{fig:rm_scaling_laws}
+\end{figure}
+
+Stiennon et al. evaluated Reward Model accuracy across parameter scales (10M to 6B) and dataset sizes (5k to 60k comparisons). As plotted in Figure~\ref{fig:rm_scaling_laws}, their experiments established two foundational **Reward Model scaling laws**:
+\begin{enumerate}
+    \item \textbf{Capacity Scaling Law}: Doubling the parameter size of the reward model ($2\times$) yields a consistent $\mathbf{+1.8\%}$ increase in validation accuracy. Larger models capture nuanced logical relationships and identify subtle factual hallucinations that smaller models miss.
+    \item \textbf{Data Volume Scaling Law}: Doubling the volume of human comparisons ($2\times$) produces a $\mathbf{+1.1\%}$ increase in evaluation accuracy.
+    \item \textbf{Reaching Human Parity}: At 6B parameters trained on 60k comparisons, the Reward Model achieves **75.8% agreement** with human raters, matching the agreement rate between two independent human annotators evaluating the same summary ($75.5\%$). However, it remains below the ensemble consensus ceiling ($86\%$), showing that the RM acts as a smoothed representation of the human rater distribution.
+\end{enumerate}
+
+\subsection{Step 3: Policy optimization via PPO and policy regularization}
+\label{subsec:step3_ppo_policy_optimization}
+
+In Step 3, the active language model policy $\pi_{\text{new}} \equiv \pi_\theta$ is fine-tuned to maximize the scalar feedback emitted by the frozen Reward Model $r_\phi(x, y)$ trained in Step 2. Unlike standard supervised pre-training where cross-entropy loss is minimized over static tokens, reinforcement learning optimizes an active generative policy that samples its own trajectories $y \sim \pi_\theta(\cdot \mid x)$ to maximize expected reward.
+
+\paragraph{Goodhart's Law and the Divergence Catastrophe}
+Naively optimizing an unconstrained language model policy against a learned neural reward model triggers catastrophic policy collapse due to **Goodhart's Law**:
+
+\begin{definition}{Goodhart's Law in AI Alignment}{goodharts_law_def}
+\emph{"When a measure becomes a target, it ceases to be a good measure."}
+
+A neural reward model $r_\phi(x, y)$ is an imperfect, finite-capacity statistical approximation of true human judgment. If an active policy $\pi_\theta$ is trained purely to maximize $r_\phi(x, y)$, gradient descent aggressively steers the policy into out-of-distribution regions where the reward model overestimates utility. The policy exploits these blind spots, generating pathological strings---such as repetitive mantras, garbled punctuation, or hyper-sycophantic affirmations---that receive astronomical proxy reward scores but are judged by humans as incoherent gibberish. This failure mode is termed \textbf{reward hacking}.
+\end{definition}
+
+As demonstrated visually in Figure~\ref{fig:goodharts_law_divergence_curve}, optimizing unconstrained reward creates a profound divergence: as policy drift $\KL{\pi_{\text{new}}}{\pi_{\text{old}}}$ expands, the reward model's predicted score monotonically increases, whereas true human satisfaction peaks at a moderate divergence ($\KL{} \approx 4$) and collapses into complete degeneration.
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    width=11.5cm,
+    height=7.0cm,
+    xlabel={Policy Divergence: $\KL{\pi_{\text{new}}}{\pi_{\text{old}}}$},
+    ylabel={Evaluator Score},
+    xmin=0, xmax=10,
+    ymin=-4, ymax=10,
+    xtick={0, 2, 4, 6, 8, 10},
+    xticklabels={$0$, $2$, $4$ (Optimal), $6$, $8$, $10$ (Degenerate)},
+    ytick={-2, 0, 2, 4, 6, 8},
+    grid=both,
+    grid style={line width=.2pt, draw=gray!20},
+    major grid style={line width=.3pt, draw=gray!40},
+    legend style={at={(0.03,0.95)}, anchor=north west, font=\small\sffamily},
+    font=\small\sffamily
+]
+    % Reward Model Predicted Score (Monotonically climbs to infinity)
+    \addplot[color=crimsonRed, dashed, line width=1.5pt] coordinates {
+        (0, 0.5)
+        (1, 2.2)
+        (2, 4.0)
+        (3, 5.5)
+        (4, 6.8)
+        (5, 7.8)
+        (6, 8.5)
+        (7, 9.1)
+        (8, 9.5)
+        (9, 9.8)
+        (10, 10.0)
+    };
+    \addlegendentry{Reward Model Score: $r_\theta(x, y)$ (Proxy Target)}
+
+    % True Human Qualitative Score (Peaks and collapses)
+    \addplot[color=politoNavy, line width=1.8pt] coordinates {
+        (0, 0.5)
+        (1, 2.1)
+        (2, 3.4)
+        (3, 4.2)
+        (4, 4.5)
+        (5, 3.8)
+        (6, 2.2)
+        (7, 0.0)
+        (8, -1.8)
+        (9, -3.2)
+        (10, -4.0)
+    };
+    \addlegendentry{Actual Human Evaluation (True Preference)}
+
+    % Optimal Alignment Zone Line
+    \draw[thick, dotted, draw=thmGreenLine] (axis cs:4,-4) -- (axis cs:4,10);
+    \node[above, font=\footnotesize\sffamily\bfseries, text=thmGreenLine] at (axis cs:4,4.7) {Optimal Alignment Peak};
+
+    % Annotation of Reward Hacking Regime
+    \node[align=center, fill=white, draw=crimsonRed, rounded corners=2pt, font=\scriptsize\sffamily, inner sep=4pt] at (axis cs:7.8,4.5) {
+        \textbf{Reward Hacking Zone}\\Model produces repetitive\\superficial artifacts that fool RM\\but humans rate as gibberish
+    };
+
+\end{axis}
+\end{tikzpicture}
+\caption{The divergence catastrophe and Goodhart's law in reinforcement learning from human feedback (adapted from Slide 23 and \citep{stiennon2020}). As policy divergence $\KL{\pi_{\text{new}}}{\pi_{\text{old}}}$ increases along the horizontal axis, the Reward Model proxy score (dashed red line) monotonically ascends. However, actual human preference (solid navy line) peaks at a moderate divergence ($\KL{} \approx 4$) and collapses into complete degeneration as the policy exploits the reward model's blind spots.}
+\label{fig:goodharts_law_divergence_curve}
+\end{figure}
+
+\paragraph{Mathematical Formulation of the Regularized Objective}
+To anchor the active policy to realistic language distributions, Stiennon et al. introduced an explicit **Kullback--Leibler (KL) divergence penalty** relative to the frozen reference model $\pi_{\text{old}} \equiv \pi_{\text{SFT}}$ (the supervised fine-tuned model before RL). The composite objective function maximized during policy optimization is formulated as:
+\begin{equation}
+\label{eq:composite_ppo_reward}
+\max_{\theta} \E_{x \sim \mathcal{D},\, y \sim \pi_\theta(\cdot \mid x)} \left[ r_\phi(x, y) - \beta \mathbb{D}_{\text{KL}}\left(\pi_\theta(\cdot \mid x) \,\|\, \pi_{\text{ref}}(\cdot \mid x)\right) \right],
+\end{equation}
+where $\beta \ge 0$ is a critical regularization hyperparameter governing the rigidity of the trust region.
+
+Expanding the definition of the Kullback--Leibler divergence for discrete autoregressive sequence distributions yields:
+\begin{align}
+\mathbb{D}_{\text{KL}}\left(\pi_\theta(\cdot \mid x) \,\|\, \pi_{\text{ref}}(\cdot \mid x)\right) &= \sum_{y} \pi_\theta(y \mid x) \log \frac{\pi_\theta(y \mid x)}{\pi_{\text{ref}}(y \mid x)} \\
+&= \E_{y \sim \pi_\theta(\cdot \mid x)} \left[ \log \frac{\pi_\theta(y \mid x)}{\pi_{\text{ref}}(y \mid x)} \right].
+\end{align}
+By linearity of expectation, the objective is equivalent to maximizing the expectation of an **augmented per-sample trajectory return** $R(x, y)$:
+\begin{equation}
+\label{eq:per_sample_composite_reward}
+R(x, y) = r_\phi(x, y) - \beta \log \frac{\pi_\theta(y \mid x)}{\pi_{\text{ref}}(y \mid x)}.
+\end{equation}
+
+\paragraph{Deconstructing the Log-Ratio Penalty Dynamics}
+The sequence log-probability ratio in Equation~\eqref{eq:per_sample_composite_reward} acts as an adaptive, dynamic penalty:
+\begin{equation}
+\Delta(x, y) = \log \frac{\pi_\theta(y \mid x)}{\pi_{\text{ref}}(y \mid x)} = \log \pi_\theta(y \mid x) - \log \pi_{\text{ref}}(y \mid x).
+\end{equation}
+Analyzing the mathematical sign and magnitude of $\Delta(x, y)$ reveals how policy drift is regulated:
+\begin{enumerate}
+    \item \textbf{When $\pi_\theta(y \mid x) > \pi_{\text{ref}}(y \mid x)$}: The active policy places higher probability on completion $y$ than the reference model did. The ratio $\frac{\pi_\theta}{\pi_{\text{ref}}} > 1$, which means $\log \frac{\pi_\theta}{\pi_{\text{ref}}} > 0$. Multiplied by $-\beta$, this subtracts an explicit penalty from the reward. The more aggressively the active policy shifts probability mass toward a novel sequence, the steeper the penalty imposed on its return.
+    \item \textbf{When $\pi_\theta(y \mid x) < \pi_{\text{ref}}(y \mid x)$}: The active policy assigns lower likelihood to $y$ than the reference model. Here, $\frac{\pi_\theta}{\pi_{\text{ref}}} < 1$, yielding $\log \frac{\pi_\theta}{\pi_{\text{ref}}} < 0$. With the negative sign, $-\beta \log(\cdot) > 0$, acting as a relative bonus. This prevents over-penalization if the policy explores tokens that $\pi_{\text{ref}}$ favored.
+    \item \textbf{The Role of $\beta$}: The hyperparameter $\beta$ controls the trade-off between exploration and entropy collapse. If $\beta \to 0$, the optimization degenerates into unconstrained reward chasing, rapidly entering the reward hacking regime. If $\beta \to \infty$, the policy is pinned immutably to $\pi_{\text{ref}}$, learning nothing from the human preferences. Optimal alignment requires tuning $\beta$ to balance task-specific alignment gains against fluency degradation.
+\end{enumerate}
+
+\paragraph{Per-Token Stepwise Reward Decomposition}
+Because autoregressive language models factorize probabilities across tokens, $\pi(y \mid x) = \prod_{t=1}^{|y|} \pi(y_t \mid x, y_{<t})$, the global trajectory log-ratio decomposes additively across time steps:
+\begin{align}
+\log \frac{\pi_\theta(y \mid x)}{\pi_{\text{ref}}(y \mid x)} &= \log \left( \prod_{t=1}^{|y|} \frac{\pi_\theta(y_t \mid x, y_{<t})}{\pi_{\text{ref}}(y_t \mid x, y_{<t})} \right) \nonumber \\
+&= \sum_{t=1}^{|y|} \left[ \log \pi_\theta(y_t \mid x, y_{<t}) - \log \pi_{\text{ref}}(y_t \mid x, y_{<t}) \right].
+\end{align}
+In standard reinforcement learning implementations, this enables distributing intermediate **step rewards** $r_t^{\text{step}}$ to every generated token $y_t$:
+\begin{equation}
+\label{eq:step_reward_formulation}
+r_t^{\text{step}} = \begin{cases}
+-\beta \left( \log \pi_\theta(y_t \mid x, y_{<t}) - \log \pi_{\text{ref}}(y_t \mid x, y_{<t}) \right) & \text{if } t < |y|, \\
+-\beta \left( \log \pi_\theta(y_t \mid x, y_{<t}) - \log \pi_{\text{ref}}(y_t \mid x, y_{<t}) \right) + r_\phi(x, y) & \text{if } t = |y|.
+\end{cases}
+\end{equation}
+Every intermediate token receives an immediate negative feedback signal proportional to its individual log-probability shift away from $\pi_{\text{ref}}$, while the holistic terminal score $r_\phi(x, y)$ is credited upon reaching the end-of-sequence delimiter.
+
+\begin{tcolorbox}[colback=cardBg,colframe=cardLine,arc=2pt,boxrule=0.5pt,title=\textbf{Pedagogical Walkthrough: PPO Regularized Reward Calculation with Concrete Numbers}]
+\label{box:ppo_reward_numerical_walkthrough}
+To understand exactly how the token-level KL penalty and the terminal reward model score interact during reinforcement learning, consider a concrete numerical calculation:
+\begin{itemize}
+    \item \textbf{Input Prompt $x$}: \texttt{"Summarize the following passage in one sentence: ..."}
+    \item \textbf{Generated Completion $y$}: Consisting of 4 tokens $(y_1, y_2, y_3, y_4) = (\texttt{"The"}, \texttt{"cat"}, \texttt{"sat"}, \texttt{"."})$.
+    \item \textbf{Reward Model Terminal Score}: $r_\phi(x, y) = +2.40$.
+    \item \textbf{Regularization Coefficient}: $\beta = 0.10$.
+\end{itemize}
+
+Assume the conditional token log-probabilities under the active policy $\pi_\theta$ and the frozen reference policy $\pi_{\text{ref}}$ are observed as follows:
+\begin{center}
+\small\sffamily
+\begin{tabular}{ccccc}
+\toprule
+\textbf{Token Position $t$} & \textbf{Token $y_t$} & $\log \pi_\theta(y_t \mid x, y_{<t})$ & $\log \pi_{\text{ref}}(y_t \mid x, y_{<t})$ & $\Delta \log \pi = \log \pi_\theta - \log \pi_{\text{ref}}$ \\
+\midrule
+$t=1$ & \texttt{"The"} & $-0.50$ & $-0.60$ & $+0.10$ \\
+$t=2$ & \texttt{"cat"} & $-1.20$ & $-1.40$ & $+0.20$ \\
+$t=3$ & \texttt{"sat"} & $-0.80$ & $-2.50$ & $+1.70$ \\
+$t=4$ & \texttt{"."}   & $-0.30$ & $-0.40$ & $+0.10$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+We evaluate the step rewards $r_t^{\text{step}}$ assigned to each token:
+\begin{align*}
+r_1^{\text{step}} &= -0.10 \times (+0.10) = -0.01, \\
+r_2^{\text{step}} &= -0.10 \times (+0.20) = -0.02, \\
+r_3^{\text{step}} &= -0.10 \times (+1.70) = -0.17 \quad \text{(Noticeable penalty for choosing a token $\pi_{\text{ref}}$ deemed unlikely)}, \\
+r_4^{\text{step}} &= -0.10 \times (+0.10) + r_\phi(x, y) = -0.01 + 2.40 = +2.39.
+\end{align*}
+The total cumulative regularized return $R(x, y)$ for the complete trajectory is:
+\begin{align*}
+R(x, y) &= \sum_{t=1}^4 r_t^{\text{step}} = -0.01 - 0.02 - 0.17 + 2.39 \\
+&= 2.40 - 0.10 \times \left( 0.10 + 0.20 + 1.70 + 0.10 \right) \\
+&= 2.40 - 0.10 \times 2.10 = 2.40 - 0.21 = \mathbf{+2.19}.
+\end{align*}
+The active policy receives a net return of $+2.19$, successfully balancing the reward model's high utility score ($+2.40$) against the cumulative KL drift penalty ($-0.21$).
+\end{tcolorbox}
+
+\subsection{The four-model architecture and algorithmic pipeline of RLHF}
+\label{subsec:four_model_architecture_algorithm}
+
+As formalized in Xiao \& Zhu \citep{xiao2025foundations}, implementing online PPO-based RLHF requires orchestrating \textbf{four distinct neural models} simultaneously in GPU memory:
+\begin{enumerate}
+    \item \textbf{Active Policy (Target LLM)} $\pi_\theta(y_t \mid x, y_{<t})$: The generative Transformer model undergoing active reinforcement learning. It samples trajectories $y \sim \pi_\theta(\cdot \mid x)$ and updates its weights $\theta$ via clipped policy gradients.
+    \item \textbf{Reference Policy} $\pi_{\text{ref}}(y_t \mid x, y_{<t})$: A frozen copy of the supervised fine-tuned model ($\pi_{\text{ref}} \equiv \pi_{\text{SFT}}$). It provides baseline token probabilities to compute the per-token KL drift penalty, ensuring $\pi_\theta$ does not collapse into reward hacking.
+    \item \textbf{Reward Model} $r_\phi(x, y)$: A frozen Transformer decoder equipped with a scalar projection head $W_r$, trained on human pairwise comparison datasets $\mathcal{D}_{\text{pair}}$ via Bradley--Terry ranking loss to output scalar quality scores.
+    \item \textbf{Value Function (Critic)} $V_\omega(x, y_{<t})$: A parameterized Transformer network initialized from the reward model, trained via Mean Squared Error (MSE) to predict the expected cumulative return from the current partial sequence state. The Critic computes Generalized Advantage Estimation (GAE) to reduce gradient variance.
+\end{enumerate}
+
+\paragraph{Policy Optimization Mechanics via PPO Clipping}
+To optimize policy parameters $\theta$ under returns $R(x, y)$, standard vanilla policy gradients $\nabla_\theta \E[\sum R]$ exhibit extreme variance and catastrophic step collapse. Proximal Policy Optimization (PPO) \citep{schulman2017ppo} stabilizes optimization by defining a **probability ratio** between the updated policy $\pi_\theta$ and the policy used to collect the batch rollout $\pi_{\theta_{\text{old}}}$:
+\begin{equation}
+\label{eq:ppo_probability_ratio}
+\rho_t(\theta) = \frac{\pi_\theta(y_t \mid x, y_{<t})}{\pi_{\theta_{\text{old}}}(y_t \mid x, y_{<t})}.
+\end{equation}
+The clipped surrogate objective function is formulated as:
+\begin{equation}
+\label{eq:ppo_clipping_formula}
+\Loss_{\text{CLIP}}(\theta) = \hat{\E}_t \left[ \min\left( \rho_t(\theta)\hat{A}_t, \; \operatorname{clip}\left(\rho_t(\theta), 1-\epsilon, 1+\epsilon\right)\hat{A}_t \right) \right],
+\end{equation}
+where $\epsilon \approx 0.2$ is the clipping boundary, and $\hat{A}_t$ is the Generalized Advantage Estimation (GAE) computed by the Critic network $V_\omega$:
+\begin{equation}
+\hat{A}_t = \sum_{l=0}^{\infty} (\gamma \lambda)^l \delta_{t+l}^V, \quad \delta_t^V = r_t^{\text{step}} + \gamma V_\omega(x, y_{\le t+1}) - V_\omega(x, y_{\le t}).
+\end{equation}
+The $\min(\cdot, \cdot)$ operator acts as a **pessimistic lower bound**:
+\begin{itemize}
+    \item When the advantage is positive ($\hat{A}_t > 0$), the action was better than average. PPO increases $\rho_t(\theta)$, but clipping caps the objective at $(1+\epsilon)\hat{A}_t$, preventing the optimizer from making an overly optimistic update that ruins language fluency.
+    \item When the advantage is negative ($\hat{A}_t < 0$), the action yielded lower returns than expected. PPO decreases $\rho_t(\theta)$, with clipping bounding the gradient at $(1-\epsilon)\hat{A}_t$.
+\end{itemize}
+
+Simultaneously, the Critic network parameters $\omega$ are updated by minimizing the mean squared Bellman temporal difference error:
+\begin{equation}
+\label{eq:critic_mse_loss}
+\Loss_{\text{Critic}}(\omega) = \hat{\E}_t \left[ \left( V_\omega(x, y_{\le t}) - \left(r_t^{\text{step}} + \gamma V_{\omega_{\text{old}}}(x, y_{\le t+1})\right) \right)^2 \right].
+\end{equation}
+
+\begin{tcolorbox}[colback=cardBg,colframe=cardLine,arc=2pt,boxrule=0.5pt,title=\textbf{Algorithmic Pipeline: Complete Execution Workflow of PPO-RLHF}]
+\label{box:rlhf_algorithmic_pipeline}
+\small\sffamily
+\textbf{Input}: Unlabeled prompt distribution $\mathcal{D}_x$, human preference dataset $\mathcal{D}_{\text{pair}} = \{(x, y_w, y_l)\}$, SFT checkpoint $\pi_{\text{SFT}}$.\\
+\textbf{Output}: Aligned policy $\pi_\theta$.
+\begin{enumerate}
+    \item \textbf{Stage 1 (Initialization)}:
+    \begin{itemize}
+        \item Initialize Active Policy $\pi_\theta \leftarrow \pi_{\text{SFT}}$ and Reference Model $\pi_{\text{ref}} \leftarrow \pi_{\text{SFT}}$ (freeze $\pi_{\text{ref}}$).
+        \item Initialize Reward Model $r_\phi$ and Value Function $V_\omega$ from $\pi_{\text{SFT}}$ with linear scalar heads.
+    \end{itemize}
+    \item \textbf{Stage 2 (Reward Model Training)}:
+    \begin{itemize}
+        \item Train $r_\phi$ by minimizing Bradley--Terry loss over $\mathcal{D}_{\text{pair}}$:
+        $$\phi^* = \arg\min_\phi -\E_{(x, y_w, y_l)} \left[ \log \sigma\left( r_\phi(x, y_w) - r_\phi(x, y_l) \right) \right].$$
+        \item Freeze the optimized reward model $r_\phi$.
+    \end{itemize}
+    \item \textbf{Stage 3 (Iterative PPO Online Loop)}:
+    \begin{itemize}
+        \item \textbf{For} each training epoch \textbf{do}:
+        \begin{enumerate}
+            \item Sample a mini-batch of prompts $x \sim \mathcal{D}_x$.
+            \item \textit{Rollout Generation}: Autoregressively sample completions $y \sim \pi_\theta(\cdot \mid x)$.
+            \item \textit{Reward \& Penalty Evaluation}:
+            \begin{itemize}
+                \item Query frozen reward model for terminal score: $r_{\text{term}} = r_\phi(x, y)$.
+                \item Query reference model for baseline log-probs: $\log \pi_{\text{ref}}(y_t \mid x, y_{<t})$.
+                \item Compute token-level step rewards $r_t^{\text{step}}$ with KL penalty via Eq.~\eqref{eq:step_reward_formulation}.
+            \end{itemize}
+            \item \textit{Advantage Estimation}: Compute values $V_\omega(x, y_{\le t})$ and GAE advantages $\hat{A}_t$.
+            \item \textit{Gradient Optimization}: For $K_{\text{ppo}}$ sub-epochs, update policy $\theta$ via $\Loss_{\text{CLIP}}(\theta)$ (Eq.~\eqref{eq:ppo_clipping_formula}) and critic $\omega$ via $\Loss_{\text{Critic}}(\omega)$ (Eq.~\eqref{eq:critic_mse_loss}).
+        \end{enumerate}
+        \item \textbf{End For}
+    \end{itemize}
+\end{enumerate}
+\end{tcolorbox}
+
+\subsection{Empirical preference results on Reddit TL;DR}
+\label{subsec:preference_results_reddit_tldr}
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    width=11.5cm,
+    height=7.2cm,
+    xmode=log,
+    log basis x=10,
+    xlabel={Model Parameters (Log Scale)},
+    ylabel={Fraction of Summaries Preferred to Reference (\%)},
+    xmin=100000000, xmax=10000000000,
+    ymin=10, ymax=75,
+    xtick={120000000, 350000000, 1300000000, 6700000000},
+    xticklabels={120M, 350M, 1.3B, 6.7B},
+    ytick={10, 20, 30, 40, 50, 60, 70},
+    grid=both,
+    grid style={line width=.2pt, draw=gray!20},
+    major grid style={line width=.3pt, draw=gray!40},
+    legend style={at={(0.03,0.95)}, anchor=north west, font=\small\sffamily},
+    font=\small\sffamily
+]
+    % Human Reference Baseline (50% Parity Line)
+    \addplot[color=bodyGray, dashed, line width=1.2pt] coordinates {
+        (100000000, 50.0)
+        (10000000000, 50.0)
+    };
+    \addlegendentry{Human Reference Baseline (50\%)}
+
+    % Human Feedback (RLHF - PPO) Curve
+    \addplot[color=politoNavy, mark=*, line width=1.8pt] coordinates {
+        (120000000, 51.5)
+        (350000000, 55.0)
+        (1300000000, 61.2)
+        (6700000000, 65.4)
+    };
+    \addlegendentry{Human Feedback (RLHF / PPO)}
+
+    % Supervised Fine-Tuning (SFT) Curve
+    \addplot[color=steelBlue, mark=square*, thick] coordinates {
+        (120000000, 25.5)
+        (350000000, 33.0)
+        (1300000000, 43.1)
+        (6700000000, 48.5)
+    };
+    \addlegendentry{Supervised Learning (SFT)}
+
+    % Pre-trained Base Model (Zero-Shot) Curve
+    \addplot[color=crimsonRed, mark=triangle*, thick] coordinates {
+        (120000000, 11.0)
+        (350000000, 12.5)
+        (1300000000, 15.0)
+        (6700000000, 18.0)
+    };
+    \addlegendentry{Pre-trained Base Model (Zero-shot)}
+
+    % Annotation: 1.3B RLHF beats 10x larger Supervised model
+    \draw[thick, <->, draw=crimsonRed] (axis cs:1300000000,61.2) -- (axis cs:6700000000,48.5);
+    \node[above, font=\footnotesize\sffamily\bfseries, text=crimsonRed] at (axis cs:2900000000,56.5) {
+        1.3B RLHF ($61.2\%$) beats 6.7B SFT ($48.5\%$)
+    };
+
+\end{axis}
+\end{tikzpicture}
+\caption{Empirical human preference win rates against human-written Reddit TL;DR reference summaries across model scale (faithfully adapted from Stiennon et al. \citep{stiennon2020} Figure 1 and lecture slide 25). Human evaluators blindly compared model-generated summaries directly against the original human-written reference summaries in the dataset (50\% dashed line represents parity). Unsupervised base models fail to perform consistent summarization ($<18\%$). Supervised fine-tuning improves with scale but remains below the human reference ceiling ($48.5\%$ at 6.7B). Reinforcement learning from human feedback (RLHF) fundamentally changes the scaling curve: a 1.3B RLHF model reaches $61.2\%$ win rate, drastically outperforming a supervised model 5$\times$ its size and surpassing human authors.}
+\label{fig:reddit_tldr_preference_scaling}
+\end{figure}
+
+\begin{table}[t]
+\centering
+\small\sffamily
+\rowcolors{2}{white}{skyBlue!15}
+\begin{tabularx}{\textwidth}{lXcc}
+\toprule
+\textbf{Model Comparison} & \textbf{Observed Qualitative Advantage} & \textbf{Win Rate (\%)} & \textbf{Statistical Sig.} \\
+\midrule
+RLHF-PPO vs. Pre-trained Base & Elimination of incoherent rambling and hallucinations & \textbf{86.4\%} vs. 13.6\% & $p < 10^{-6}$ \\
+RLHF-PPO vs. Supervised SFT & Superior factual conciseness, coherence, and relevance & \textbf{68.2\%} vs. 31.8\% & $p < 10^{-4}$ \\
+\textbf{RLHF-PPO vs. Human Reference} & \textbf{More faithful extraction of core operative facts} & \textbf{71.5\%} vs. 28.5\% & $p < 10^{-5}$ \\
+\bottomrule
+\end{tabularx}
+\caption{Blinded human preference win rates on the Reddit TL;DR summarization benchmark \citep{stiennon2020}. Blinded human judges overwhelmingly preferred the RLHF-PPO model over the supervised SFT baseline. Crucially, human evaluators preferred summaries generated by the RLHF policy over the actual human-written Reddit reference summaries with a $>70\%$ win rate.}
+\label{tab:reddit_tldr_win_rates}
+\end{table}
+
+The empirical evaluation conducted by Stiennon et al., visualised in Figure~\ref{fig:reddit_tldr_preference_scaling} and summarized in Table~\ref{tab:reddit_tldr_win_rates}, established that RLHF fundamentally changes model capabilities:
+\begin{itemize}
+    \item **Defeating Supervised SFT ($68.2\%$ Win Rate)**: Human annotators preferred the RLHF policy over the SFT model by more than two-to-one. SFT models frequently produced verbose summaries that copied irrelevant details from the post. The RLHF model extracted the central dilemma with precision.
+    \item **Surpassing Human Authors ($71.5\%$ Win Rate)**: Remarkably, human evaluators preferred the RLHF model's completions over the actual human-authored Reddit summaries in over $70\%$ of comparisons. Human forum writers are often sarcastic, informal, or sloppy; the RLHF model learned to extract the operative facts into coherent, high-density summaries.
+    \item **Efficiency Dividend Across Scale**: A **1.3-billion parameter RLHF policy** achieved a $61.2\%$ preference rate over human references, decisively outperforming the **6.7-billion parameter supervised baseline** ($48.5\%$). Aligning models with human preferences delivers larger quality dividends than a $5\times$ expansion in raw compute and parameter volume.
+\end{itemize}
+
+% ==============================================================================
+% SECTION 9.4: ALIGNING INSTRUCTION-TUNED MODELS: INSTRUCTGPT AND THE MODERN PARADIGM
+% ==============================================================================
+\section{InstructGPT and Modern Alignment}
+\label{sec:instructgpt_modern_paradigm}
+
+\subsection{Extending RLHF to open-ended tasks: the InstructGPT architecture}
+\label{subsec:instructgpt_architecture_pipeline}
+
+While Stiennon et al. validated RLHF on summarization, building a true general assistant required extending the methodology to **arbitrary, open-ended user queries**. Ouyang et al. \citep{ouyang2022} developed **InstructGPT**, taking a crucial operational step: abandoning synthetic benchmark templates (such as T0 and FLAN) in favor of real, organic user prompts submitted to OpenAI's API playground.
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[
+    >=Stealth,
+    node distance=1.0cm and 1.2cm,
+    stagebox/.style={rectangle, draw=politoNavy, fill=skyBlue!15, rounded corners=4pt, thick, align=center, inner sep=6pt, font=\small\sffamily},
+    databox/.style={rectangle, draw=steelBlue, fill=white, rounded corners=3pt, thick, align=left, inner sep=5pt, font=\footnotesize\sffamily},
+    modelbox/.style={rectangle, draw=thmGreenLine, fill=thmGreenBg, rounded corners=3pt, thick, align=center, inner sep=6pt, font=\footnotesize\sffamily\bfseries},
+    arrow/.style={->, thick, draw=politoNavy}
+]
+    % STAGE 1
+    \node[stagebox, minimum width=4.5cm] (s1) {\textbf{Stage 1: Supervised Fine-Tuning}\\\textit{Demonstration Curation}};
+    \node[databox, below=0.4cm of s1] (d1) {$\approx 13{,}000$ User Prompts\\Human labelers write\\gold-standard completions};
+    \node[modelbox, below=0.4cm of d1] (m1) {SFT Model (1.3B / 6B / 175B)\\$\Loss_{\text{SFT}}(\theta) = -\sum \log P_\theta(y_t \mid x, y_{<t})$};
+
+    % STAGE 2
+    \node[stagebox, minimum width=4.5cm, right=1.2cm of s1] (s2) {\textbf{Stage 2: Reward Modeling}\\\textit{Preference Data Collection}};
+    \node[databox, below=0.4cm of s2] (d2) {$\approx 33{,}000$ Prompts\\Model samples $K \in [4, 9]$ outputs\\Labelers rank: $y_1 \succ y_2 \succ y_3$};
+    \node[modelbox, below=0.4cm of d2] (m2) {6B Reward Model $r_\phi(x, y)$\\Bradley--Terry Ranking Loss\\$\Loss_{\text{RM}}(\phi) = -\E \left[\log \sigma(r_w - r_l)\right]$};
+
+    % STAGE 3
+    \node[stagebox, minimum width=4.5cm, right=1.2cm of s2] (s3) {\textbf{Stage 3: Reinforcement Learning}\\\textit{PPO Policy Optimization}};
+    \node[databox, below=0.4cm of s3] (d3) {$\approx 31{,}000$ Unlabeled Prompts\\Active policy generates $y \sim \pi_\theta$\\No human labels required};
+    \node[modelbox, below=0.4cm of d3] (m3) {InstructGPT Policy $\pi_\theta$\\\textbf{PPO with KL Regularization}\\$R(x, y) = r_\phi(x, y) - \beta \log \frac{\pi_\theta}{\pi_{\text{SFT}}}$};
+
+    % Inter-stage arrows
+    \draw[arrow] (s1) -- (d1);
+    \draw[arrow] (d1) -- (m1);
+
+    \draw[arrow] (s2) -- (d2);
+    \draw[arrow] (d2) -- (m2);
+
+    \draw[arrow] (s3) -- (d3);
+    \draw[arrow] (d3) -- (m3);
+
+    % Flow connections across stages
+    \draw[arrow, dashed, draw=thmGreenLine] (m1.east) -- ++(0.3,0) |- (d2.west);
+    \draw[arrow, dashed, draw=thmGreenLine] (m1.east) -- ++(0.3,0) |- (m3.west);
+    \draw[arrow, dashed, draw=deepdiveTealLine] (m2.east) -- ++(0.3,0) |- (m3.west);
+
+\end{tikzpicture}
+\caption{The canonical three-stage industrial alignment pipeline of InstructGPT \citep{ouyang2022}. In Stage 1, a base model is fine-tuned on curated human demonstrations. In Stage 2, the model generates multiple candidate completions for user prompts, which are ranked by annotators to train a 6B Bradley--Terry reward model. In Stage 3, the policy is optimized via PPO against the reward model with a per-token KL divergence penalty anchoring it to the Stage 1 SFT baseline.}
+\label{fig:instructgpt_pipeline}
+\end{figure}
+
+The InstructGPT workflow (Figure~\ref{fig:instructgpt_pipeline}) operates in three industrial stages:
+\begin{enumerate}
+    \item \textbf{Stage 1: Demonstration Curation and Supervised Fine-Tuning (SFT)}: Trained labelers authored gold-standard answers for approximately $\mathbf{13{,}000}$ real-world prompts, fine-tuning base GPT-3 models (1.3B, 6B, 175B) via standard cross-entropy.
+    \item \textbf{Stage 2: Comparison Data and Reward Model Training}: Annotators ranked $K \in [4, 9]$ model completions for $\mathbf{33{,}000}$ prompts. A **6-billion parameter Reward Model** was trained on all $\binom{K}{2}$ pairs per prompt using the normalized Bradley--Terry ranking loss:
+    \begin{equation}
+    \Loss_{\text{RM}}(\theta) = -\frac{1}{\binom{K}{2}} \E_{(x, \{y_k\}) \sim \mathcal{D}} \left[ \sum_{i < j, y_i \succ y_j} \log \sigma\left(r_\theta(x, y_i) - r_\theta(x, y_j)\right) \right].
+    \end{equation}
+    \item \textbf{Stage 3: Policy Optimization via PPO-ptx}: The policy was trained on $\mathbf{31{,}000}$ unlabeled prompts via PPO. Crucially, to mitigate the **alignment tax**---performance degradation on academic benchmarks like SQuAD and translation---OpenAI introduced **pre-training gradient mixing (PPO-ptx)**, adding an auxiliary unsupervised language modeling loss on public web text:
+    \begin{equation}
+    \Loss_{\text{total}}(\theta) = \Loss_{\text{PPO}}(\theta) + \gamma \E_{x_{\text{pretrain}}} \left[ \log P_\theta(x_{\text{pretrain}}) \right].
+    \end{equation}
+\end{enumerate}
+
+\paragraph{Empirical Breakthroughs: The 100x Parameter Alignment Dividend}
+The primary empirical breakthrough of InstructGPT is plotted in Figure~\ref{fig:instructgpt_win_rates_scaling}:
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    width=11.5cm,
+    height=7.0cm,
+    xmode=log,
+    log basis x=10,
+    xlabel={Model Parameters (Log Scale)},
+    ylabel={Win Rate vs. 175B SFT Baseline (\%)},
+    xmin=1000000000, xmax=250000000000,
+    ymin=10, ymax=90,
+    xtick={1300000000, 6000000000, 175000000000},
+    xticklabels={1.3B, 6B, 175B},
+    ytick={10, 20, 30, 40, 50, 60, 70, 80},
+    grid=both,
+    grid style={line width=.2pt, draw=gray!20},
+    major grid style={line width=.3pt, draw=gray!40},
+    legend style={at={(0.03,0.95)}, anchor=north west, font=\small\sffamily},
+    font=\small\sffamily
+]
+    % 175B SFT 50% Baseline Line
+    \addplot[color=bodyGray, dashed, line width=1.0pt] coordinates {
+        (1000000000, 50.0)
+        (250000000000, 50.0)
+    };
+    \addlegendentry{175B SFT Baseline (50\%)}
+
+    % PPO (InstructGPT) Line
+    \addplot[color=politoNavy, mark=*, line width=1.8pt] coordinates {
+        (1300000000, 65.0)
+        (6000000000, 72.0)
+        (175000000000, 78.5)
+    };
+    \addlegendentry{InstructGPT (PPO)}
+
+    % PPO-ptx Line
+    \addplot[color=thmGreenLine, mark=square*, thick] coordinates {
+        (1300000000, 62.5)
+        (6000000000, 70.0)
+        (175000000000, 76.0)
+    };
+    \addlegendentry{InstructGPT (PPO-ptx)}
+
+    % SFT Line
+    \addplot[color=steelBlue, mark=triangle*, thick] coordinates {
+        (1300000000, 36.0)
+        (6000000000, 44.5)
+        (175000000000, 50.0)
+    };
+    \addlegendentry{Supervised Fine-Tuning (SFT)}
+
+    % GPT-3 (Prompted with instruction) Line
+    \addplot[color=amberGold, mark=diamond*, thick] coordinates {
+        (1300000000, 23.0)
+        (6000000000, 28.5)
+        (175000000000, 35.0)
+    };
+    \addlegendentry{GPT-3 (Few-shot prompted)}
+
+    % GPT-3 (Unprompted) Line
+    \addplot[color=crimsonRed, mark=x, thick] coordinates {
+        (1300000000, 15.0)
+        (6000000000, 18.0)
+        (175000000000, 24.0)
+    };
+    \addlegendentry{GPT-3 (Base unprompted)}
+
+    % 100x Parameter Dividend Highlight Arrow
+    \draw[thick, <->, draw=crimsonRed] (axis cs:1300000000,65.0) -- (axis cs:175000000000,35.0);
+    \node[above, font=\footnotesize\sffamily\bfseries, text=crimsonRed] at (axis cs:15000000000,53.0) {
+        $100\times$ Alignment Dividend: 1.3B PPO beats 175B GPT-3
+    };
+
+\end{axis}
+\end{tikzpicture}
+\caption{Human preference win rates against the 175B SFT baseline across model scale (faithfully adapted from Ouyang et al. \citep{ouyang2022} Figure 1). Human evaluators overwhelmingly prefer outputs from the 1.3B InstructGPT (PPO) model ($65\%$ win rate) over the 175B base GPT-3 model ($24\%$ unprompted, $35\%$ prompted) and the 175B SFT model ($50\%$), establishing that alignment acts as a $100\times$ multiplier on effective model capability.}
+\label{fig:instructgpt_win_rates_scaling}
+\end{figure}
+
+The empirical evaluation of InstructGPT across scale revealed three transformative breakthroughs:
+\begin{itemize}
+    \item **The $100\times$ Parameter Efficiency Dividend**: Human labelers overwhelmingly preferred completions from a **1.3-billion parameter InstructGPT** model ($65\%$ win rate) over outputs from the **175-billion parameter base GPT-3** model ($24\%$ unprompted, $35\%$ prompted). Despite having over $100\times$ fewer parameters, aligning model behavior with human intent produces dramatically more capable, relevant, and useful outputs.
+    \item **Truthfulness and Toxicity Reductions**: On TruthfulQA, InstructGPT-175B generated truthful and informative answers nearly **$2\times$ more often** than base GPT-3 ($42\%$ vs. $21\%$). On RealToxicityPrompts, toxic completions were reduced by **$25\%$**.
+    \item **Zero-Shot Transfer to Unseen Modalities**: InstructGPT generalized cleanly to coding tasks and non-English instructions, despite labelers authoring virtually zero programming or foreign language demonstrations during SFT. Teaching the model the abstract concept of instruction adherence transferred across domains.
+\end{itemize}
+
+\subsection{The modern trend: the three-phase LLM lifecycle and ChatGPT}
+\label{subsec:modern_trend_chatgpt_three_phase}
+
+On November 30, 2022, OpenAI released **ChatGPT**, applying the InstructGPT RLHF pipeline to **GPT-3.5** (a 175B model pre-trained on code and text). This crystallized the modern **three-phase LLM lifecycle** (Slide 27):
+\begin{enumerate}
+    \item \textbf{Pre-training on Large Quantities of Dirty Web Data}: Consumes $\approx 98\%$ of total training compute. The model absorbs world knowledge, syntactic structures, and statistical grammar, but exhibits severe alignment flaws.
+    \item \textbf{Supervised Fine-Tuning on Curated Instruction Datasets}: Consumes $\approx 1\%$ of compute. Uses high-quality demonstrations to teach the model conversational formatting, dialogue tone, and direct obedience.
+    \item \textbf{Preference Alignment via RLHF}: Consumes $\approx 1\%$ of compute. Refines the model using human comparison rankings, enforcing truthfulness, suppressing toxicity, and optimizing qualitative utility.
+\end{enumerate}
+
+\subsection{The direct alignment frontier: Direct Preference Optimization (DPO)}
+\label{subsec:dpo_direct_alignment_frontier}
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[
+    >=Stealth,
+    node distance=1.2cm and 1.5cm,
+    block/.style={rectangle, draw=politoNavy, fill=skyBlue!15, rounded corners=4pt, thick, align=center, inner sep=6pt, font=\small\sffamily},
+    modelbox/.style={rectangle, draw=thmGreenLine, fill=thmGreenBg, rounded corners=3pt, thick, align=center, inner sep=5pt, font=\footnotesize\sffamily\bfseries},
+    refbox/.style={rectangle, draw=steelBlue, fill=cardBg, rounded corners=3pt, thick, align=center, inner sep=5pt, font=\footnotesize\sffamily},
+    databox/.style={rectangle, draw=crimsonRed, fill=crimsonRed!10, rounded corners=3pt, thick, align=center, inner sep=5pt, font=\footnotesize\sffamily},
+    arrow/.style={->, thick, draw=politoNavy}
+]
+    % LEFT: PPO 4-Model System
+    \node[block, minimum width=6.5cm] (ppohead) {\textbf{RLHF-PPO Optimization}\\\textit{Complex 4-Model Online Dynamic Loop}};
+
+    \node[databox, below=0.4cm of ppohead] (ppoprompt) {Prompt $x \sim \mathcal{D}$};
+    \node[modelbox, below left=0.6cm and -0.5cm of ppoprompt] (actor) {Actor Policy $\pi_\theta$\\\textit{(Online Rollout Sampling)}};
+    \node[refbox, below right=0.6cm and -0.5cm of ppoprompt] (ref) {Frozen Reference $\pi_{\text{ref}}$\\\textit{(Per-Token KL Penalty)}};
+
+    \node[modelbox, below=0.6cm of actor, draw=crimsonRed, fill=crimsonRed!15] (critic) {Critic Network $V_\psi$\\\textit{(Advantage Estimation)}};
+    \node[refbox, below=0.6cm of ref, draw=deepdiveTealLine, fill=deepdiveTealBg] (rm) {Reward Model $r_\phi$\\\textit{(Terminal Scalar Reward)}};
+
+    \draw[arrow] (ppoprompt) -- (actor);
+    \draw[arrow] (ppoprompt) -- (ref);
+    \draw[arrow] (actor) -- (critic);
+    \draw[arrow] (ref) -- (rm);
+
+    % RIGHT: DPO 2-Model System
+    \node[block, minimum width=6.5cm, right=1.5cm of ppohead] (dpohead) {\textbf{Direct Preference Optimization (DPO)}\\\textit{Simple 2-Model Static Offline Loss}};
+
+    \node[databox, below=0.4cm of dpohead] (dpodata) {Static Pairwise Dataset $\mathcal{D}$\\$(x, y_w, y_l)$};
+    \node[modelbox, below left=0.8cm and -0.5cm of dpodata] (dpopol) {Active Policy $\pi_\theta$\\\textit{Forward pass on $(y_w, y_l)$}};
+    \node[refbox, below right=0.8cm and -0.5cm of dpodata] (dporef) {Frozen Reference $\pi_{\text{ref}}$\\\textit{Forward pass on $(y_w, y_l)$}};
+
+    \node[block, below=1.0cm of dpodata, fill=thmGreenBg, draw=thmGreenLine, text=politoNavy] (dpoloss) {
+        \textbf{Exact DPO Loss Function}\\
+        $\Loss_{\text{DPO}}(\theta) = -\log \sigma\left(\beta \log \frac{\pi_\theta(y_w)}{\pi_{\text{ref}}(y_w)} - \beta \log \frac{\pi_\theta(y_l)}{\pi_{\text{ref}}(y_l)}\right)$
+    };
+
+    \draw[arrow] (dpodata) -- (dpopol);
+    \draw[arrow] (dpodata) -- (dporef);
+    \draw[arrow] (dpopol) -- (dpoloss);
+    \draw[arrow] (dporef) -- (dpoloss);
+
+\end{tikzpicture}
+\caption{Architectural comparison between RLHF-PPO and Direct Preference Optimization (DPO). RLHF-PPO requires orchestrating four separate models in GPU memory simultaneously, relying on slow, bandwidth-bound online autoregressive token sampling and unstable advantage estimation. DPO eliminates both the Critic and Reward Model entirely, optimizing the active policy directly against a frozen reference model on static offline pairwise datasets via standard forward-backward passes.}
+\label{fig:ppo_vs_dpo_architecture}
+\end{figure}
+
+Despite PPO's success, it suffers from severe operational bottlenecks:
+\begin{enumerate}
+    \item \textbf{Four Models in Memory}: Maintaining the Actor $\pi_\theta$, Critic $V_\psi$, Reference $\pi_{\text{ref}}$, and Reward Model $r_\phi$ concurrently creates an extreme GPU VRAM footprint.
+    \item \textbf{Online Generation Bottleneck}: Sampling rollouts dynamically during training consumes over $80\%$ of total wall-clock training time.
+    \item \textbf{Hyperparameter Fragility}: Fragile sensitivity to learning rates, clipping thresholds $\epsilon$, and GAE parameters.
+\end{enumerate}
+
+To solve this, Rafailov et al. \citep{rafailov2023} introduced **Direct Preference Optimization (DPO)**. Under the KL-regularized objective:
+\begin{equation}
+\max_\pi \E_{x \sim \mathcal{D}, y \sim \pi} \left[ r(x, y) \right] - \beta \KL{\pi(y \mid x)}{\pi_{\text{ref}}(y \mid x)},
+\end{equation}
+the closed-form optimal policy takes the analytical form of a Gibbs distribution:
+\begin{equation}
+\label{eq:gibbs_optimal_policy}
+\pi^*(y \mid x) = \frac{1}{Z(x)} \pi_{\text{ref}}(y \mid x) \exp\left( \frac{1}{\beta} r(x, y) \right), \quad Z(x) = \sum_y \pi_{\text{ref}}(y \mid x) \exp\left( \frac{1}{\beta} r(x, y) \right).
+\end{equation}
+
+Inverting Equation~\eqref{eq:gibbs_optimal_policy} yields an exact expression for the latent reward in terms of the policy probabilities:
+\begin{equation}
+\label{eq:inverted_reward_dpo}
+r(x, y) = \beta \log \frac{\pi^*(y \mid x)}{\pi_{\text{ref}}(y \mid x)} + \beta \log Z(x).
+\end{equation}
+
+When substituted into the Bradley--Terry preference model:
+\begin{equation}
+P(y_w \succ y_l \mid x) = \sigma\left(r(x, y_w) - r(x, y_l)\right),
+\end{equation}
+the intractable partition function $Z(x)$ depends strictly on prompt $x$ and \textbf{cancels out identically}:
+\begin{align}
+r(x, y_w) - r(x, y_l) &= \left( \beta \log \frac{\pi^*(y_w \mid x)}{\pi_{\text{ref}}(y_w \mid x)} + \beta \log Z(x) \right) - \left( \beta \log \frac{\pi^*(y_l \mid x)}{\pi_{\text{ref}}(y_l \mid x)} + \beta \log Z(x) \right) \notag \\
+&= \beta \log \frac{\pi^*(y_w \mid x)}{\pi_{\text{ref}}(y_w \mid x)} - \beta \log \frac{\pi^*(y_l \mid x)}{\pi_{\text{ref}}(y_l \mid x)}.
+\end{align}
+
+Replacing $\pi^*$ with parameterized policy $\pi_\theta$ yields the parameter-efficient **DPO loss**:
+\begin{equation}
+\label{eq:dpo_closed_loss}
+\Loss_{\text{DPO}}(\theta; \pi_{\text{ref}}) = -\E_{(x, y_w, y_l) \sim \mathcal{D}} \left[ \log \sigma\left( \beta \log \frac{\pi_\theta(y_w \mid x)}{\pi_{\text{ref}}(y_w \mid x)} - \beta \log \frac{\pi_\theta(y_l \mid x)}{\pi_{\text{ref}}(y_l \mid x)} \right) \right].
+\end{equation}
+
+As contrasted in Figure~\ref{fig:ppo_vs_dpo_architecture} and Table~\ref{tab:alignment_paradigms_synthesis}, DPO eliminates the Critic, the Reward Model, and online rollouts, optimizing preferences directly via parallel forward-backward passes.
+
+\begin{table}[t]
+\centering
+\small\sffamily
+\rowcolors{2}{white}{skyBlue!15}
+\begin{tabularx}{\textwidth}{lXXX}
+\toprule
+\textbf{Dimension} & \textbf{Supervised SFT} & \textbf{RLHF-PPO} & \textbf{Direct Preference Optimization (DPO)} \\
+\midrule
+\textbf{Primary Objective} & Token cross-entropy on demonstrations: $\Loss_{\text{SFT}}$ & Expected reward maximization with token KL penalty: $\Loss_{\text{PPO}}$ & Direct pairwise implicit log-ratio ranking: $\Loss_{\text{DPO}}$ \\
+\midrule
+\textbf{Active Models in VRAM} & 1 model ($\pi_\theta$) & \textbf{4 models} ($\pi_\theta, \pi_{\text{ref}}, V_\psi, r_\phi$) & \textbf{2 models} ($\pi_\theta, \pi_{\text{ref}}$) \\
+\midrule
+\textbf{Online Sampling Requirement} & None (Parallel teacher-forcing) & \textbf{Extensive} (Token-by-token on-policy rollout generation) & None (Parallel teacher-forcing on static completions) \\
+\midrule
+\textbf{Auxiliary Evaluator Head} & None & Separate scalar linear reward head & None (Implicit reward derived analytically from policy) \\
+\midrule
+\textbf{Hyperparameter Sensitivity} & Low (Standard AdamW learning rate, epochs) & \textbf{Extremely High} ($\epsilon$ clipping, GAE $\lambda$, Actor/Critic lr, $\beta$) & Moderate ($\beta$ regularization strength, learning rate) \\
+\midrule
+\textbf{Vulnerability to Reward Hacking} & Low (Suffers instead from hallucination \& mode collapse) & \textbf{Severe} (Requires careful KL tuning to avoid Goodhart's collapse) & Substantially reduced (Strictly bounded by reference policy logits) \\
+\bottomrule
+\end{tabularx}
+\caption{Comprehensive comparative synthesis of LLM alignment methodologies. SFT provides the initial conversational baseline, PPO pioneered reinforcement learning from human feedback, and DPO offers an elegant, stable mathematical bridge that optimizes preferences directly without online reinforcement learning overhead.}
+\label{tab:alignment_paradigms_synthesis}
+\end{table}
+
+\end{document}
+'''
+
+with open('STUDY_GUIDE/chapters/part1_foundations/09_instruction_tuning_alignment.tex', 'w', encoding='utf-8') as f:
+    f.write(content.strip() + '\n')
+
+print("Wrote refined Chapter 9.")
