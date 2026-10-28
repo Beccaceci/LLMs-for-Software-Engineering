@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="3" time="0.054" timestamp="2026-10-25T23:08:01.323080+01:00" hostname="Nicolas-MacBook-Pro.local"><testcase classname="execution.suites.test_function_01_copilot" name="test_valid_inputs" time="0.001" /><testcase classname="execution.suites.test_function_01_copilot" name="test_invalid_inputs" time="0.000" /><testcase classname="execution.suites.test_function_01_copilot" name="test_edge_cases" time="0.001"><failure message="assert True == False&#10; +  where True = your_function_name([135, 270, 405], [90, 180, 270], 0, [])">execution/suites/test_function_01_copilot.py:74: in test_edge_cases
+    assert your_function_name([135, 270, 405], [90, 180, 270], 0, []) == False
+E   assert True == False
+E    +  where True = your_function_name([135, 270, 405], [90, 180, 270], 0, [])</failure></testcase></testsuite></testsuites>

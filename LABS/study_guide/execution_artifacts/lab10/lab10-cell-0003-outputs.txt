@@ -1,0 +1,163 @@
+--- notebook output 0 ---
+======================================= test session starts ========================================
+platform darwin -- Python 3.11.16, pytest-9.1.1, pluggy-1.7.0 -- /private/tmp/llms-lab10-venv/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/nicolabeccaceci/Desktop/LLMs/LABS/lab10
+plugins: cov-7.1.0, platformdirs-4.13.5
+collecting ...
+
+--- notebook output 1 ---
+collected 21 items
+
+t_1032c35a5d7f4ed4b89f850c009b245f.py::test_disqualification_rules[times0-penalties0-False]
+
+--- notebook output 2 ---
+PASSED [  4%]
+
+--- notebook output 3 ---
+
+t_1032c35a5d7f4ed4b89f850c009b245f.py::test_disqualification_rules[times1-penalties1-False]
+
+--- notebook output 4 ---
+PASSED [  9%]
+
+--- notebook output 5 ---
+
+t_1032c35a5d7f4ed4b89f850c009b245f.py::test_disqualification_rules[times2-penalties2-True]
+
+--- notebook output 6 ---
+PASSED [ 14%]
+
+--- notebook output 7 ---
+
+t_1032c35a5d7f4ed4b89f850c009b245f.py::test_disqualification_rules[times3-penalties3-True]
+
+--- notebook output 8 ---
+PASSED [ 19%]
+
+--- notebook output 9 ---
+
+t_1032c35a5d7f4ed4b89f850c009b245f.py::test_disqualification_rules[times4-penalties4-True]
+
+--- notebook output 10 ---
+PASSED [ 23%]
+
+--- notebook output 11 ---
+
+t_1032c35a5d7f4ed4b89f850c009b245f.py::test_disqualification_rules[times5-penalties5-False]
+
+--- notebook output 12 ---
+PASSED [ 28%]
+
+--- notebook output 13 ---
+
+t_1032c35a5d7f4ed4b89f850c009b245f.py::test_disqualification_rules[times6-penalties6-True]
+
+--- notebook output 14 ---
+PASSED [ 33%]
+
+--- notebook output 15 ---
+
+t_1032c35a5d7f4ed4b89f850c009b245f.py::test_disqualification_rules[times7-penalties7-False]
+
+--- notebook output 16 ---
+PASSED [ 38%]
+
+--- notebook output 17 ---
+
+t_1032c35a5d7f4ed4b89f850c009b245f.py::test_disqualification_rules[times8-penalties8-True]
+
+--- notebook output 18 ---
+PASSED [ 42%]
+
+--- notebook output 19 ---
+
+t_1032c35a5d7f4ed4b89f850c009b245f.py::test_disqualification_rules[times9-penalties9-False]
+
+--- notebook output 20 ---
+PASSED [ 47%]
+
+--- notebook output 21 ---
+
+t_1032c35a5d7f4ed4b89f850c009b245f.py::test_disqualification_rules[times10-penalties10-True]
+
+--- notebook output 22 ---
+PASSED [ 52%]
+
+--- notebook output 23 ---
+
+t_1032c35a5d7f4ed4b89f850c009b245f.py::test_invalid_inputs[args0]
+
+--- notebook output 24 ---
+PASSED                     [ 57%]
+
+--- notebook output 25 ---
+
+t_1032c35a5d7f4ed4b89f850c009b245f.py::test_invalid_inputs[args1]
+
+--- notebook output 26 ---
+PASSED                     [ 61%]
+
+--- notebook output 27 ---
+
+t_1032c35a5d7f4ed4b89f850c009b245f.py::test_invalid_inputs[args2]
+
+--- notebook output 28 ---
+PASSED                     [ 66%]
+
+--- notebook output 29 ---
+
+t_1032c35a5d7f4ed4b89f850c009b245f.py::test_invalid_inputs[args3]
+
+--- notebook output 30 ---
+PASSED                     [ 71%]
+
+--- notebook output 31 ---
+
+t_1032c35a5d7f4ed4b89f850c009b245f.py::test_invalid_inputs[args4]
+
+--- notebook output 32 ---
+PASSED                     [ 76%]
+
+--- notebook output 33 ---
+
+t_1032c35a5d7f4ed4b89f850c009b245f.py::test_invalid_inputs[args5]
+
+--- notebook output 34 ---
+PASSED                     [ 80%]
+
+--- notebook output 35 ---
+
+t_1032c35a5d7f4ed4b89f850c009b245f.py::test_invalid_inputs[args6]
+
+--- notebook output 36 ---
+PASSED                     [ 85%]
+
+--- notebook output 37 ---
+
+t_1032c35a5d7f4ed4b89f850c009b245f.py::test_invalid_inputs[args7]
+
+--- notebook output 38 ---
+PASSED                     [ 90%]
+
+--- notebook output 39 ---
+
+t_1032c35a5d7f4ed4b89f850c009b245f.py::test_invalid_inputs[args8]
+
+--- notebook output 40 ---
+PASSED                     [ 95%]
+
+--- notebook output 41 ---
+
+t_1032c35a5d7f4ed4b89f850c009b245f.py::test_invalid_inputs[args9]
+
+--- notebook output 42 ---
+PASSED                     [100%]
+
+--- notebook output 43 ---
+
+
+======================================== 21 passed in 0.10s ========================================
+
+--- notebook output 44 ---
+<ExitCode.OK: 0>

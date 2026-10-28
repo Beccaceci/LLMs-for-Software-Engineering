@@ -1,0 +1,606 @@
+Politecnico di Torino
+Master of Science in Computer Engineering
+Department of Control and Computer Engineering (DAUIN)
+Large Language Models
+for Software Engineering
+Laboratory 07: User Story Generation
+Complete notebook-aligned solution
+Course Instructor
+Prof. Flavio Giobergia
+Laboratory Assistant
+Claudio Savelli
+Prepared by
+Nicola Beccaceci
+Academic Y ear
+2026/2027
+Politecnico di Torino | Torino, Italy
+Contents 1
+Contents
+1 User-story generation 2
+1.1 Model setup and prompt serialization . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 2
+1.2 Extracting and evaluating roles . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 4
+1.3 From roles to functions and purposes . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 7
+2 Execution and reproducibility notes 10
+2
+1 User-story generation from requirements
+This exercise turns a hiking-platform requirements specification into user stories through three linked questions:
+whousesthesystem,whateachroleneedstodo,andwhythatactionmatters. Thesamerequirementstextfeeds
+each extraction stage; a supplied CSV provides a reference set for role-level precision and recall. The process
+ends by adding a purpose clause to a generated role/function pair. The results are model outputs evaluated
+against this particular reference, not a proof that the requirements or generated stories are complete.
+Figure 1: Notebook-provided architecture: requirements feed role extraction, then functions and purposes,
+producing user stories.
+1.1 Model setup and prompt serialization
+The pipeline begins with a fixed seed, the available compute device, and Llama 3.2 3B Instruct loaded from the
+locally authenticated Hugging Face account. The helper accepts chat-template prompts, avoids adding a second
+BOS token, samples at temperature 0.15, and stops at either Llama’s end-of-turn or EOS token. After decoding,
+it frees generated tensors and clears the MPS cache. These shared settings apply to role, function, and purpose
+generation.
+1# ------------------ Initial setup ---------------------
+2importgc
+3importtorch
+4fromhuggingface_hubimportget_token
+5fromtransformersimportAutoTokenizer, AutoModelForCausalLM, set_seed
+6
+7set_seed(42)
+8torch.set_num_threads(2)
+9device = torch.device("cuda"iftorch.cuda.is_available()else"mps"iftorch.backends.mps.is_available()else"cpu")
+10print("Using device:", device)
+11
+12# Read a local saved login or HF_TOKEN; never store a token in the notebook.
+13hf_token = get_token()
+14model_id = "meta-llama/Llama-3.2-3B-Instruct"
+15model = AutoModelForCausalLM.from_pretrained(
+16model_id, torch_dtype=torch.float16, low_cpu_mem_usage=True, token=hf_token,
+17).to(device).eval()
+18tokenizer = AutoTokenizer.from_pretrained(model_id, token=hf_token, clean_up_tokenization_spaces=False)
+19tokenizer.pad_token = tokenizer.eos_token
+20
+21
+22defmake_a_query(prompt:str, tokenizer, model, device, max_new_tokens:int= 200):
+23# Chat-template prompts already contain special tokens; do not add another BOS.
+24inputs = tokenizer(prompt, return_tensors="pt", add_special_tokens=False).to(device)
+25prompt_length = inputs["input_ids"].shape[1]
+26eot_id = tokenizer.convert_tokens_to_ids("<|eot_id|>")
+27withtorch.inference_mode():
+28output = model.generate(
+29**inputs,
+30max_new_tokens=max_new_tokens,
+31do_sample=True,
+32temperature=0.15,
+33top_p=0.9,
+34num_beams=1,
+35# Stop on Llama’s end-of-turn marker and the model’s EOS marker.
+36eos_token_id=list(dict.fromkeys([eot_id, tokenizer.eos_token_id])),
+37pad_token_id=tokenizer.pad_token_id,
+38)
+39answer = tokenizer.decode(output[0, prompt_length:], skip_special_tokens=True).strip()
+40deloutput, inputs
+41gc.collect()
+1.1 Model setup and prompt serialization 3
+42if getattr(device, "type",str(device)) == "mps":
+43torch.mps.empty_cache()
+44returnanswer
+1/Users/nicolabeccaceci/.venvs/llms-lab07/lib/python3.11/site-packages/tqdm/auto.py:21: TqdmWarning: IProgressnotfound. Please
+update jupyterandipywidgets. See https://ipywidgets.readthedocs.io/en/stable/user_install.html
+2from.autonotebookimporttqdmasnotebook_tqdm
+1Using device: mps
+1
+2Loading checkpoint shards: 0%| | 0/2 [00:00<?, ?it/s]
+1
+2Loading checkpoint shards: 50%|■■■■■| 1/2 [00:30<00:30, 30.54s/it]
+1
+2Loading checkpoint shards: 100%|■■■■■■■■■■| 2/2 [00:36<00:00, 16.19s/it]
+1
+2Loading checkpoint shards: 100%|■■■■■■■■■■| 2/2 [00:36<00:00, 18.34s/it]
+This notebook output has no printable text representation.The output confirms MPS selection and successful model
+initialization; the loading progress and library warnings are execution diagnostics rather than model answers.
+Authentication comes from the local Hugging Face credential store, never the notebook. The checkpoint is
+loaded in FP16. The environment and model revision accompany the run record for reproducibility.
+The requirements specification is the shared input for all later stages. Before extracting stories, this cell contrasts
+a manually serialized system/user conversation with the tokenizer’s official chat-template serializer using a
+small capital-city question. The demo isolates prompt structure from the hiking requirements and shows how
+an assistant-generation prefix is formed.
+1#reference requirements_text
+2
+3requirements_text = "The proposed platform is designed to enhance the hiking experience for various user groups, including
+visitors, local guides, platform managers, and hut workers. The platform provides a centralized repository of hiking
+routes, hut information, and parking facilities. It also enables interactive features such as real-time hike tracking,
+personalized recommendations, and group hike planning. By combining these capabilities, the platform seeks to foster
+safe, informed, and collaborative hiking experiences.\
+4The platform will be deployed as a cloud-based web and mobile application accessible to all stakeholders. The distribution
+strategy includes an app available on major mobile operating systems, such as iOS and Android, alongside a responsive
+web interface. It will require an internet connection for features like real-time tracking, notifications, and user
+authentication, though some offline capabilities, such as pre-downloaded hike information, will also be available.\
+5User authentication will be role-based, ensuring that only authorized users, such as verified hut workers and platform
+managers, can access sensitive or administrative features.\
+6Visitors are the primary users of the platform. They can browse a comprehensive list of hiking trails, filter them based on
+specific criteria such as difficulty, length, or starting point, and view detailed descriptions. To access advanced
+features like personalized recommendations, visitors can create user accounts by registering on the platform.
+Registered users can record their fitness parameters, enabling the system to suggest trails tailored to their
+capabilities.\
+7During a hike, visitors can record their progress by marking reference points and sharing their live location through a
+broadcasting URL. They can also initiate group activities by planning hikes, adding group members, and confirming
+group participation. The platform allows visitors to start, terminate, and track their hikes, with notifications for
+unfinished hikes or late group members to ensure safety and accountability.\
+8Local guides enrich the platform by contributing essential information. They can add detailed descriptions of hikes,
+parking facilities, and huts, ensuring hikers have accurate and comprehensive data. Local guides also link parking
+lots and huts to specific trails as starting or arrival points, enhancing the planning process.\
+9To aid in the visual representation and accessibility of information, local guides can upload pictures of huts and connect
+these locations directly to hikes. This integration simplifies route planning and helps visitors visualize their
+journey.\
+10Platform managers oversee the operational integrity and safety of the platform. They verify new hut worker registrations,
+ensuring that only authorized personnel can update hut-related data. Managers can also broadcast weather alerts for
+specific areas, notifying all hikers in those regions through push notifications. This ensures that users stay
+informed about potentially hazardous conditions.\
+11The platform manager’s role includes maintaining an organized and secure user system while facilitating collaboration
+between local guides, hut workers, and visitors.\
+12Hut workers are critical to the maintenance of up-to-date trail and accommodation information. After registering and being
+verified, hut workers can log into the platform to add or update information about their assigned huts, including
+uploading pictures and describing the facilities available. They can also monitor and report on the condition of
+nearby trails, ensuring hikers receive current information.\
+13Hut workers play a vital role in providing situational updates for hikers. For instance, if a nearby trail is impacted by
+severe weather or physical obstructions, they can communicate these conditions through the platform. This enhances the
+safety and preparedness of all hikers relying on the platform."
+14
+15
+16#---------------------Example usage - without chat template and customized system prompt------------------
+1.2 Extracting and evaluating roles 4
+17prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+18
+19You are an expert on world capitals.
+20Respond with only the capital city of the given country. Do not repeat the question.<|eot_id|>
+21<|start_header_id|>user<|end_header_id|>
+22
+23What is the capital of France?<|eot_id|>
+24<|start_header_id|>assistant<|end_header_id|>
+25
+26"""
+27
+28response = make_a_query(prompt, tokenizer, model, device)
+29
+30print(f"Prompt: {prompt}\n\nResponse: {response}")
+31#----------------------------------------------------------------------------
+32
+33
+34#---------------------Example usage - with chat template and customized system prompt---------------------
+35messages = [
+36{"role": "system", "content": "You are an expert on world capitals. Respond with only the capital city of the given
+country. Do not repeat the question."},
+37{"role": "user", "content": "What is the capital of France?"}
+38]
+39
+40chat = tokenizer.apply_chat_template(messages,
+41tokenize=False,#IMPORTANT: only the special tokens are added, we’ll apply
+tokenisation later
+42add_generation_prompt=True)# adds the placeholder for the assistant’s response
+43
+44
+45response = make_a_query(chat, tokenizer, model, device)
+46
+47print("------------------------------------------------------------")
+48print(f"Prompt: {chat}\n\nResponse: {response}")
+1Prompt: <|begin_of_text|><|start_header_id|>system<|end_header_id|>
+2
+3You are an expert on world capitals.
+4Respondwithonly the capital city of the given country. Donotrepeat the question.<|eot_id|>
+5<|start_header_id|>user<|end_header_id|>
+6
+7Whatisthe capital of France?<|eot_id|>
+8<|start_header_id|>assistant<|end_header_id|>
+9
+10
+11
+12Response: Paris
+1------------------------------------------------------------
+2Prompt: <|begin_of_text|><|start_header_id|>system<|end_header_id|>
+3
+4Cutting Knowledge Date: December 2023
+5Today Date: 26 Oct 2026
+6
+7You are an expert on world capitals. Respondwithonly the capital city of the given country. Donotrepeat the question.<|
+eot_id|><|start_header_id|>user<|end_header_id|>
+8
+9Whatisthe capital of France?<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+10
+11
+12
+13Response: Paris
+Bothpathsreturnexactly Paris. Themanualserializationvisiblysuppliesitsownsystemanduserheaders,while
+thetokenizer-generatedtemplateinsertsthemodel’ssystemmetadata(knowledge-cutoffandcurrentdate)before
+thesamemessages. Bothincludeanassistant-generationprefix;usingtheofficialtemplatepreventshand-written
+header mistakes. Because the prompt text already includes the serialized tokens,add_special_tokens=False
+in the shared helper avoids adding a second beginning token.
+1.2 Extracting and evaluating roles
+The first extraction stage asks the same model to identify the people and stakeholders represented in the
+hiking-platform requirements. The prompts below differ only in their in-context examples; the CSV reference is
+prepared separately so the scoring target does not depend on the generated response.
+This cell creates zero-shot, one-shot, and few-shot role-extraction prompts. The one-shot and few-shot examples
+are represented as complete alternating user/assistant messages, so each demonstration teaches both the task
+1.2 Extracting and evaluating roles 5
+and the requested list format. The same hiking requirements are then appended as the final user query to each
+prompt.
+1#define three different prompts for extracting users, using the zero-shot, one-shot and few-shot approach. then evaluate
+the difference in terms of capability to format the output and actual results
+2
+3# IMPORTANT: wheter you use the chat template or not, remember to add the shots into the correct structure composed by user
+’s query and assistant’s response (see previous lab)
+4
+5query = "Requirements Text:\n" + requirements_text + "\nList the distinct user roles."
+6
+7shots = [# This is a list of lists, useful to separate each shot from each other
+8
+9# First shot
+10[
+11{’role’: ’user’,
+12’content’: """Requirements Text:
+13"The applicationisdesigned to streamline food delivery operations. Customers can browse menusandplace orders. Delivery
+personnel use the app to view delivery assignmentsandupdate order statuses. Restaurant managers can manage their
+menusandtrack incoming orders."""},
+14{’role’: ’assistant’, ’content’: """1. Customers
+152. Delivery Personnel
+163. Restaurant Managers"""},
+17],
+18
+19# Second shot
+20[
+21{’role’: ’user’,
+22’content’: """Requirements Text:
+23The platform supports the education sector by providing toolsforstudents, teachers,andadministrators. Students can
+access course materials, submit assignments,andtrack their progress. Teachers can create content, grade submissions,
+andcommunicatewithstudents. Administrators oversee user registrationsandsystem performance."""},
+24{’role’: ’assistant’,
+25’content’: """1. Students
+262. Teachers
+273. Administrators"""}
+28],
+29
+30# Third shot
+31[
+32{’role’: ’user’,
+33’content’: """Requirements Text:
+34The system provides real-time updatesforcommuters, transit operators,andcity planners. Commuters can check schedules
+anddelays. Transit operators monitor vehicle statusesandmanage timetables. City planners analyze system data to
+improve routesandinfrastructure."""},
+35{’role’: ’assistant’,
+36’content’: """1. Commuters
+372. Transit Operators
+383. City Planners"""}
+39]
+40]
+41
+42
+43system_prompt = """Extract only the distinct user roles explicitly supported by the supplied requirements.
+44Return only the role names explicitly statedinthe requirements, one per numbered lineinthe form ‘1. Role name‘.
+45Donotinclude a heading, introduction, rationale, examples, actions,orcommentary.
+46Stop immediately after the final role. Donotinfer roles absentfromthe text."""
+47
+48# Build the message list for each promoting technique
+49
+50messages_zero_shot = [{"role": "system", "content": system_prompt}, {"role": "user", "content": query}]
+51prompt_zero_shot = tokenizer.apply_chat_template(messages_zero_shot, tokenize=False, add_generation_prompt=True)
+52
+53messages_one_shot = [{"role": "system", "content": system_prompt}] + shots[0] + [{"role": "user", "content": query}]
+54prompt_one_shot = tokenizer.apply_chat_template(messages_one_shot, tokenize=False, add_generation_prompt=True)
+55
+56messages_few_shots = [{"role": "system", "content": system_prompt}] + [message for shot in shots for message in shot] + [{"
+role": "user", "content": query}]
+57prompt_few_shots = tokenizer.apply_chat_template(messages_few_shots, tokenize=False, add_generation_prompt=True)
+58
+59
+60# Call the LLM function for the three prompts and print the results
+61roles_extracted_zero_shot = make_a_query(prompt_zero_shot, tokenizer, model, device, max_new_tokens=96)
+62
+63print("Extracted Roles - zero shot: \n", roles_extracted_zero_shot)
+64
+65roles_extracted_one_shot = make_a_query(prompt_one_shot, tokenizer, model, device, max_new_tokens=96)
+66
+67print("Extracted Roles - one shot: \n", roles_extracted_one_shot)
+68
+69
+70roles_extracted_few_shots = make_a_query(prompt_few_shots, tokenizer, model, device, max_new_tokens=96)
+71
+1.2 Extracting and evaluating roles 6
+72print("Extracted Roles - few shots: \n", roles_extracted_few_shots)
+1Extracted Roles - zero shot:
+21. Visitors
+32. Local Guides
+43. Platform Managers
+54. Hut Workers
+1Extracted Roles - one shot:
+21. Visitors
+32. Local Guides
+43. Platform Managers
+54. Hut Workers
+1Extracted Roles - few shots:
+21. Visitors
+32. Local Guides
+43. Platform Managers
+54. Hut Workers
+All three prompt conditions returned the same four roles: visitors, local guides, platform managers, and hut
+workers. The consistency is useful, but the CSV comparison later shows the list misses two reference roles. In
+this recorded run, adding demonstrations did not change the extracted list; format compliance should not be
+confused with full coverage.
+Theevaluationreferenceisderivedfromthesupplied stories.csv. Thehelperscanseachuser-storydescription
+for its ’As a ... I want’ role phrase, removes duplicates, and sorts the result. Keeping reference preparation in its
+own cell makes it possible to audit the target set independently of the language model.
+1importcsv
+2importre
+3
+4
+5defextract_unique_roles(file_path:str):
+6roles =set()
+7with open(file_path, newline="", encoding="utf-8-sig")asstream:
+8forrowincsv.DictReader(stream):
+9match = re.search(r"^As\s+(?:an?\s+)?(.+?)\s+I\s+want\b", row["Description"].strip(), flags=re.IGNORECASE)
+10ifmatch:
+11roles.add(match.group(1).strip().lower())
+12return sorted(roles)
+13
+14
+15defextract_list_items(text:str):
+16"""Keep only a leading numbered/bulleted list; reject explanatory prose."""
+17items = []
+18started = False
+19forlineintext.splitlines():
+20line = line.strip()
+21match = re.match(r"^(?:\d+\s*[.)-]?\s+|[-*•]\s+)(.+?)\s*$", line)
+22ifmatch:
+23started = True
+24item = match.group(1).strip().strip("* ")
+25# Keep the role label and discard parenthetical/editorial commentary.
+26item = re.split(r"\s+[–—]\s+|\s+-\s+", item, maxsplit=1)[0]
+27item = re.sub(r"\s*\([^)]*\)", "", item).strip()
+28item = re.sub(r"/s$", "s", item, flags=re.IGNORECASE)
+29ifitem:
+30items.append(item)
+31elifstartedandline:
+32break
+33return list(dict.fromkeys(items))
+34
+35
+36defnormalize_roles(role_list:list[str]):
+37# Ignore whitespace, case and a final plural s as requested by the exercise.
+38return{re.sub(r"\s+", "", role.lower()).removesuffix("s")forroleinrole_listifrole.strip()}
+39
+40
+41defrole_metrics(expected, actual):
+42expected, actual = normalize_roles(expected), normalize_roles(actual)
+43tp =len(expected & actual)
+44fp =len(actual - expected)
+45fn =len(expected - actual)
+46returntp, fp, fn, tp / (tp + fp)iftp + fpelse0.0, tp / (tp + fn)iftp + fnelse0.0
+47
+48
+49file_path = "stories.csv"
+50expected_roles = extract_unique_roles(file_path)
+51print("Reference roles from stories.csv:", expected_roles)
+1.3 From roles to functions and purposes 7
+1Reference rolesfromstories.csv: [’friend (of a hiker)’, ’hiker’, ’hut worker’, ’local guide’, ’platform manager’, ’visitor’]
+The printed set contains the six distinct role phrases extracted from the CSV. The parenthetical phrase in the first
+description is retained as part of its role string; the following normalization handles case, whitespace, and a
+final plural ’s’, but does not semantically rewrite role names.
+This cell parses the few-shot model answer into list items, normalizes the extracted and reference roles, and
+counts true positives, false positives, and false negatives. Precision is the fraction of extracted roles that match
+thereference;recallisthefractionofreferencerolesrecovered. Theformulasreturnzerowhentheirdenominator
+is empty, avoiding a division error for empty sets.
+1actual_roles = extract_list_items(roles_extracted_few_shots)
+2print("Roles extracted by the model:", actual_roles)
+3true_positives, false_positives, false_negatives, precision, recall = role_metrics(expected_roles, actual_roles)
+4print("True Positives:", true_positives)
+5print("False Positives:", false_positives)
+6print("False Negatives:", false_negatives)
+7print("Precision:", precision)
+8print("Recall:", recall)
+1Roles extracted by the model: [’Visitors’, ’Local Guides’, ’Platform Managers’, ’Hut Workers’]
+2True Positives: 4
+3False Positives: 0
+4False Negatives: 2
+5Precision: 1.0
+6Recall: 0.6666666666666666
+The run reports four true positives, zero false positives, and two false negatives. Precision is 1.0 because every
+extracted role appears in the CSV reference; recall is 0.667 because two CSV roles were missed. These scores
+reflect this reference and exact string normalization; they do not establish semantic equivalence or measure
+zero-shot and one-shot answers, which happen to match in this run.
+1.3 From roles to functions and purposes
+Role names narrow the next prompt to actions that a stakeholder needs from the platform. The notebook
+converts each extracted action into a provisional role/function story, then asks for the reason behind one such
+action to complete the familiar ’As a ..., I want ..., so that ...’ form.
+For each extracted role, this loop asks for concise actions grounded in the complete hiking requirements. A
+food-delivery example demonstrates the expected numbered-list shape, while the actual query includes the full
+requirements and names the current role. The parser accepts only an initial, contiguous numbered or bulleted
+list; it skips a response that begins with NONE or prose, and stops at commentary. Accepted actions become
+provisional ’As a role, I want to function’ tuples.
+1current_roles = actual_roles
+2user_stories =list()
+3
+4#this function will be used to extract the functions from the answer provided by the llm agent
+5
+6defextract_functions(text:str):
+7"""Accept only an initial, contiguous numbered/bulleted list of functions."""
+8functions = []
+9started = False
+10forlineintext.splitlines():
+11line = line.strip()
+12if notline:
+13ifstarted:
+14break
+15continue
+16ifline.upper() == "NONE":
+17return[]
+18match = re.match(r"^(?:\d+[.)]|[-*•])\s+(.+?)\s*$", line)
+19if notmatch:
+20ifstarted:
+21break
+22return[]
+23started = True
+24item = match.group(1).strip().rstrip(".")
+25ifitem:
+26functions.append(item)
+27return list(dict.fromkeys(functions))
+28
+29
+30
+31#this function can be used to format a user story in the expected format. it returns a list of tuples (user, story)
+1.3 From roles to functions and purposes 8
+32
+33defcreate_user_stories(role:str, functions:list[str]):
+34"""
+35Generate user stories in the standard format.
+36"""
+37user_stories = [(role, f"As a {role}, I want to {function}")forfunctioninfunctions]
+38returnuser_stories
+39
+40
+41forroleincurrent_roles:
+42
+43#1. Loop over the list of roles and extract the piece of text from requirements related to that role
+44print("\n\nExtracting stories for role", role)
+45
+46
+47#define a prompt to extract functions for a given user
+48#the prompt will be composed of the following fields:
+49# - context: usage persona of the Lllama agent and instructions
+50# - examples: examples of requirements text, role and user
+51# - task: description of the task to perform. here you have to provide the current role
+52# - answer field: placeholder from which the response will start
+53
+54#a tentative example can be the following one (you can generate many of them for instance by using another LLM agent, e.
+g. ChatGPT)
+55example_text = [
+56{
+57’role’: ’user’,
+58’content’: """**Requirements Text**:
+59The application is designed to streamline food delivery operations. Customers can browse menus and place orders. Delivery
+personnel use the app to view delivery assignments and update order statuses. Restaurant managers can manage their
+menus and track incoming orders.
+60
+61Role: Delivery personnel
+62List the functions for this role."""
+63},
+64
+65{
+66’role’: ’assistant’,
+67’content’: """1. View delivery assignments.
+682. Update order status."""
+69}
+70]
+71
+72system_prompt = (
+73"Extract only actions explicitly supported by the requirements for the requested role. "
+74"Return 1 to 8 numbered lines, each formatted ‘1. Verb phrase‘ and no more than eight words. "
+75"Use no heading, explanation, prose, claims, or action not stated in the requirements. "
+76"Stop after the final list item. If no action is stated for that role, return exactly ‘NONE‘."
+77)
+78
+79query = f"Requirements Text:\n{requirements_text}\n\nRole: {role}\nList the functions for this role."
+80
+81messages = [{"role": "system", "content": system_prompt}] + example_text + [{"role": "user", "content": query}]
+82prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+83
+84
+85#now ask the agent and get the response
+86response = make_a_query(prompt, tokenizer, model, device, max_new_tokens=128)# Memory-safe cap for a concise numbered
+action list
+87
+88print(response)
+89
+90functions = extract_functions(response)
+91
+92tmp_user_stories = create_user_stories(role, functions)
+93if notfunctions:
+94ifresponse.strip().upper() == "NONE":
+95print("No explicit supported functions were returned for this role.")
+96continue
+97raiseValueError(f"The model returned no numbered functions for {role}: {response}")
+98user_stories.extend(tmp_user_stories)
+1
+2
+3Extracting storiesforrole Visitors
+11. Browse hiking trails.
+22. Filter hiking trails.
+33. View detailed trail descriptions.
+44. Record fitness parameters.
+55. Record hike progress.
+66. Share live location.
+1.3 From roles to functions and purposes 9
+77. Plan group hikes.
+88. Track hikes.
+9
+10
+11Extracting storiesforrole Local Guides
+11. Add detailed hike descriptions.
+22. Link parking lots to trails.
+33. Upload pictures of huts.
+44. Connect huts to hikes.
+5
+6
+7Extracting storiesforrole Platform Managers
+11. Verify new hut worker registrations.
+22. Broadcast weather alerts.
+33. Maintain an organized user system.
+44. Facilitate collaboration between local guides, hut workers,andvisitors.
+5
+6
+7Extracting storiesforrole Hut Workers
+11. Addorupdate hut information.
+22. Upload pictures of huts.
+33. Describe hut facilities.
+44. Monitorandreport trail conditions.
+55. Communicate situational updates to hikers.
+Therecordedrunreturnsnumberedfunctionsforallfourextractedroles. Theactionsarerelevantparaphrasesof
+the requirements, not an independently verified or exhaustive inventory. Importantly, no per-role requirement
+excerpt is constructed despite the original comments describing that as an option; each prompt receives the full
+requirements.
+The final cell demonstrates the ’so that’ step for the first generated role/function pair. It separates the existing
+role and function from the provisional story, then asks the model to infer one purpose using the original
+requirements and a single worked example. This cell demonstrates purpose generation for one pair rather than
+completing every tuple in the collection.
+1# Demonstrate purpose extraction for one (role, story) pair, as requested.
+2if notuser_stories:
+3raiseValueError("No user stories were generated in the previous step.")
+4user_story1 = user_stories[0]
+5role, initial_story = user_story1
+6prefix = f"As a {role}, I want to "
+7function = initial_story[len(prefix):]ifinitial_story.startswith(prefix)elseinitial_story
+8print("Role:", role)
+9print("Function:", function)
+10
+11system_prompt = (
+12"You are a requirements analyst. Use the requirements and the given role and function "
+13"to infer the supported purpose. Return exactly one complete story in the format "
+14"’As a <role>, I want to <function>, so that <purpose>.’ Do not invent capabilities "
+15"or add an explanation."
+16)
+17shot_examples = [
+18{"role": "user", "content": "Requirements: Visitors filter hiking trails by difficulty, length, or starting point to
+select a suitable route.\nRole: visitor\nFunction: filter hiking trails by difficulty"},
+19{"role": "assistant", "content": "As a visitor, I want to filter hiking trails by difficulty, so that I can choose a
+route suited to my abilities."},
+20]
+21query = f"Requirements:\n{requirements_text}\n\nRole: {role}\nFunction: {function}"
+22messages = [{"role": "system", "content": system_prompt}] + shot_examples + [{"role": "user", "content": query}]
+23prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+24response = make_a_query(prompt, tokenizer, model, device, max_new_tokens=128)# One concise user-story purpose clause
+25print(response)
+1Role: Visitors
+2Function: Browse hiking trails
+1As a visitor, I want to browse hiking trails, so that I can exploreanddiscover suitable routesformy hiking experience.
+The printed role and function identify the first tuple, and the response demonstrates one ’so that’ completion:
+exploring and discovering suitable hiking routes. The revised in-context example now uses hiking preferences
+and abilities rather than an unrelated domain. This final cell handles only one pair, so it neither completes all
+tuples nor validates every earlier function.
+10
+Reading the result.The exercise demonstrates a staged requirements-analysis workflow and a
+simple reference-based metric. Its final purpose-generation cell handles only the first role/function
+pair, and automatic extraction can omit, duplicate, or paraphrase requirements. A human review is
+still needed before treating generated stories as accepted requirements.
+2 Execution and reproducibility notes
+The matching lecture recording was not available in Whisper or in the supplied course files during this run. Per
+the task scope, lecture review is deferred until the professor provides the recordings; explanations here are
+based on the notebook’s assignment text, source, provided architecture image, and saved outputs.
+The model ismeta-llama/Llama-3.2-3B-Instruct, loaded in FP16 on MPS from the locally authenticated
+Hugging Face account. Generation uses seeded low-temperature sampling with one beam and task-specific
+token caps. Samples can vary across framework versions, kernels, and model revisions. The exact dependency
+versions, model revision, and execution records are listed in the accompanying environment and provenance
+files.

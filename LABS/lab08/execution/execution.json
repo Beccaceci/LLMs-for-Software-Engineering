@@ -1,0 +1,79 @@
+{
+  "started_utc": "2026-10-26T16:12:10.829449+00:00",
+  "python": "3.11.16",
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "light_run": false,
+  "cells": [
+    {
+      "cell_index": 1,
+      "status": "ok",
+      "source_sha256": "51da99b505dec12f391f132eb09d479515ac15dc51ed1694809d3df140563435",
+      "seconds": 1.3988812919997144,
+      "execution_count": 1,
+      "output_types": [
+        "stream"
+      ]
+    },
+    {
+      "cell_index": 3,
+      "status": "ok",
+      "source_sha256": "554908a77a54f752dca5e022501f904b695ba32d29e4136e9dc60dc516a3ebc8",
+      "seconds": 0.010909832999459468,
+      "execution_count": 2,
+      "output_types": [
+        "stream"
+      ]
+    },
+    {
+      "cell_index": 5,
+      "status": "ok",
+      "source_sha256": "6a2f390d300a9a00d283b762e4d903c73aea724a0a52d43dfa297bd3979ca89d",
+      "seconds": 0.25610525000047346,
+      "execution_count": 3,
+      "output_types": [
+        "display_data",
+        "stream"
+      ]
+    },
+    {
+      "cell_index": 8,
+      "status": "ok",
+      "source_sha256": "e02a6b0a14fd781cda3f434b264eab83c30269c4fa01d54f1c5fe977a0331c48",
+      "seconds": 19.80314591699971,
+      "execution_count": 4,
+      "output_types": [
+        "stream",
+        "stream",
+        "stream",
+        "stream",
+        "stream",
+        "stream",
+        "stream"
+      ]
+    },
+    {
+      "cell_index": 10,
+      "status": "ok",
+      "source_sha256": "ba0756b4b802ff6924b9aa6aa531339a212a699aaae1d4e448e6719d61176476",
+      "seconds": 1.883555125001294,
+      "execution_count": 5,
+      "output_types": [
+        "stream",
+        "stream",
+        "stream"
+      ]
+    },
+    {
+      "cell_index": 12,
+      "status": "ok",
+      "source_sha256": "40c850426217f62210c2a38b89f47307bd9b7a99af37856a7132f762548ca2cc",
+      "seconds": 32.36384104100034,
+      "execution_count": 6,
+      "output_types": [
+        "stream",
+        "stream",
+        "stream"
+      ]
+    }
+  ]
+}

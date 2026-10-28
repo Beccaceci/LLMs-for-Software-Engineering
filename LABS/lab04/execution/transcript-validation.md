@@ -1,0 +1,9 @@
+# Laboratory 04 transcript validation
+
+The source is the `Lab04` session in the local Whisper library. It reports an 82:13.055 recording, 801 timestamped segments, and a successful English transcription. The beginning is timestamped at 00:00:01.860; the final segment ends at 01:22:14.440, 1.385 seconds beyond the recorded duration. This discrepancy is retained in the timestamp-preserving transcript export. The largest gap between adjacent segments is 57.660 seconds (between 04:31.660 and 05:29.320), consistent with the recording's music, silence, and indistinct passages.
+
+The transcript contains intelligible anchors for the notebook topics: creating labels at approximately 03:03 and 23:20, using Trainer at 03:51, selecting data around 15:55, evaluating and fine-tuning around 34:55–36:53, comparing pretrained and fine-tuned GPT-2 around 37:00–51:00, sampling and temperature around 43:00–46:30, Llama access around 58:30, and system/user messages and templates around 65:20–70:10. These anchors support a topic map, not reconstructed lecture wording.
+
+A local Whisper `small.en` transcription was also run over a 90-second recording excerpt near 33 minutes and saved in `transcript-audio-check-33m.txt`. It produced different wording from the stored transcript and remained uncertain. A second full-recording attempt on MPS failed with invalid logits; a later CPU excerpt was stopped because its processing rate was too slow for this run. These automated comparisons do not establish an authoritative correction. The final solution should preserve the exported source transcript, use the notebook as the source of code and numeric results, and avoid quoting unclear lecture passages.
+
+The machine-readable inventory and source hashes are in `solution-baseline.json`. The timestamp-preserving source export is `../transcriptions/Lab04-Causal-Language-Modeling-And-Instruction-Tuned-LLMs.md`.

@@ -1,0 +1,8 @@
+actual_roles = extract_list_items(roles_extracted_few_shots)
+print("Roles extracted by the model:", actual_roles)
+true_positives, false_positives, false_negatives, precision, recall = role_metrics(expected_roles, actual_roles)
+print("True Positives:", true_positives)
+print("False Positives:", false_positives)
+print("False Negatives:", false_negatives)
+print("Precision:", precision)
+print("Recall:", recall)

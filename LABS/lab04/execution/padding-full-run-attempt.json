@@ -1,0 +1,11 @@
+{
+  "attempt": "initial-full-epoch-dynamic-padding",
+  "date_local": "2026-10-26",
+  "cell_index": 28,
+  "elapsed_seconds_before_failure": 2367.7180820840294,
+  "status": "failed",
+  "device": "mps",
+  "error_type": "RuntimeError",
+  "error": "MPS backend out of memory. At failure: MPS allocated 9.38 GiB; other allocations 10.64 GiB; maximum allowed 20.13 GiB; attempted allocation 147.24 MiB.",
+  "disposition": "Preserved as a diagnostic. Replaced the multi-hour full-epoch timing attempt with matched independent-kernel 12-update runs; the final comparison uses those two successful runs."
+}

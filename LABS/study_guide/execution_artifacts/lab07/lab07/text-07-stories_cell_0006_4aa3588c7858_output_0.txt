@@ -1,0 +1,1 @@
+Reference roles from stories.csv: ['friend (of a hiker)', 'hiker', 'hut worker', 'local guide', 'platform manager', 'visitor']

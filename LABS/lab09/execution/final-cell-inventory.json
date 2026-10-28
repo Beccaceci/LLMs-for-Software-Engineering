@@ -1,0 +1,153 @@
+[
+  {
+    "index": 1,
+    "source_sha256": "8dd68aba9dbab4d7ab39f142b94af5a9cc64a1d5a0af4c9e69897fad0853e50c",
+    "execution_count": 1,
+    "errors": [],
+    "output_types": [
+      "stream"
+    ]
+  },
+  {
+    "index": 3,
+    "source_sha256": "bdc8c2e15919968abfed734da21dcda9329e3566b803b0515929121a8a96c8a1",
+    "execution_count": 2,
+    "errors": [],
+    "output_types": []
+  },
+  {
+    "index": 5,
+    "source_sha256": "ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5",
+    "execution_count": 3,
+    "errors": [],
+    "output_types": [
+      "stream",
+      "stream",
+      "stream",
+      "stream",
+      "stream",
+      "stream",
+      "stream",
+      "stream",
+      "stream",
+      "stream",
+      "stream",
+      "stream",
+      "stream",
+      "stream",
+      "stream",
+      "stream",
+      "stream",
+      "stream",
+      "stream",
+      "stream",
+      "stream",
+      "stream",
+      "stream",
+      "stream",
+      "stream",
+      "stream",
+      "stream",
+      "stream",
+      "stream",
+      "stream",
+      "stream",
+      "stream",
+      "stream",
+      "stream",
+      "stream",
+      "stream",
+      "stream",
+      "stream",
+      "stream",
+      "stream",
+      "stream",
+      "stream",
+      "stream",
+      "stream",
+      "stream",
+      "stream"
+    ]
+  },
+  {
+    "index": 7,
+    "source_sha256": "c9c19a76b65da5f143fa2d720bb233b443dcc1fa029cf1bf3c013c39304569e8",
+    "execution_count": 4,
+    "errors": [
+      {
+        "name": "OSError",
+        "message": "You are trying to access a gated repo.\nMake sure to have access to it at https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct.\n401 Client Error. (Request ID: Root=1-6ade7f19-534d61876d24173f095e9b30;c71faab0-08ec-4da9-960a-7ae4ee6bfc3a)\n\nCannot access gated repo for url https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct/resolve/main/config.json.\nAccess to model meta-llama/Llama-3.2-3B-Instruct is restricted. You must have access to it and be authenticated to access it. Please log in."
+      }
+    ],
+    "output_types": [
+      "stream",
+      "stream",
+      "error"
+    ]
+  },
+  {
+    "index": 8,
+    "source_sha256": "438e1a5ac6dd089cdf2cdd02e62fa39ef23306bf92d5aea5681184fb4d905209",
+    "execution_count": null,
+    "errors": [],
+    "output_types": []
+  },
+  {
+    "index": 10,
+    "source_sha256": "1daeed1554491deb6421c00cb61d7ad76dba507839602ffd097b75fb481185f7",
+    "execution_count": 2,
+    "errors": [],
+    "output_types": [
+      "stream"
+    ]
+  },
+  {
+    "index": 12,
+    "source_sha256": "b05ac5bcb1f4489e3da8be9127335396e61d5eb49a8de8f6720b5c7c4efc0a16",
+    "execution_count": null,
+    "errors": [],
+    "output_types": []
+  },
+  {
+    "index": 14,
+    "source_sha256": "52d5f042bd7bdf89d23730b9aedc1fb0943831bb6a70c07b98032fa5cb31fa80",
+    "execution_count": 3,
+    "errors": [],
+    "output_types": [
+      "stream"
+    ]
+  },
+  {
+    "index": 16,
+    "source_sha256": "ebaf2737dae25738187d265f85df50ac75ecc656491a761ca6c90e23e57c6b02",
+    "execution_count": 4,
+    "errors": [],
+    "output_types": [
+      "display_data"
+    ]
+  },
+  {
+    "index": 18,
+    "source_sha256": "5a2dba39c66ca0604987d1e5fcd68ecfec2f26b91f0a5fa2ca7e3fede5a095f0",
+    "execution_count": null,
+    "errors": [],
+    "output_types": []
+  },
+  {
+    "index": 20,
+    "source_sha256": "b6fcf4beed137e2fe82a492045d2e369d21e00d4ec819076b0284db31ea41efb",
+    "execution_count": 8,
+    "errors": [],
+    "output_types": [
+      "stream",
+      "stream"
+    ]
+  },
+  {
+    "index": 21,
+    "source_sha256": "e682c516e3b2027f8d174f89d5af39c30a787930d93ae940a071c75c999f053b",
+    "execution_count": null,
+    "errors": [],
+    "output_types": []
+  }
+]

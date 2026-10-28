@@ -1,0 +1,263 @@
+{
+  "started_utc": "2026-10-26T08:43:27.915316+00:00",
+  "python": "3.11.16",
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "cells": [
+    {
+      "cell_index": 3,
+      "execution_count": 1,
+      "source_sha256": "c4ac0b14efcb459bcc325b02822bdf16d16df7a9ff63610efa4d6274dc2b7625",
+      "seconds": 3.1950616659596562,
+      "kernel_rss_bytes": 324583424,
+      "status": "ok"
+    },
+    {
+      "cell_index": 5,
+      "execution_count": 2,
+      "source_sha256": "83cc1756cc9c6d3398a0351b012b1322727f252835e34ce130005b777e2b264f",
+      "seconds": 0.005394875013735145,
+      "kernel_rss_bytes": 324583424,
+      "status": "ok"
+    },
+    {
+      "cell_index": 7,
+      "execution_count": 3,
+      "source_sha256": "675c886520e80c9270c75d8f9ec1ff442221d54a3ff88276247c2ddbfe1be5c7",
+      "seconds": 0.16489983297651634,
+      "kernel_rss_bytes": 338460672,
+      "status": "ok"
+    },
+    {
+      "cell_index": 8,
+      "execution_count": 4,
+      "source_sha256": "468bd268267c6525812d85ffa8fb51b23993fa92b7927613cc7cabc98838497b",
+      "seconds": 0.004292790952604264,
+      "kernel_rss_bytes": 338460672,
+      "status": "ok"
+    },
+    {
+      "cell_index": 10,
+      "execution_count": 5,
+      "source_sha256": "2c3acec44f78c840a359fb64a9d03319203b23935b8af18344e5b26c0200efff",
+      "seconds": 0.004862625035457313,
+      "kernel_rss_bytes": 338493440,
+      "status": "ok"
+    },
+    {
+      "cell_index": 12,
+      "execution_count": 6,
+      "source_sha256": "120e80d1b097196a3647f40d3dda647de679cfa5c769b30df8434e2a7f053592",
+      "seconds": 0.0079769580042921,
+      "kernel_rss_bytes": 338870272,
+      "status": "ok"
+    },
+    {
+      "cell_index": 15,
+      "execution_count": 7,
+      "source_sha256": "5facd73516058ec21a5d286ce495962b3aa1981e8e0fc3f0700e16cc87dc2e4c",
+      "seconds": 0.004840417008381337,
+      "kernel_rss_bytes": 338886656,
+      "status": "ok"
+    },
+    {
+      "cell_index": 17,
+      "execution_count": 8,
+      "source_sha256": "5a3005b1d67c042e2ae33b5da2b935c726f3af7cd404420088e8dc398a30586a",
+      "seconds": 0.00404458399862051,
+      "kernel_rss_bytes": 338886656,
+      "status": "ok"
+    },
+    {
+      "cell_index": 20,
+      "execution_count": 9,
+      "source_sha256": "7df409677aeff4060e35ab048c95be993efdf7dd48012bf66627133c18ad1c58",
+      "seconds": 0.004212666011881083,
+      "kernel_rss_bytes": 338903040,
+      "status": "ok"
+    },
+    {
+      "cell_index": 23,
+      "execution_count": 10,
+      "source_sha256": "971ecdff8068746890dd41a496473d9b77ffd4facada93a924a64ecd916afa03",
+      "seconds": 1.5819296250119805,
+      "kernel_rss_bytes": 427540480,
+      "status": "ok"
+    },
+    {
+      "cell_index": 24,
+      "execution_count": 11,
+      "source_sha256": "36c2f68afce7e499699cdb7bd4b50695aa26b251960352602ccb753e021058d6",
+      "seconds": 0.4993811250315048,
+      "kernel_rss_bytes": 456392704,
+      "status": "ok"
+    },
+    {
+      "cell_index": 26,
+      "execution_count": 12,
+      "source_sha256": "858a625ebd4e097e6d48696d3b22368e5d0d068bcae0c44c118c5b60dbe81666",
+      "seconds": 0.11341616598656401,
+      "kernel_rss_bytes": 475267072,
+      "status": "ok"
+    },
+    {
+      "cell_index": 29,
+      "execution_count": 13,
+      "source_sha256": "d6428d1e2cfb8986688d702f2b5abebbf8924a2d6e67e00e2ff28a06ac5194d0",
+      "seconds": 0.004517749999649823,
+      "kernel_rss_bytes": 475267072,
+      "status": "ok"
+    },
+    {
+      "cell_index": 31,
+      "execution_count": 14,
+      "source_sha256": "64842d8e699b1ccae7ac81030cc30ab017adb984e698192547cb5735367eb03e",
+      "seconds": 0.0048364579561166465,
+      "kernel_rss_bytes": 475299840,
+      "status": "ok"
+    },
+    {
+      "cell_index": 34,
+      "execution_count": 15,
+      "source_sha256": "98e6d41abd06d88ab01f31d62964495a58a98446c70d4e99910f0b66cc627d37",
+      "seconds": 0.003575999988242984,
+      "kernel_rss_bytes": 475299840,
+      "status": "ok"
+    },
+    {
+      "cell_index": 35,
+      "execution_count": 16,
+      "source_sha256": "7bea928f1dc59fdf0e3df84575567969b639a2807608ac7a67a7a72ca29c2b83",
+      "seconds": 0.7769459160044789,
+      "kernel_rss_bytes": 563904512,
+      "status": "ok"
+    },
+    {
+      "cell_index": 37,
+      "execution_count": 17,
+      "source_sha256": "c38adc488a542b3e43c03e3bce49114be4f7e1957dfdc6b83c08f411943d62b3",
+      "seconds": 0.8387415829929523,
+      "kernel_rss_bytes": 1007370240,
+      "status": "ok"
+    },
+    {
+      "cell_index": 39,
+      "execution_count": 18,
+      "source_sha256": "6586591212ff9f9ac197abe6bd45ec0b26872cb5e891aab90f2eb077403c41f5",
+      "seconds": 0.011257666978053749,
+      "kernel_rss_bytes": 1007828992,
+      "status": "ok"
+    },
+    {
+      "cell_index": 41,
+      "execution_count": 19,
+      "source_sha256": "7f628e9aa7d84f0f1c12a6d9e958178840f9cce345d89bdb8bfe6016fdfb19c3",
+      "seconds": 0.382037749979645,
+      "kernel_rss_bytes": 1253916672,
+      "status": "ok"
+    },
+    {
+      "cell_index": 42,
+      "execution_count": 20,
+      "source_sha256": "2d445865e7e4a3d678b13833570819c94c4e02384ac7f51f9be1c2a13316c25a",
+      "seconds": 0.03628383402246982,
+      "kernel_rss_bytes": 1254096896,
+      "status": "ok"
+    },
+    {
+      "cell_index": 46,
+      "execution_count": 21,
+      "source_sha256": "66ce8bc9dce603c9e75de4080bef788f554ef48918baed8bfda5e6cc1088b244",
+      "seconds": 0.005291750014293939,
+      "kernel_rss_bytes": 1254096896,
+      "status": "ok"
+    },
+    {
+      "cell_index": 47,
+      "execution_count": 22,
+      "source_sha256": "11d660b8839441cb046fb203472518f4473fa02ac73f3c33507548d1945a3c23",
+      "seconds": 0.5274459579959512,
+      "kernel_rss_bytes": 1613250560,
+      "status": "ok"
+    },
+    {
+      "cell_index": 49,
+      "execution_count": 23,
+      "source_sha256": "e5f4e67c35f6c814fefb9384756029dd60b989c213dc6ac82eb8a09fbcd460ce",
+      "seconds": 0.00445804197806865,
+      "kernel_rss_bytes": 1613250560,
+      "status": "ok"
+    },
+    {
+      "cell_index": 51,
+      "execution_count": 24,
+      "source_sha256": "9372b5c24f85de185c3b1d5351ba19c2ee93d5b30390a852494a6ca9dfd653e2",
+      "seconds": 0.08464320900384337,
+      "kernel_rss_bytes": 1620131840,
+      "status": "ok"
+    },
+    {
+      "cell_index": 52,
+      "execution_count": 25,
+      "source_sha256": "45839112f27878d814e50678b2f3e4e694d466fb3321345be9a9675592a09c50",
+      "seconds": 0.8007911670138128,
+      "kernel_rss_bytes": 1649278976,
+      "status": "ok"
+    },
+    {
+      "cell_index": 57,
+      "execution_count": 26,
+      "source_sha256": "86a0b7e8c531d0fb17c3651e92d1bfd5cfd47d24f9249fbdfc69a2d75d1ba4e9",
+      "seconds": 0.004231375001836568,
+      "kernel_rss_bytes": 1649278976,
+      "status": "ok"
+    },
+    {
+      "cell_index": 58,
+      "execution_count": 27,
+      "source_sha256": "a631e3900be61ad1836ad9e22b8999ff2881b8908c28281d9635c0673fb3351a",
+      "seconds": 0.6588063340168446,
+      "kernel_rss_bytes": 540344320,
+      "status": "ok"
+    },
+    {
+      "cell_index": 61,
+      "execution_count": 28,
+      "source_sha256": "b1cc69dce7358f1fe538d859cf4dc542bbe1c076d574afc0bdf090d01670d8b0",
+      "seconds": 0.00489633297547698,
+      "kernel_rss_bytes": 540360704,
+      "status": "ok"
+    },
+    {
+      "cell_index": 63,
+      "execution_count": 29,
+      "source_sha256": "6b389a6ad3099244de1649357c46e879a30d0cf669f58de8b8f4b4021ec56b41",
+      "seconds": 9.707982208987232,
+      "kernel_rss_bytes": 703463424,
+      "status": "ok"
+    },
+    {
+      "cell_index": 65,
+      "execution_count": 30,
+      "source_sha256": "a31f290809c55e159afb18eede93c87adf0bbbb60e7a79fa0b655432fa9616dc",
+      "seconds": 0.006014249986037612,
+      "kernel_rss_bytes": 703660032,
+      "status": "ok"
+    },
+    {
+      "cell_index": 67,
+      "execution_count": 31,
+      "source_sha256": "0670b12a11e51af9add9be2ffa73450ed7691bde1fd58b48f09a3f6390d988dd",
+      "seconds": 5.7764194589690305,
+      "kernel_rss_bytes": 731611136,
+      "status": "ok"
+    },
+    {
+      "cell_index": 69,
+      "execution_count": 32,
+      "source_sha256": "78a168914838ad3df4b4f2ead284e20ff417c85af2701bc836ac5ea18232a480",
+      "seconds": 0.899322832992766,
+      "kernel_rss_bytes": 786432000,
+      "status": "ok"
+    }
+  ]
+}

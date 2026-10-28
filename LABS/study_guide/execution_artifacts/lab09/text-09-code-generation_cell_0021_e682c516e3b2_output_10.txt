@@ -1,0 +1,42 @@
+Llama-3.2-3B-Instruct bike def computeMaxTime(winner_time, avg_speed, track_type):
+    """
+    Compute the maximum time a winner can have on a track.
+
+    Args:
+    winner_time (float): The initial time of the winner.
+    avg_speed (float): The average speed of the winner.
+    track_type (str): The type of the track. Can be 'A', 'B', or 'C'.
+
+    Returns:
+    float: The maximum time the winner can have on the track.
+    """
+    
+    # Check if inputs are valid
+    if not isinstance(winner_time, (int, float)) or winner_time <= 0:
+        return 0
+    if not isinstance(avg_speed, (int, float)) or avg_speed <= 0:
+        return 0
+    if not isinstance(track_type, str) or len(track_type)!= 1 or not track_type.isupper():
+        return 0
+
+    # Define the track types and their corresponding time multipliers
+    track_types = {
+        'A': {'speed': 30,'multiplier': 0.05},
+        'B': {'speed': 35,'multiplier': 0.20},
+        'C': {'speed': float('inf'),'multiplier': 0.50}
+    }
+
+    # Check if the track type is valid
+    if track_type not in track_types:
+        return 0
+
+    # Calculate the multiplier based on the speed
+    if avg_speed <= track_types[track_type]['speed']:
+        multiplier = track_types[track_type]['multiplier']
+    else:
+        multiplier = 0
+
+    # Calculate the maximum time
+    max_time = winner_time * (1 + multiplier)
+
+    return max_time

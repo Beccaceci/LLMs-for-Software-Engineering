@@ -1,0 +1,335 @@
+--- notebook output 0 ---
+
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]
+
+--- notebook output 1 ---
+
+Loading checkpoint shards:  50%|#####     | 1/2 [00:10<00:10, 10.42s/it]
+
+--- notebook output 2 ---
+
+Loading checkpoint shards: 100%|##########| 2/2 [00:14<00:00,  6.53s/it]
+
+--- notebook output 3 ---
+
+Loading checkpoint shards: 100%|##########| 2/2 [00:14<00:00,  7.11s/it]
+
+--- notebook output 4 ---
+
+
+--- notebook output 5 ---
+/Users/nicolabeccaceci/.venvs/llms-lab09/lib/python3.11/site-packages/transformers/generation/configuration_utils.py:590: UserWarning: `do_sample` is set to `False`. However, `temperature` is set to `0.6` -- this flag is only used in sample-based generation modes. You should set `do_sample=True` or unset `temperature`.
+  warnings.warn(
+/Users/nicolabeccaceci/.venvs/llms-lab09/lib/python3.11/site-packages/transformers/generation/configuration_utils.py:595: UserWarning: `do_sample` is set to `False`. However, `top_p` is set to `0.9` -- this flag is only used in sample-based generation modes. You should set `do_sample=True` or unset `top_p`.
+  warnings.warn(
+
+--- notebook output 6 ---
+Llama-3.2-3B-Instruct railway def computeFee(basePrice, n_passengers, n_over18, n_under15):
+    """
+    Compute the fee for a group of passengers.
+
+    Args:
+    basePrice (float): The base price per passenger.
+    n_passengers (int): The total number of passengers.
+    n_over18 (int): The number of passengers aged 18 or older.
+    n_under15 (int): The number of passengers under 15.
+
+    Returns:
+    float: The total fee for the group.
+
+    Raises:
+    ValueError: If the inputs are invalid.
+    """
+
+    # Check if the inputs are valid
+    if not isinstance(basePrice, (int, float)) or basePrice < 0:
+        raise ValueError("Invalid base price")
+    if not isinstance(n_passengers, int) or n_passengers <= 0:
+        raise ValueError("Invalid number of passengers")
+    if not isinstance(n_over18, int) or n_over18 < 0:
+        raise ValueError("Invalid number of passengers over 18")
+    if not isinstance(n_under15, int) or n_under15 < 0:
+        raise ValueError("Invalid number of passengers under 15")
+
+    # Check if the counts are consistent with the group size
+    if n_passengers < 2 or n_passengers > 5:
+        raise ValueError("Invalid group size")
+    if n_over18 + n_under15 > n_passengers:
+        raise ValueError("Invalid counts")
+
+    # Compute the fee
+    fee = 0
+    for i in range(2, 6):
+        # Calculate the number of groups of i passengers
+        groups = n_passengers // i
+        # Calculate the number of passengers in each group
+        passengers_in_group = n_passengers % i
+        # Calculate the fee for each group
+        group_fee = basePrice * i
+        # Add the fee for the current group to the total fee
+        fee += group_fee * groups
+        # Add the fee for the remaining passengers to the total fee
+        fee += basePrice * passengers_in_group
+
+    # Subtract the fee for passengers under 15 from the total fee
+    fee -= n_under15 * basePrice
+
+    return fee
+
+--- notebook output 7 ---
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+
+--- notebook output 8 ---
+Codex_railway {'Passed': 13, 'Failed': 0, 'Errors': 0, 'Skipped': 0, 'FunctionalCorrectness': 1.0, 'pytest_exit_code': 0, 'SourceSHA256': 'e9f6a232bfeb302e7537f2a9a1acad1fee1e2b8191ed0f0d2f42735e73f3b34e'}
+Llama-3.2-3B-Instruct_railway {'Passed': 8, 'Failed': 5, 'Errors': 0, 'Skipped': 0, 'FunctionalCorrectness': 0.6153846153846154, 'pytest_exit_code': 1, 'SourceSHA256': 'b9a1dfa0a90811cc69044a556f33dd79300d15a7436991950abb9dd19af47e45'}
+
+--- notebook output 9 ---
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+
+--- notebook output 10 ---
+Llama-3.2-3B-Instruct bike def computeMaxTime(winner_time, avg_speed, track_type):
+    """
+    Compute the maximum time a winner can have on a track.
+
+    Args:
+    winner_time (float): The initial time of the winner.
+    avg_speed (float): The average speed of the winner.
+    track_type (str): The type of the track. Can be 'A', 'B', or 'C'.
+
+    Returns:
+    float: The maximum time the winner can have on the track.
+    """
+    
+    # Check if inputs are valid
+    if not isinstance(winner_time, (int, float)) or winner_time <= 0:
+        return 0
+    if not isinstance(avg_speed, (int, float)) or avg_speed <= 0:
+        return 0
+    if not isinstance(track_type, str) or len(track_type)!= 1 or not track_type.isupper():
+        return 0
+
+    # Define the track types and their corresponding time multipliers
+    track_types = {
+        'A': {'speed': 30,'multiplier': 0.05},
+        'B': {'speed': 35,'multiplier': 0.20},
+        'C': {'speed': float('inf'),'multiplier': 0.50}
+    }
+
+    # Check if the track type is valid
+    if track_type not in track_types:
+        return 0
+
+    # Calculate the multiplier based on the speed
+    if avg_speed <= track_types[track_type]['speed']:
+        multiplier = track_types[track_type]['multiplier']
+    else:
+        multiplier = 0
+
+    # Calculate the maximum time
+    max_time = winner_time * (1 + multiplier)
+
+    return max_time
+
+--- notebook output 11 ---
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+
+--- notebook output 12 ---
+Codex_bike {'Passed': 19, 'Failed': 0, 'Errors': 0, 'Skipped': 0, 'FunctionalCorrectness': 1.0, 'pytest_exit_code': 0, 'SourceSHA256': 'afb17cd190a85eeafcdef8771f27df4eebfd52cc37a85b288dc8f8bcd0d77dcb'}
+
+--- notebook output 13 ---
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+
+--- notebook output 14 ---
+Llama-3.2-3B-Instruct_bike {'Passed': 11, 'Failed': 8, 'Errors': 0, 'Skipped': 0, 'FunctionalCorrectness': 0.5789473684210527, 'pytest_exit_code': 1, 'SourceSHA256': '46eb38bb921c9c8d7d5b5369f63add95f221177508bfd403950c840d81b0ba67'}
+
+--- notebook output 15 ---
+Qwen2.5-Coder-1.5B-Instruct railway def compute_fee(basePrice, n_passengers, n_over18, n_under15):
+    if not (0 <= basePrice <= 100) or not (0 <= n_passengers <= 100) or not (0 <= n_over18 <= 100) or not (0 <= n_under15 <= 100):
+        raise ValueError("Invalid input values")
+    
+    if n_passengers > 5:
+        raise ValueError("Group size cannot be more than 5")
+    
+    if n_over18 + n_under15 != n_passengers:
+        raise ValueError("Counts must match the number of passengers")
+    
+    if n_under15 >= n_over18:
+        return basePrice * n_passengers
+    
+    return basePrice * n_over18 + (basePrice / 2) * n_under15
+
+--- notebook output 16 ---
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+
+--- notebook output 17 ---
+Codex_railway {'Passed': 13, 'Failed': 0, 'Errors': 0, 'Skipped': 0, 'FunctionalCorrectness': 1.0, 'pytest_exit_code': 0, 'SourceSHA256': 'e9f6a232bfeb302e7537f2a9a1acad1fee1e2b8191ed0f0d2f42735e73f3b34e'}
+
+--- notebook output 18 ---
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+
+--- notebook output 19 ---
+Llama-3.2-3B-Instruct_railway {'Passed': 8, 'Failed': 5, 'Errors': 0, 'Skipped': 0, 'FunctionalCorrectness': 0.6153846153846154, 'pytest_exit_code': 1, 'SourceSHA256': 'b9a1dfa0a90811cc69044a556f33dd79300d15a7436991950abb9dd19af47e45'}
+
+--- notebook output 20 ---
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+
+--- notebook output 21 ---
+Qwen2.5-Coder-1.5B-Instruct_railway {'Passed': 0, 'Failed': 0, 'Errors': 1, 'Skipped': 0, 'FunctionalCorrectness': 0.0, 'pytest_exit_code': 2, 'SourceSHA256': '02d35fe69e71af1eb973447b507a24ffad4082b5a462bab6d3058e35e2a23dea'}
+
+--- notebook output 22 ---
+Qwen2.5-Coder-1.5B-Instruct bike def computeMaxTime(winner_time, avg_speed, track_type):
+    if not isinstance(winner_time, (int, float)) or winner_time <= 0:
+        return 0
+    if not isinstance(avg_speed, (int, float)) or avg_speed <= 0:
+        return 0
+    if track_type not in ['A', 'B', 'C']:
+        return 0
+    
+    if track_type == 'A':
+        if avg_speed <= 30:
+            return winner_time * 1.05
+        elif avg_speed <= 35:
+            return winner_time * 1.10
+        else:
+            return winner_time * 1.15
+    elif track_type == 'B':
+        if avg_speed <= 30:
+            return winner_time * 1.20
+        elif avg_speed <= 35:
+            return winner_time * 1.25
+        else:
+            return winner_time * 1.30
+    else:  # track_type == 'C'
+        return winner_time * 1.50
+
+--- notebook output 23 ---
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+
+--- notebook output 24 ---
+Codex_bike {'Passed': 19, 'Failed': 0, 'Errors': 0, 'Skipped': 0, 'FunctionalCorrectness': 1.0, 'pytest_exit_code': 0, 'SourceSHA256': 'afb17cd190a85eeafcdef8771f27df4eebfd52cc37a85b288dc8f8bcd0d77dcb'}
+
+--- notebook output 25 ---
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+
+--- notebook output 26 ---
+Llama-3.2-3B-Instruct_bike {'Passed': 11, 'Failed': 8, 'Errors': 0, 'Skipped': 0, 'FunctionalCorrectness': 0.5789473684210527, 'pytest_exit_code': 1, 'SourceSHA256': '46eb38bb921c9c8d7d5b5369f63add95f221177508bfd403950c840d81b0ba67'}
+
+--- notebook output 27 ---
+Qwen2.5-Coder-1.5B-Instruct_bike {'Passed': 17, 'Failed': 2, 'Errors': 0, 'Skipped': 0, 'FunctionalCorrectness': 0.8947368421052632, 'pytest_exit_code': 1, 'SourceSHA256': 'd03228a1692906b3aa497b88a68ce5eadc3df693592198e6da93c10058c8681e'}
+{
+  "railway": {
+    "Codex": {
+      "CC": 13,
+      "MI": 57.69893707064606,
+      "LOC": 12,
+      "Comments": 0,
+      "Passed": 13,
+      "Failed": 0,
+      "Errors": 0,
+      "Skipped": 0,
+      "FunctionalCorrectness": 1.0,
+      "pytest_exit_code": 0,
+      "SourceSHA256": "e9f6a232bfeb302e7537f2a9a1acad1fee1e2b8191ed0f0d2f42735e73f3b34e"
+    },
+    "Llama-3.2-3B-Instruct": {
+      "CC": 13,
+      "MI": 78.73755739125758,
+      "LOC": 51,
+      "Comments": 9,
+      "Passed": 8,
+      "Failed": 5,
+      "Errors": 0,
+      "Skipped": 0,
+      "FunctionalCorrectness": 0.6153846153846154,
+      "pytest_exit_code": 1,
+      "SourceSHA256": "b9a1dfa0a90811cc69044a556f33dd79300d15a7436991950abb9dd19af47e45"
+    },
+    "Qwen2.5-Coder-1.5B-Instruct": {
+      "CC": 8,
+      "MI": 59.85280151682359,
+      "LOC": 14,
+      "Comments": 0,
+      "Passed": 0,
+      "Failed": 0,
+      "Errors": 1,
+      "Skipped": 0,
+      "FunctionalCorrectness": 0.0,
+      "pytest_exit_code": 2,
+      "SourceSHA256": "02d35fe69e71af1eb973447b507a24ffad4082b5a462bab6d3058e35e2a23dea"
+    }
+  },
+  "bike": {
+    "Codex": {
+      "CC": 10,
+      "MI": 59.01647343290267,
+      "LOC": 12,
+      "Comments": 0,
+      "Passed": 19,
+      "Failed": 0,
+      "Errors": 0,
+      "Skipped": 0,
+      "FunctionalCorrectness": 1.0,
+      "pytest_exit_code": 0,
+      "SourceSHA256": "afb17cd190a85eeafcdef8771f27df4eebfd52cc37a85b288dc8f8bcd0d77dcb"
+    },
+    "Llama-3.2-3B-Instruct": {
+      "CC": 10,
+      "MI": 80.51480541410928,
+      "LOC": 42,
+      "Comments": 5,
+      "Passed": 11,
+      "Failed": 8,
+      "Errors": 0,
+      "Skipped": 0,
+      "FunctionalCorrectness": 0.5789473684210527,
+      "pytest_exit_code": 1,
+      "SourceSHA256": "46eb38bb921c9c8d7d5b5369f63add95f221177508bfd403950c840d81b0ba67"
+    },
+    "Qwen2.5-Coder-1.5B-Instruct": {
+      "CC": 12,
+      "MI": 63.802904183778594,
+      "LOC": 24,
+      "Comments": 1,
+      "Passed": 17,
+      "Failed": 2,
+      "Errors": 0,
+      "Skipped": 0,
+      "FunctionalCorrectness": 0.8947368421052632,
+      "pytest_exit_code": 1,
+      "SourceSHA256": "d03228a1692906b3aa497b88a68ce5eadc3df693592198e6da93c10058c8681e"
+    }
+  }
+}
+
+--- notebook output 28 ---
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)

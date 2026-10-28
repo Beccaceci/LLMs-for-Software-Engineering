@@ -1,0 +1,35 @@
+results
+gpt2-medical-finetuned
+hf_token.txt
+model_answers.json
+augmented_model.onnx
+static_quantized_model
+
+# OS files
+.DS_Store
+
+# LaTeX build artifacts
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.nav
+*.out
+*.run.xml
+*.snm
+*.synctex.gz
+*.toc
+*.vrb
+study_guide/chapters/*.aux
+study_guide/chapters/*.log
+study_guide/chapters/*.out
+study_guide/standalone/*/*.aux
+study_guide/standalone/*/*.log
+study_guide/standalone/*/*.fls
+study_guide/standalone/*/*.fdb_latexmk
+study_guide/standalone/*/*.out
+study_guide/standalone/*/*.toc
+study_guide/standalone/*/*.synctex.gz

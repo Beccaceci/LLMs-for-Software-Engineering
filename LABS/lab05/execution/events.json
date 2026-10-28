@@ -1,0 +1,18 @@
+{
+  "events": [
+    {
+      "notebook": "text-02-LoRA.ipynb",
+      "cell_index": 19,
+      "event": "Initial preparation was interrupted with SIGINT while importing metrics after a slow online dataset-metadata lookup.",
+      "resolution": "Reran preparation from a clean kernel with HF_HUB_OFFLINE=1 and HF_DATASETS_OFFLINE=1, reusing cached BERT/IMDB. Cell19 and all selected preparation cells then executed successfully.",
+      "historical_traceback_retained": false,
+      "note": "The initial lora-preparation.log was replaced by the clean rerun log. This record preserves the interruption history without reconstructing its traceback."
+    },
+    {
+      "notebook": "text-01-quantization.ipynb",
+      "cell_index": 40,
+      "event": "Missing local approved Hugging Face credentials.",
+      "resolution": "Pending local user login. Actual error output remains in notebook and quantization.log."
+    }
+  ]
+}

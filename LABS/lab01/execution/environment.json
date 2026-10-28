@@ -1,0 +1,11 @@
+{
+  "python": "3.11.16",
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "torch": "2.8.0",
+  "torchvision": "0.23.0",
+  "nbclient": "0.11.0",
+  "mps_available": true,
+  "dot": "/opt/homebrew/bin/dot",
+  "light_execution_device": "cpu",
+  "full_execution_default": "mps when available"
+}

@@ -1,0 +1,2 @@
+Codex_railway {'Passed': 13, 'Failed': 0, 'Errors': 0, 'Skipped': 0, 'FunctionalCorrectness': 1.0, 'pytest_exit_code': 0, 'SourceSHA256': 'e9f6a232bfeb302e7537f2a9a1acad1fee1e2b8191ed0f0d2f42735e73f3b34e'}
+Llama-3.2-3B-Instruct_railway {'Passed': 8, 'Failed': 5, 'Errors': 0, 'Skipped': 0, 'FunctionalCorrectness': 0.6153846153846154, 'pytest_exit_code': 1, 'SourceSHA256': 'b9a1dfa0a90811cc69044a556f33dd79300d15a7436991950abb9dd19af47e45'}

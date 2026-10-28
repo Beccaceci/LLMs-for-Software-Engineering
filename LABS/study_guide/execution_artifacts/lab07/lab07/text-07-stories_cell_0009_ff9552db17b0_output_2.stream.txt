@@ -1,0 +1,7 @@
+1. Add detailed hike descriptions.
+2. Link parking lots to trails.
+3. Upload pictures of huts.
+4. Connect huts to hikes.
+
+
+Extracting stories for role Platform Managers

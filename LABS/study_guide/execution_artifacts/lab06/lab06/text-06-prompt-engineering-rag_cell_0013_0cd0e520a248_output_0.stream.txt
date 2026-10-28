@@ -1,0 +1,2 @@
+{".topic": "AC Milan football club",".explanation":"Italian professional football club history and achievements"}
+The generated response did not satisfy the requested JSON schema: AssertionError

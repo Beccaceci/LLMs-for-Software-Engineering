@@ -1,0 +1,11 @@
+1. Browse hiking trails.
+2. Filter hiking trails.
+3. View detailed trail descriptions.
+4. Record fitness parameters.
+5. Record hike progress.
+6. Share live location.
+7. Plan group hikes.
+8. Track hikes.
+
+
+Extracting stories for role Local Guides

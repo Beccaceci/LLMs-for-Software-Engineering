@@ -1,0 +1,2 @@
+Learned weights: tensor([[2.0017]])
+Learned biases: tensor([1.0014])

@@ -1,0 +1,4 @@
+Loss: 9.0
+Gradients:
+dL/d(theta1): tensor(18.)
+dL/d(theta2): tensor(12.)

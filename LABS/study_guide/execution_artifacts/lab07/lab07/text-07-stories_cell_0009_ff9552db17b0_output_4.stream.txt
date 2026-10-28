@@ -1,0 +1,5 @@
+1. Add or update hut information.
+2. Upload pictures of huts.
+3. Describe hut facilities.
+4. Monitor and report trail conditions.
+5. Communicate situational updates to hikers.

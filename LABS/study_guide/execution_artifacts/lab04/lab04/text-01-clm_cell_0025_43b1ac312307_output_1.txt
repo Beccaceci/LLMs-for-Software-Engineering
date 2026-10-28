@@ -1,0 +1,2 @@
+Collator check passed: attended EOS targets remain; only padded labels are ignored.
+Example batch tensor shapes: {'input_ids': (2, 2), 'attention_mask': (2, 2), 'labels': (2, 2)}

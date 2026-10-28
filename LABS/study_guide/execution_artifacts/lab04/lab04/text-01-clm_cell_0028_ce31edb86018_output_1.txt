@@ -1,0 +1,8 @@
+Progress: 12/12
+[12/12 07:43, Epoch 0/1]
+Step
+Training Loss
+6
+3.412100
+12
+3.418800

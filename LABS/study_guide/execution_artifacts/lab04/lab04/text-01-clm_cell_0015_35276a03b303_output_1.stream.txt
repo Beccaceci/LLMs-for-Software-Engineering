@@ -1,0 +1,2 @@
+{'train_runtime': 2878.7333, 'train_samples_per_second': 0.347, 'train_steps_per_second': 0.058, 'total_flos': 520493727744000.0, 'train_loss': 3.3559414047792733, 'epoch': 0.996}
+Fixed-padding training: 2879.03 seconds

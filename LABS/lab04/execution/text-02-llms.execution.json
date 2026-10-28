@@ -1,0 +1,81 @@
+{
+  "run_id": "20261026T140920.543088Z-4f9ec9f4",
+  "notebook": "text-02-llms.ipynb",
+  "started_utc": "2026-10-26T14:09:20.542814+00:00",
+  "python": "3.13.9",
+  "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+  "cells": [
+    {
+      "cell_index": 3,
+      "source_sha256": "d4b466cc38181a760d8844e3c5f398b1fff4571ebbf142828d9c53d2cc4fc838",
+      "seconds": 1.669897084000013,
+      "status": "ok"
+    },
+    {
+      "cell_index": 4,
+      "source_sha256": "819bd4d00231c9f4e92d1b37afc057c1e0cdc5ed8d988d9f5214fc269a6ad8fb",
+      "seconds": 0.2757962079999743,
+      "status": "ok"
+    },
+    {
+      "cell_index": 8,
+      "source_sha256": "56c0735d556b32107c6852ec9e1d252e38b4d46fde9a9cb22cc10c649c213e44",
+      "seconds": 173.62568670899987,
+      "status": "ok"
+    },
+    {
+      "cell_index": 10,
+      "source_sha256": "0502fff72fa6c134e2a22f8012692617b22d8abe30556e43b2131dbfd2beb6b2",
+      "seconds": 14.653791834000003,
+      "status": "ok"
+    },
+    {
+      "cell_index": 12,
+      "source_sha256": "0d10274c4cdca8af2b670b31655e7b7fa58c06ced63612fa8deb32deb37bdab4",
+      "seconds": 0.005049249999956373,
+      "status": "ok"
+    },
+    {
+      "cell_index": 14,
+      "source_sha256": "ddbdd263da0ce66466f8505965e3b072cf4328961062f3a042c7c455763e9f1c",
+      "seconds": 0.005069583000022249,
+      "status": "ok"
+    },
+    {
+      "cell_index": 15,
+      "source_sha256": "bbe47852e540dac0d2ef1e49d8d88a771033861b316b94863bda105f042c069e",
+      "seconds": 0.003998458000069149,
+      "status": "ok"
+    },
+    {
+      "cell_index": 17,
+      "source_sha256": "d80dbd1629c28d5e0604989ebe46f45b144e575cc7ecb2d0146d6920d8eb08b2",
+      "seconds": 12.895266624999977,
+      "status": "ok"
+    },
+    {
+      "cell_index": 19,
+      "source_sha256": "5fe9a0edd6cf2bc49bf93b380feb4cbd2553c9219b9908b06f4a52e1c3d2d8b0",
+      "seconds": 176.69353037499968,
+      "status": "ok"
+    },
+    {
+      "cell_index": 21,
+      "source_sha256": "9f6e6aee8660c79b3b89251cce515c0d2d7b8177f57c66560a03a076c792db21",
+      "seconds": 0.591123250000237,
+      "status": "ok"
+    },
+    {
+      "cell_index": 24,
+      "source_sha256": "9c3416c7a2679742e2a3fe5e80efcd31fa8482fdbf0201aa486fb118bcd80a54",
+      "seconds": 3.7116191250001975,
+      "status": "ok"
+    },
+    {
+      "cell_index": 26,
+      "source_sha256": "5fc77adf50bf2b98fe6df6ec6a476ca779a47b1ca83e8be60aaac069b339e4f5",
+      "seconds": 2.7302516250001645,
+      "status": "ok"
+    }
+  ]
+}

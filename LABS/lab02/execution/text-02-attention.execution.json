@@ -1,0 +1,130 @@
+{
+  "started_utc": "2026-10-25T22:17:27.177104+00:00",
+  "python": "3.11.16",
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "backend": "CPU",
+  "offline_cache": true,
+  "ipython_output_cache": false,
+  "cells": [
+    {
+      "cell_index": 0,
+      "source_sha256": "c7605496e681fa029db1ce9cc63814d7c3c1da3b163977a0e88e927238453521",
+      "execution_count": 1,
+      "seconds": 1.814328457985539,
+      "kernel_rss_bytes": 246382592,
+      "status": "ok"
+    },
+    {
+      "cell_index": 7,
+      "source_sha256": "bcc748ce8bcb20e94177f9ba23b6b11960edd20f9007b67d06d6f77c34ce6626",
+      "execution_count": 2,
+      "seconds": 0.008767208026256412,
+      "kernel_rss_bytes": 246562816,
+      "status": "ok"
+    },
+    {
+      "cell_index": 8,
+      "source_sha256": "0659c695ad4eb2e0bab31bc205744903a9513d6afd5e1bb8239eb60e1d842bb4",
+      "execution_count": 3,
+      "seconds": 0.14456695900298655,
+      "kernel_rss_bytes": 253640704,
+      "status": "ok"
+    },
+    {
+      "cell_index": 14,
+      "source_sha256": "6416c9b705371415df4c0145a1a54c4a36ba52b7cda3f6422b9f7ff6b604a18f",
+      "execution_count": 4,
+      "seconds": 0.00831733300583437,
+      "kernel_rss_bytes": 253706240,
+      "status": "ok"
+    },
+    {
+      "cell_index": 18,
+      "source_sha256": "bdeabb332309d5b7d123166ecdaeab91cb22fc9a66a8ad219aad143610936eba",
+      "execution_count": 5,
+      "seconds": 0.007862792001105845,
+      "kernel_rss_bytes": 253755392,
+      "status": "ok"
+    },
+    {
+      "cell_index": 21,
+      "source_sha256": "e543749ea8bcc616c74f09ef67d5617d41b3e073cbaefeec39cb07d5d4888253",
+      "execution_count": 6,
+      "seconds": 0.00900562497554347,
+      "kernel_rss_bytes": 253788160,
+      "status": "ok"
+    },
+    {
+      "cell_index": 24,
+      "source_sha256": "fee2b777ad86ffa3246e1db49e8f0aa90f048ac5eed9fbe7add3ef43a0d1c85f",
+      "execution_count": 7,
+      "seconds": 0.009168999968096614,
+      "kernel_rss_bytes": 253804544,
+      "status": "ok"
+    },
+    {
+      "cell_index": 25,
+      "source_sha256": "83f26c5a98a28709fc969c53cb841b24519f62df57b5985b02bd55a2a0adfe64",
+      "execution_count": 8,
+      "seconds": 0.010299084009602666,
+      "kernel_rss_bytes": 254722048,
+      "status": "ok"
+    },
+    {
+      "cell_index": 26,
+      "source_sha256": "539f9864b693874e59f41399fb3185f6543156fa9a3a07e896c25482731ecd96",
+      "execution_count": 9,
+      "seconds": 0.01030383404577151,
+      "kernel_rss_bytes": 254803968,
+      "status": "ok"
+    },
+    {
+      "cell_index": 27,
+      "source_sha256": "f4799b1200278eac606bc2403f08585b0458c4552ac67d32181c7f44cd0a4086",
+      "execution_count": 10,
+      "seconds": 0.00583970797015354,
+      "kernel_rss_bytes": 254820352,
+      "status": "ok"
+    },
+    {
+      "cell_index": 28,
+      "source_sha256": "58fb73af413908863ac0de2ddb0537b7ac34502b0a8309ae9b47f1da8abb7dac",
+      "execution_count": 11,
+      "seconds": 12.528409582970198,
+      "kernel_rss_bytes": 408076288,
+      "status": "ok"
+    },
+    {
+      "cell_index": 31,
+      "source_sha256": "760501eeddcc2dd6efe222f052f9155c5959468ccd83f4b13b1a6ff3ed94355c",
+      "execution_count": 12,
+      "seconds": 0.14805054204771295,
+      "kernel_rss_bytes": 408879104,
+      "status": "ok"
+    },
+    {
+      "cell_index": 36,
+      "source_sha256": "8f6f5c45f189d950949ee5840b4914f295fc921bd3b44ff6e382e14344ec3de3",
+      "execution_count": 13,
+      "seconds": 0.008778167015407234,
+      "kernel_rss_bytes": 408911872,
+      "status": "ok"
+    },
+    {
+      "cell_index": 37,
+      "source_sha256": "6a78cc503e6f721605d0da94a1884defaf6abb065490e350aa399b04cd622562",
+      "execution_count": 14,
+      "seconds": 11.888687084021512,
+      "kernel_rss_bytes": 413220864,
+      "status": "ok"
+    },
+    {
+      "cell_index": 38,
+      "source_sha256": "760501eeddcc2dd6efe222f052f9155c5959468ccd83f4b13b1a6ff3ed94355c",
+      "execution_count": 15,
+      "seconds": 0.15642708400264382,
+      "kernel_rss_bytes": 414253056,
+      "status": "ok"
+    }
+  ]
+}

@@ -1,0 +1,3 @@
+# Laboratory 05 lecture source
+
+No matching Laboratory 05 recording or transcript was supplied in the available course files at the time this solution was prepared. The Whisper library contains Laboratory 04 and one dated lecture whose contents concern computer-vision object detection and segmentation; that recording is unrelated and was excluded. As requested by the course workflow, the professor's promised recording can be integrated later. The solution's exact code, numerical results, and explanations are therefore grounded in the notebooks and their recorded executions; no lecture claims are inferred.

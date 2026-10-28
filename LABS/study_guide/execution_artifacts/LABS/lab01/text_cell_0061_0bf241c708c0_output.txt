@@ -1,0 +1,5 @@
+Epoch [1/5], Loss: 1.7461
+Epoch [2/5], Loss: 1.4103
+Epoch [3/5], Loss: 1.2676
+Epoch [4/5], Loss: 1.1643
+Epoch [5/5], Loss: 1.0799

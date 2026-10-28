@@ -1,0 +1,1 @@
+trainable params: 1,328,642 || all params: 110,812,420 || trainable%: 1.1990

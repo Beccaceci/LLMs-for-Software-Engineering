@@ -1,0 +1,46 @@
+Few-shot response: [
+  {
+    "name": "",
+    "description": "AC Milan",
+    "type":"club"
+  },
+  {
+      "name" : "San Siro",
+      "description" : null,
+      "type" :"stadium"
+  }
+  ,
+  {
+        "name":"Serie A",
+        "description":"",
+        "type ":"league"
+  } , 
+  {
+          "name":["Inter Milan","Derby della Madonna"],
+          "description":[null,null],
+          "type":["team","derby"]
+  } ,
+
+  {
+            "name":
+            [
+              "Piero Pirell",
+              "Silvio Brelusconi"
+            ],
+            "description":
+
+            [
+                "chairman",
+                "president"
+            ]
+            ,"type":["person","person"]
+  }
+
+  , 
+   {
+       "name":[{"name":"Lombardy"},{"name":"Italy"}],
+       "description":[{
+           "region",
+           "country"
+       },"type":["region","country"]
+   }

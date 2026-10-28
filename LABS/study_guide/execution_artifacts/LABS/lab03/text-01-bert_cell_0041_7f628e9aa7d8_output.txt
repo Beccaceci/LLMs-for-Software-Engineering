@@ -1,0 +1,17 @@
+Loading weights:   0%|          | 0/201 [00:00<?, ?it/s]
+
+[transformers] [1mBertForNextSentencePrediction LOAD REPORT[0m from: bert-base-uncased
+Key                                        | Status     |  | 
+-------------------------------------------+------------+--+-
+cls.predictions.transform.dense.bias       | UNEXPECTED |  | 
+cls.predictions.transform.LayerNorm.bias   | UNEXPECTED |  | 
+cls.predictions.transform.LayerNorm.weight | UNEXPECTED |  | 
+cls.predictions.bias                       | UNEXPECTED |  | 
+cls.predictions.transform.dense.weight     | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+
+
+Tokens: ['[CLS]', 'arthur', 'conan', 'doyle', 'is', 'my', 'favorite', 'author', '[SEP]', 'i', 'read', 'all', 'of', 'his', 'books', '[SEP]']
+True: 0.999989, False: 0.000011

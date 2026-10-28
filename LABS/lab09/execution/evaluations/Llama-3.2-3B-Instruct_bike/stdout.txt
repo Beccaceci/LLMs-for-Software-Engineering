@@ -1,0 +1,78 @@
+.FFF.FFF........FF.                                                      [100%]
+=================================== FAILURES ===================================
+________________________ test_boundaries[A-30.001-110] _________________________
+test_cases_03.py:4: in test_boundaries
+    def test_boundaries(category,speed,expected): assert computeMaxTime(100,speed,category) == pytest.approx(expected)
+                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   assert 100 == 110 ± 1.1e-04
+E     
+E     comparison failed
+E     Obtained: 100
+E     Expected: 110 ± 1.1e-04
+__________________________ test_boundaries[A-35-110] ___________________________
+test_cases_03.py:4: in test_boundaries
+    def test_boundaries(category,speed,expected): assert computeMaxTime(100,speed,category) == pytest.approx(expected)
+                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   assert 100 == 110 ± 1.1e-04
+E     
+E     comparison failed
+E     Obtained: 100
+E     Expected: 110 ± 1.1e-04
+________________________ test_boundaries[A-35.001-115] _________________________
+test_cases_03.py:4: in test_boundaries
+    def test_boundaries(category,speed,expected): assert computeMaxTime(100,speed,category) == pytest.approx(expected)
+                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   assert 100 == 115 ± 1.1e-04
+E     
+E     comparison failed
+E     Obtained: 100
+E     Expected: 115 ± 1.1e-04
+________________________ test_boundaries[B-30.001-125] _________________________
+test_cases_03.py:4: in test_boundaries
+    def test_boundaries(category,speed,expected): assert computeMaxTime(100,speed,category) == pytest.approx(expected)
+                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   assert 120.0 == 125 ± 1.3e-04
+E     
+E     comparison failed
+E     Obtained: 120.0
+E     Expected: 125 ± 1.3e-04
+__________________________ test_boundaries[B-35-125] ___________________________
+test_cases_03.py:4: in test_boundaries
+    def test_boundaries(category,speed,expected): assert computeMaxTime(100,speed,category) == pytest.approx(expected)
+                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   assert 120.0 == 125 ± 1.3e-04
+E     
+E     comparison failed
+E     Obtained: 120.0
+E     Expected: 125 ± 1.3e-04
+________________________ test_boundaries[B-35.001-130] _________________________
+test_cases_03.py:4: in test_boundaries
+    def test_boundaries(category,speed,expected): assert computeMaxTime(100,speed,category) == pytest.approx(expected)
+                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   assert 100 == 130 ± 1.3e-04
+E     
+E     comparison failed
+E     Obtained: 100
+E     Expected: 130 ± 1.3e-04
+_____________________________ test_invalid[args6] ______________________________
+test_cases_03.py:6: in test_invalid
+    def test_invalid(args): assert computeMaxTime(*args) == 0
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AssertionError: assert nan == 0
+E    +  where nan = computeMaxTime(*(nan, 30, 'A'))
+_____________________________ test_invalid[args7] ______________________________
+test_cases_03.py:6: in test_invalid
+    def test_invalid(args): assert computeMaxTime(*args) == 0
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AssertionError: assert 105.0 == 0
+E    +  where 105.0 = computeMaxTime(*(100, True, 'A'))
+=========================== short test summary info ============================
+FAILED test_cases_03.py::test_boundaries[A-30.001-110] - assert 100 == 110 ± ...
+FAILED test_cases_03.py::test_boundaries[A-35-110] - assert 100 == 110 ± 1.1e-04
+FAILED test_cases_03.py::test_boundaries[A-35.001-115] - assert 100 == 115 ± ...
+FAILED test_cases_03.py::test_boundaries[B-30.001-125] - assert 120.0 == 125 ...
+FAILED test_cases_03.py::test_boundaries[B-35-125] - assert 120.0 == 125 ± 1....
+FAILED test_cases_03.py::test_boundaries[B-35.001-130] - assert 100 == 130 ± ...
+FAILED test_cases_03.py::test_invalid[args6] - AssertionError: assert nan == 0
+FAILED test_cases_03.py::test_invalid[args7] - AssertionError: assert 105.0 == 0
+8 failed, 11 passed in 0.03s

@@ -1,0 +1,1 @@
+As a visitor, I want to browse hiking trails, so that I can explore and discover suitable routes for my hiking experience.

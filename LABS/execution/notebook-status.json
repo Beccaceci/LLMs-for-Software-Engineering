@@ -1,0 +1,2616 @@
+[
+  {
+    "path": "lab01/text.ipynb",
+    "notebook_sha256": "dcfed7d7f88052cf2fee6e912ee178d85b1c82cc4d4c6332d7a50e290dc93b97",
+    "code_cell_count": 50,
+    "executed_cell_count": 0,
+    "unexecuted_cells": [
+      2,
+      4,
+      6,
+      11,
+      12,
+      14,
+      16,
+      18,
+      20,
+      22,
+      24,
+      25,
+      26,
+      28,
+      29,
+      31,
+      33,
+      34,
+      37,
+      39,
+      42,
+      44,
+      46,
+      47,
+      48,
+      49,
+      50,
+      53,
+      55,
+      58,
+      59,
+      60,
+      61,
+      62,
+      63,
+      65,
+      66,
+      67,
+      68,
+      69,
+      71,
+      72,
+      74,
+      75,
+      76,
+      77,
+      78,
+      80,
+      83,
+      84
+    ],
+    "error_cells": [],
+    "ellipsis_cells": [],
+    "saved_execution_complete": false,
+    "cells": [
+      {
+        "index": 2,
+        "source_sha256": "0b7af975ee4a7461c0cb374c4b9a5b40a672fdbafa86044b9767b977dd6c5c46",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 4,
+        "source_sha256": "be5725e90589047af22ffc18ebfb631aaf29184d54875968e76187a766d1fa20",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 6,
+        "source_sha256": "ead00a503e73303c8a279a5d4441dfc83eaea2675ea1e73f04c8cd05326d4a14",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 11,
+        "source_sha256": "687027ed0490a416f9c4e6cd164db05c0c2c89670888dd6211ad0c510bd042c0",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 12,
+        "source_sha256": "5439c832e381eb45c62221bdf7e324e2abdc80918ad771c3d2faffc5088e6901",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 14,
+        "source_sha256": "f62cfce442339a3c44e4a666ac85e4e66ff7dbbde94a6a2c71ce783052d5791e",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 16,
+        "source_sha256": "501ea74e8a436c42f49792111c573bd1caac8c21c9a10e988f90e0d736ada5a1",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 18,
+        "source_sha256": "e02a03fba8efdb9e38923dc815d34ec5a199d95419e3c53e3a920b54710b7350",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 20,
+        "source_sha256": "70fc8a40d38aa28c7953e4d8972ecde5bb96d414208618e84e0bff75d8850e8f",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 22,
+        "source_sha256": "11b96de8ae0588049016bcb87802d29ae4846f8e7e417246810bb71a7f7dd679",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 24,
+        "source_sha256": "8dff03cd947a1ce8cbd7771702fef5c1cfa14c255447aabd738a8201470ea819",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 25,
+        "source_sha256": "22e8be101ae2a4417108e8be6c27f66b4626c86f8db4945d72fc4a3d959cab9d",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 26,
+        "source_sha256": "504b5a2f1e1e36731d75289d6b5b96ebb8e393d5f845feb3687d482dc982ff24",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 28,
+        "source_sha256": "0e4e0b51a1386c368b2349b7c21fe696ad5e5d397696c33f332d7573baf34fe9",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 29,
+        "source_sha256": "675de43cd632e4073c15aa371f48a0184d83a55cb0cbeeb99410abe4ff66a14e",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 31,
+        "source_sha256": "cf1eac10679868f291e4e2cc5e1ab86eb510cd694e57162fef2078f40cd6543c",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 33,
+        "source_sha256": "297bb471a4b48d9b6cfaab89cdae45e779c5a3168dabcf5fdf452595f6e9d987",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 34,
+        "source_sha256": "4b73a6c8d09235433e79696e35e6a70c2c7de8d47fde36b7464ad640b44955ae",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 37,
+        "source_sha256": "43c95a758d26eea8ca5a59f9fdcb592ac63fb9905f00ed88971c6d91cede720d",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 39,
+        "source_sha256": "688f20f9e55d7aa6ea3f955b2cdbc9582871bc4d850a7c7f2106b8d5614f4894",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 42,
+        "source_sha256": "088fb52a832b17170dfa9e3f09d37b3b5705c8fdbf91be372cfa6cf4e9e134da",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 44,
+        "source_sha256": "b76a4e65263ef4ce2d776557de3ba1b596d7cca9f7842fdde231b7afca783e6e",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 46,
+        "source_sha256": "75bc3e9b2a00a9601a0b833c0ac57ad94f82ffa0ee5931a374faf3d8da1cccee",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 47,
+        "source_sha256": "2f811e62a6bcfba64f9e0ff4228affe78ebf3b531a34330253ee456b274980d8",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 48,
+        "source_sha256": "b4b5eb9a67a8af458b82c57fb22fe6f3965b0f7af74102677df967892a5fcfb8",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 49,
+        "source_sha256": "6490eaf729ef3154c05ad4b83c75ea2a625d15ed16b29d1014f3d11315e40b46",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 50,
+        "source_sha256": "cf26e96f521e0f341a082524a20e48b05225d9ef47385a495132ce478da920fa",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 53,
+        "source_sha256": "6490eaf729ef3154c05ad4b83c75ea2a625d15ed16b29d1014f3d11315e40b46",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 55,
+        "source_sha256": "7fc165ade1bbbb7165c1becf6d29ad014f09b480a6e734bdbd3a85458fb0077c",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 58,
+        "source_sha256": "ebc4aea12b4f05886e325e89555a0a4e1d81c9e3e93994db31475225b7744441",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 59,
+        "source_sha256": "dd082972ad9c20f5d3abc7dc051e759b2d9c0eca0b90e0b95a99147132f97783",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 60,
+        "source_sha256": "8feea5ec8e7d85b7d4b641cae63efa349aac23e5cb81353818236d610f1d1e5f",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 61,
+        "source_sha256": "0bf241c708c09ccb6ea3c708cea1bf01c98b4aa643b5b68283c0a78086548bf1",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 62,
+        "source_sha256": "f9bc453e919fd41802a8a7deb1213a6362a9007c26a1452b25dca62702f43e36",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 63,
+        "source_sha256": "7fc165ade1bbbb7165c1becf6d29ad014f09b480a6e734bdbd3a85458fb0077c",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 65,
+        "source_sha256": "f1cdc4bb7d065287b919e103c3f8532633c931912bb5dc7a75feb7a18c9cebce",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 66,
+        "source_sha256": "921e8d78d510eb5590e72bc739c6077cc5c11f5cba133bb9ee9a80f59f669bbc",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 67,
+        "source_sha256": "faf1160be06dc93d669e167d30018af9ab1f13dfbaa08774ca6d0b7a4c35cfd2",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 68,
+        "source_sha256": "fcbfe787f2ccce921b6755974b835a4f234e2d35827aad99926dadfe0e020ee9",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 69,
+        "source_sha256": "7fc165ade1bbbb7165c1becf6d29ad014f09b480a6e734bdbd3a85458fb0077c",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 71,
+        "source_sha256": "d5e3626fea02ea4e2596096eaa9325e83214d873f5ecf9177e668cbfad044f08",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 72,
+        "source_sha256": "1e07695d8099431d54d2e268b480a110ee7a3fb801094462c03230be4dd1a640",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 74,
+        "source_sha256": "84fa2c1e1bf7f2b229957ebceb8ac908ae331119b6dac4bf284abff041fb7a61",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 75,
+        "source_sha256": "fc90f79d1b4f8afacde529d702cb105e327917ce5eed88fdc85d1f1342b4627c",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 76,
+        "source_sha256": "a27a22425e055e83b8bc4509106b750808100faf7356677db9c0d6fc44186993",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 77,
+        "source_sha256": "c6d0aa877bafefa22cc99104163df8b965e0fe2b03462633db77e9f00a7e5e01",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 78,
+        "source_sha256": "7fc165ade1bbbb7165c1becf6d29ad014f09b480a6e734bdbd3a85458fb0077c",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 80,
+        "source_sha256": "86cc2e65b59c73f4d1b5202bd5ddae9dbaf317f5901dc853c823de57b8bb4661",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 83,
+        "source_sha256": "5da920e0ee397aefa82553a6558b14f1180cfaaec804455f607e5c83ce38e3b1",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 84,
+        "source_sha256": "574bc7bf6dacba873a68895ae31f238bc168faab731bc2e8097d229cb89a48b2",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      }
+    ]
+  },
+  {
+    "path": "lab02/text-01-t5.ipynb",
+    "notebook_sha256": "954efdb15a3b0aa3a1206e7f96def082d786b2b19d3d6f466aa51bee1df8bb9f",
+    "code_cell_count": 51,
+    "executed_cell_count": 51,
+    "unexecuted_cells": [],
+    "error_cells": [],
+    "ellipsis_cells": [],
+    "saved_execution_complete": true,
+    "cells": [
+      {
+        "index": 2,
+        "source_sha256": "b927b535296be2d3c1a8cae69506587d441b354bd2c884735fe60bc4b537ee38",
+        "execution_count": 1,
+        "output_count": 2,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 5,
+        "source_sha256": "0b92899d5a03a1d993a5cb2804b8ee29e6716c098ee2a713e2292a8d5739b9c7",
+        "execution_count": 2,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 7,
+        "source_sha256": "07801de2b657d4aa9fe27a2f692c0c2456080805b92dd08f685355e04190806a",
+        "execution_count": 3,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 10,
+        "source_sha256": "37639b4d8948730120d4015a21e3a1aeb43fa6e5703e0221944586e9e4396042",
+        "execution_count": 4,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 11,
+        "source_sha256": "5ddd06561c4bfc5d3b147cf345c812023d3c279ea2d8044a301e6de134d9facf",
+        "execution_count": 5,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 14,
+        "source_sha256": "c30252f4942b17134fd8c222f902923ef80284efcaa9043d82fcb3f9e23f5ed7",
+        "execution_count": 6,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 16,
+        "source_sha256": "d657c3d13c304e5d224eef161f715c58e4b9e33b864a909791f61a6b62ac8b3f",
+        "execution_count": 7,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 18,
+        "source_sha256": "3ffc82e1d4c5f8c72ab179f43c4a215f39d2647a2df142f9569b8e548ac76c46",
+        "execution_count": 8,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 21,
+        "source_sha256": "00379626e33282fab8f6b381534ba583075aad6dfe906f7703f295e72c464852",
+        "execution_count": 9,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 23,
+        "source_sha256": "c539047211c577ecd4d3fdf821f879278fcc550d85fb6216335bed8493fa0972",
+        "execution_count": 10,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 26,
+        "source_sha256": "d7380f47e9053eca0db14f12141f07c2135774aa5696370fd423d4bfd317135e",
+        "execution_count": 11,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 28,
+        "source_sha256": "8cd92e832794c0b2cdd98f0169ea9a85fe48debc235c32c492da9850ea3bf1ac",
+        "execution_count": 12,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 30,
+        "source_sha256": "68f1a6b0ae14348a02b6156da3d97cef22d4406396de01f5237cf6944bb1f174",
+        "execution_count": 13,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 32,
+        "source_sha256": "7e9c342928efeb085ccecbdfa54254ce772cd99f4512ed8d19f5c11bc2d09a25",
+        "execution_count": 14,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 34,
+        "source_sha256": "0610dc2f78d7156629c65d8a134aff2c7c5a306b63bdd7259bb7cd27d6f6ec5b",
+        "execution_count": 15,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 36,
+        "source_sha256": "357c4c7fdc036750b78aee1b0557d1acaf445e5a44a48ce4df1fad1751163d99",
+        "execution_count": 16,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 39,
+        "source_sha256": "da13192b7689c67797bfc4727bed4078571f5b8c6e694b6c21bd7da0530f387c",
+        "execution_count": 17,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 41,
+        "source_sha256": "961f983b042d1d45ff85e2edd5884535a06242e3cb277feae36d43c37f7e8aa1",
+        "execution_count": 18,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 44,
+        "source_sha256": "9372c470eeadd5ecd9c3c74c2b3cb633f8e2f2fad799250a0f70d652b6b825e4",
+        "execution_count": 19,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 47,
+        "source_sha256": "b10c9c9b642ca626082edaeabea185059fd7db955428b8f48562e8ee9fb05061",
+        "execution_count": 20,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 49,
+        "source_sha256": "7ec48c9db6ec9002b192e4a6791de856b8e320001ede678f0e3ab7abcdfe4e18",
+        "execution_count": 21,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 51,
+        "source_sha256": "8c3644ba0ec12144eeada842d9e5724825a1acb17451b955e72f92f634835f3f",
+        "execution_count": 22,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 52,
+        "source_sha256": "4a2c4bb789a7a495d104c09e5813a833f0b0886135d51d4531293770bc670af1",
+        "execution_count": 23,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 53,
+        "source_sha256": "9e6a6473a481330bc02bc5be8041c55644ce819a7feb711028e1dc09df9261c0",
+        "execution_count": 24,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 54,
+        "source_sha256": "5d437c751e71b63389cc62a8a67172b9600324dceae95519f5f84c638c2286a4",
+        "execution_count": 25,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 57,
+        "source_sha256": "72309e25e574d2af57382a876c15ab97eb8284a6d6c6d695b8b5cfaba02a1dff",
+        "execution_count": 26,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 59,
+        "source_sha256": "33ac656b7dc398de3d863d57f1f48dd736afbd543f0012b001b5fdc7ba951421",
+        "execution_count": 27,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 61,
+        "source_sha256": "d53d8daef20e79b0239b27b88c522e14b4b2aaa682134bf8b334374d44c5ef4b",
+        "execution_count": 28,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 64,
+        "source_sha256": "cf8c5d45aca140218229da3e7a345ffc7a0407a0de47032a5bfa672b8f3c0ed6",
+        "execution_count": 29,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 67,
+        "source_sha256": "f8b0967b2beced1c943241df463ee1892f3c675c2a79935c1b36ab63398acb35",
+        "execution_count": 30,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 69,
+        "source_sha256": "cb1adb19e4f0dc7844ffc69f67f413b23bd1ac7ed603a69f45baef9273b2b89c",
+        "execution_count": 31,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 70,
+        "source_sha256": "29285e89fa1b6c472caa56e14f374f37f44346dc76cf983342bfcf3bca829c8b",
+        "execution_count": 32,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 72,
+        "source_sha256": "6ebfd27a077082f5c831bb279dd96f6cf841a44d33afe319ce98810358261623",
+        "execution_count": 33,
+        "output_count": 2,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 74,
+        "source_sha256": "2013d6cfe757314cfb04c2d7c5a511b9c15848f0ea39925cf2a43205e67807d6",
+        "execution_count": 34,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 76,
+        "source_sha256": "c00a1951c6e5f40f39092a2d1bc642d8a3c0390e7ecfcf3889c5fba81e267694",
+        "execution_count": 35,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 78,
+        "source_sha256": "07d2ed09cfbe00da1f7718ec1a53cb811f08d2bde084fbb1fcdede1952bf9d95",
+        "execution_count": 36,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 79,
+        "source_sha256": "016e474bab203b4bbad77edad84a968e45de1775560baed1d384a5e0ebd3c7be",
+        "execution_count": 37,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 81,
+        "source_sha256": "e1244ccef27b10ca2114a8d34dff6880bcd36fed5b6fb38de421196a5ec291ee",
+        "execution_count": 38,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 83,
+        "source_sha256": "e2e6e0f6e088254e6df2373a3e91d381f5146b9e9afe2377aa692720091f2a72",
+        "execution_count": 39,
+        "output_count": 2,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 84,
+        "source_sha256": "16576b6895deb56e86e24203bb4becd3fe0cb0ca0b78922507a3b65d6e55f5e3",
+        "execution_count": 40,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 85,
+        "source_sha256": "0238b7a3ba41a2156c1a3ea4264d25a69b46659d0847ac910f678559c57f4f21",
+        "execution_count": 41,
+        "output_count": 8,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 87,
+        "source_sha256": "69d405c99489b86d22644948fe759c6963bab56221deb0b68160ba24e66b19ea",
+        "execution_count": 42,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 90,
+        "source_sha256": "e711d2196e72f00d09ba4d76fc05fe4bbe166ea8a33b0a04de4f4102f94a22eb",
+        "execution_count": 43,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 91,
+        "source_sha256": "f18bef82b91199b69ced82b1b284e250797dc9643ba54b5e83cb1aa7e62ae48d",
+        "execution_count": 44,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 92,
+        "source_sha256": "6b798d7e06481c0ed6317e689ea2b3aa3c669da89f6a9061b48c643f4bf7ff3f",
+        "execution_count": 45,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 94,
+        "source_sha256": "504242aae736f67186a8d6e5cf8027f95cead95d0f8b19cf79904be7846ffc60",
+        "execution_count": 46,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 96,
+        "source_sha256": "f6327c0301004dd0217f69c5d44ccd1800b4132d124ccb53faff33742c8ab28e",
+        "execution_count": 47,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 98,
+        "source_sha256": "b81e8d3efc3f63a1525ea19714a2f63cbf51a10aa5fe342566a40adadd1593c2",
+        "execution_count": 48,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 100,
+        "source_sha256": "baa26aea00108ecdb816457af4ea31cfcc363ae8aa8a05cefe06ff4b24d2f0da",
+        "execution_count": 49,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 102,
+        "source_sha256": "d3691b484aa6d90a8856d9d9d645c004788dbc94d6b377c4683ec879dfbda01e",
+        "execution_count": 50,
+        "output_count": 8,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 104,
+        "source_sha256": "1482f81a37b91a9693b7e9393946e68a89105ef8335275d3ef7e50af95026733",
+        "execution_count": 51,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      }
+    ]
+  },
+  {
+    "path": "lab02/text-02-attention.ipynb",
+    "notebook_sha256": "b222e9f07460c9e1b5704299261b93c1849213b15935e0a6c5f4d9aaa48d02f6",
+    "code_cell_count": 15,
+    "executed_cell_count": 15,
+    "unexecuted_cells": [],
+    "error_cells": [],
+    "ellipsis_cells": [],
+    "saved_execution_complete": true,
+    "cells": [
+      {
+        "index": 0,
+        "source_sha256": "c7605496e681fa029db1ce9cc63814d7c3c1da3b163977a0e88e927238453521",
+        "execution_count": 1,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 7,
+        "source_sha256": "bcc748ce8bcb20e94177f9ba23b6b11960edd20f9007b67d06d6f77c34ce6626",
+        "execution_count": 2,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 8,
+        "source_sha256": "0659c695ad4eb2e0bab31bc205744903a9513d6afd5e1bb8239eb60e1d842bb4",
+        "execution_count": 3,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 14,
+        "source_sha256": "6416c9b705371415df4c0145a1a54c4a36ba52b7cda3f6422b9f7ff6b604a18f",
+        "execution_count": 4,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 18,
+        "source_sha256": "bdeabb332309d5b7d123166ecdaeab91cb22fc9a66a8ad219aad143610936eba",
+        "execution_count": 5,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 21,
+        "source_sha256": "e543749ea8bcc616c74f09ef67d5617d41b3e073cbaefeec39cb07d5d4888253",
+        "execution_count": 6,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 24,
+        "source_sha256": "fee2b777ad86ffa3246e1db49e8f0aa90f048ac5eed9fbe7add3ef43a0d1c85f",
+        "execution_count": 7,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 25,
+        "source_sha256": "83f26c5a98a28709fc969c53cb841b24519f62df57b5985b02bd55a2a0adfe64",
+        "execution_count": 8,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 26,
+        "source_sha256": "539f9864b693874e59f41399fb3185f6543156fa9a3a07e896c25482731ecd96",
+        "execution_count": 9,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 27,
+        "source_sha256": "f4799b1200278eac606bc2403f08585b0458c4552ac67d32181c7f44cd0a4086",
+        "execution_count": 10,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 28,
+        "source_sha256": "58fb73af413908863ac0de2ddb0537b7ac34502b0a8309ae9b47f1da8abb7dac",
+        "execution_count": 11,
+        "output_count": 17,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 31,
+        "source_sha256": "760501eeddcc2dd6efe222f052f9155c5959468ccd83f4b13b1a6ff3ed94355c",
+        "execution_count": 12,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 36,
+        "source_sha256": "8f6f5c45f189d950949ee5840b4914f295fc921bd3b44ff6e382e14344ec3de3",
+        "execution_count": 13,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 37,
+        "source_sha256": "6a78cc503e6f721605d0da94a1884defaf6abb065490e350aa399b04cd622562",
+        "execution_count": 14,
+        "output_count": 17,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 38,
+        "source_sha256": "760501eeddcc2dd6efe222f052f9155c5959468ccd83f4b13b1a6ff3ed94355c",
+        "execution_count": 15,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      }
+    ]
+  },
+  {
+    "path": "lab03/text-01-bert.ipynb",
+    "notebook_sha256": "396890c04b2ab4e680a4289f7ec6307940df8188959557296c844fd649f7dc9d",
+    "code_cell_count": 34,
+    "executed_cell_count": 34,
+    "unexecuted_cells": [],
+    "error_cells": [],
+    "ellipsis_cells": [],
+    "saved_execution_complete": true,
+    "cells": [
+      {
+        "index": 3,
+        "source_sha256": "c4ac0b14efcb459bcc325b02822bdf16d16df7a9ff63610efa4d6274dc2b7625",
+        "execution_count": 1,
+        "output_count": 4,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 5,
+        "source_sha256": "83cc1756cc9c6d3398a0351b012b1322727f252835e34ce130005b777e2b264f",
+        "execution_count": 2,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 7,
+        "source_sha256": "675c886520e80c9270c75d8f9ec1ff442221d54a3ff88276247c2ddbfe1be5c7",
+        "execution_count": 3,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 8,
+        "source_sha256": "468bd268267c6525812d85ffa8fb51b23993fa92b7927613cc7cabc98838497b",
+        "execution_count": 4,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 10,
+        "source_sha256": "2c3acec44f78c840a359fb64a9d03319203b23935b8af18344e5b26c0200efff",
+        "execution_count": 5,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 12,
+        "source_sha256": "120e80d1b097196a3647f40d3dda647de679cfa5c769b30df8434e2a7f053592",
+        "execution_count": 6,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 15,
+        "source_sha256": "5facd73516058ec21a5d286ce495962b3aa1981e8e0fc3f0700e16cc87dc2e4c",
+        "execution_count": 7,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 17,
+        "source_sha256": "5a3005b1d67c042e2ae33b5da2b935c726f3af7cd404420088e8dc398a30586a",
+        "execution_count": 8,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 20,
+        "source_sha256": "7df409677aeff4060e35ab048c95be993efdf7dd48012bf66627133c18ad1c58",
+        "execution_count": 9,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 23,
+        "source_sha256": "971ecdff8068746890dd41a496473d9b77ffd4facada93a924a64ecd916afa03",
+        "execution_count": 10,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 24,
+        "source_sha256": "36c2f68afce7e499699cdb7bd4b50695aa26b251960352602ccb753e021058d6",
+        "execution_count": 11,
+        "output_count": 3,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 26,
+        "source_sha256": "858a625ebd4e097e6d48696d3b22368e5d0d068bcae0c44c118c5b60dbe81666",
+        "execution_count": 12,
+        "output_count": 2,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 29,
+        "source_sha256": "d6428d1e2cfb8986688d702f2b5abebbf8924a2d6e67e00e2ff28a06ac5194d0",
+        "execution_count": 13,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 31,
+        "source_sha256": "64842d8e699b1ccae7ac81030cc30ab017adb984e698192547cb5735367eb03e",
+        "execution_count": 14,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 34,
+        "source_sha256": "98e6d41abd06d88ab01f31d62964495a58a98446c70d4e99910f0b66cc627d37",
+        "execution_count": 15,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 35,
+        "source_sha256": "7bea928f1dc59fdf0e3df84575567969b639a2807608ac7a67a7a72ca29c2b83",
+        "execution_count": 16,
+        "output_count": 3,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 37,
+        "source_sha256": "c38adc488a542b3e43c03e3bce49114be4f7e1957dfdc6b83c08f411943d62b3",
+        "execution_count": 17,
+        "output_count": 2,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 39,
+        "source_sha256": "6586591212ff9f9ac197abe6bd45ec0b26872cb5e891aab90f2eb077403c41f5",
+        "execution_count": 18,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 41,
+        "source_sha256": "7f628e9aa7d84f0f1c12a6d9e958178840f9cce345d89bdb8bfe6016fdfb19c3",
+        "execution_count": 19,
+        "output_count": 3,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 42,
+        "source_sha256": "2d445865e7e4a3d678b13833570819c94c4e02384ac7f51f9be1c2a13316c25a",
+        "execution_count": 20,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 46,
+        "source_sha256": "66ce8bc9dce603c9e75de4080bef788f554ef48918baed8bfda5e6cc1088b244",
+        "execution_count": 21,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 47,
+        "source_sha256": "11d660b8839441cb046fb203472518f4473fa02ac73f3c33507548d1945a3c23",
+        "execution_count": 22,
+        "output_count": 2,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 49,
+        "source_sha256": "e5f4e67c35f6c814fefb9384756029dd60b989c213dc6ac82eb8a09fbcd460ce",
+        "execution_count": 23,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 51,
+        "source_sha256": "9372b5c24f85de185c3b1d5351ba19c2ee93d5b30390a852494a6ca9dfd653e2",
+        "execution_count": 24,
+        "output_count": 2,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 52,
+        "source_sha256": "45839112f27878d814e50678b2f3e4e694d466fb3321345be9a9675592a09c50",
+        "execution_count": 25,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 57,
+        "source_sha256": "86a0b7e8c531d0fb17c3651e92d1bfd5cfd47d24f9249fbdfc69a2d75d1ba4e9",
+        "execution_count": 26,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 58,
+        "source_sha256": "a631e3900be61ad1836ad9e22b8999ff2881b8908c28281d9635c0673fb3351a",
+        "execution_count": 27,
+        "output_count": 3,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 61,
+        "source_sha256": "b1cc69dce7358f1fe538d859cf4dc542bbe1c076d574afc0bdf090d01670d8b0",
+        "execution_count": 28,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 63,
+        "source_sha256": "6b389a6ad3099244de1649357c46e879a30d0cf669f58de8b8f4b4021ec56b41",
+        "execution_count": 29,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 65,
+        "source_sha256": "a31f290809c55e159afb18eede93c87adf0bbbb60e7a79fa0b655432fa9616dc",
+        "execution_count": 30,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 67,
+        "source_sha256": "0670b12a11e51af9add9be2ffa73450ed7691bde1fd58b48f09a3f6390d988dd",
+        "execution_count": 31,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 69,
+        "source_sha256": "78a168914838ad3df4b4f2ead284e20ff417c85af2701bc836ac5ea18232a480",
+        "execution_count": 32,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 71,
+        "source_sha256": "a3005edea48ed8223103defd9143732f26c8ddc523d9d4c40a734ffac243391d",
+        "execution_count": 33,
+        "output_count": 15,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 72,
+        "source_sha256": "90214f284ac32b7c717605f953f612884f94d21163d32ddebc4bbd01b3ccbafe",
+        "execution_count": 34,
+        "output_count": 4,
+        "ellipsis_placeholder": false,
+        "errors": []
+      }
+    ]
+  },
+  {
+    "path": "lab03/text-02-gpt2.ipynb",
+    "notebook_sha256": "b86678eeea33cda51dc873612d18945a46431489014c226b7419ebecfe66e26d",
+    "code_cell_count": 16,
+    "executed_cell_count": 15,
+    "unexecuted_cells": [
+      3
+    ],
+    "error_cells": [],
+    "ellipsis_cells": [],
+    "saved_execution_complete": false,
+    "cells": [
+      {
+        "index": 3,
+        "source_sha256": "3bfa593fb7b5b98e51a2d6900655d70bc301c08c27ca4aba2ce528cb18b6105d",
+        "execution_count": null,
+        "output_count": 4,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 5,
+        "source_sha256": "cc82b8f9ded0cd4f7bc0526dc836c09215e33d5d8cf1096bf0ed7f0a53af3e31",
+        "execution_count": 2,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 8,
+        "source_sha256": "8d5de2b0c0b0b162b9d579df6e871b7f5659eb4183e40dad14351a7aab9b47eb",
+        "execution_count": 3,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 9,
+        "source_sha256": "66b37288af236ea6e4f60c062a3346247038f2c23c303d6ea38bdc68fffac7d5",
+        "execution_count": 4,
+        "output_count": 2,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 12,
+        "source_sha256": "c83319cc39daa8013bef5a1ca4d749ace0665812fb7cf69ca2021c718199c368",
+        "execution_count": 5,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 13,
+        "source_sha256": "6e025cf9cd30752579dee7d8dbc106df61636b0215b1e7cfdeab49aa91506f21",
+        "execution_count": 6,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 17,
+        "source_sha256": "d2b66b447836b89a4f728c429db1cd124ea274b28912e8f3114591b029987dc9",
+        "execution_count": 7,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 18,
+        "source_sha256": "203e9cdff9d473e4769e4175874f2ce5f297b7f3a54be0d47e21cab722baed08",
+        "execution_count": 8,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 20,
+        "source_sha256": "bea004be966f3d4817448a4a9b5ba114cf7b368b8b7557163ec5db3c56cbcb6e",
+        "execution_count": 9,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 22,
+        "source_sha256": "4864927dcd061c2373312e30343c427d5a765e2272cd8862f80a81a73458c51b",
+        "execution_count": 10,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 24,
+        "source_sha256": "62196547a5d510982ba8b5f6966e457fbaad10c79cbf3af5d79d31dba280570e",
+        "execution_count": 11,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 26,
+        "source_sha256": "5d42f8f00e3df06ea26b5d44a57c8c910bcfbb2cde0e0636b45edd6f53c27b3e",
+        "execution_count": 12,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 28,
+        "source_sha256": "29339fd6db118cb84bd1f43f94ca3a5ab74051437308695b5dcea1f8e4ddb662",
+        "execution_count": 13,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 29,
+        "source_sha256": "c6e085e89f027d510b2ec6a3590b2a1ab3159dbbcd1ed47edbc999e5392cc787",
+        "execution_count": 14,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 31,
+        "source_sha256": "55949767382ff2f732f730f0a66b4e1e3874e469e732a19bc0455a4155346ef3",
+        "execution_count": 15,
+        "output_count": 6,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 34,
+        "source_sha256": "670fd8cc32a0d1f1b7f4015766ff84572787b87145e0914ca7c705245ff4a004",
+        "execution_count": 16,
+        "output_count": 6,
+        "ellipsis_placeholder": false,
+        "errors": []
+      }
+    ]
+  },
+  {
+    "path": "lab04/text-01-clm.ipynb",
+    "notebook_sha256": "d736bdfb5a7e4fee938aea7bb453e0f13adcd63af86363d0de1313c7524da3bb",
+    "code_cell_count": 9,
+    "executed_cell_count": 6,
+    "unexecuted_cells": [
+      18,
+      19,
+      20
+    ],
+    "error_cells": [],
+    "ellipsis_cells": [],
+    "saved_execution_complete": false,
+    "cells": [
+      {
+        "index": 2,
+        "source_sha256": "cb8ed58a968014e96f3a117c12421bb49cf0745d7de963b4254240d0a573ef05",
+        "execution_count": 1,
+        "output_count": 2,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 5,
+        "source_sha256": "c9928d2abedc802588a6b9046c655788a1620c7f267ce1b5fdcd195e07aa3dad",
+        "execution_count": 2,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 7,
+        "source_sha256": "7078f6ee92efc42b3e50a03bcfb2ba6af316950a8b621b510c4efdc8186793ff",
+        "execution_count": 3,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 10,
+        "source_sha256": "ff1882d3ed4da13a310091ce599f95615b7b09fff126ab994fddf3b610f8d158",
+        "execution_count": 4,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 12,
+        "source_sha256": "219d07079f38b8d691d6d3ec1273191a7fd134754b95437308265a351ce7b50a",
+        "execution_count": 5,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 15,
+        "source_sha256": "35276a03b3039a4a7ac069c36e582f42cc0382954526193bb371934273dd0938",
+        "execution_count": 6,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 18,
+        "source_sha256": "686545b2f5aba057c3dacc69be58f7797b4eb1d822bb50826839d5d752d8e760",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 19,
+        "source_sha256": "db16c5764da53c279ac8f16f3d9ca6df05fa9bdf1583b3ab28dcd8e96203c6b9",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 20,
+        "source_sha256": "47b78221489607d456b45374117a15ee3388aa066d08debfd816d54c6f34f31c",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      }
+    ]
+  },
+  {
+    "path": "lab04/text-02-llms.ipynb",
+    "notebook_sha256": "2b561f9f4836933d8ae29a6009660e2f37523b38e4573079e241fb63284fa7eb",
+    "code_cell_count": 17,
+    "executed_cell_count": 6,
+    "unexecuted_cells": [
+      8,
+      10,
+      14,
+      17,
+      19,
+      21,
+      24,
+      26,
+      29,
+      36,
+      37
+    ],
+    "error_cells": [
+      4
+    ],
+    "ellipsis_cells": [],
+    "saved_execution_complete": false,
+    "cells": [
+      {
+        "index": 3,
+        "source_sha256": "d4b466cc38181a760d8844e3c5f398b1fff4571ebbf142828d9c53d2cc4fc838",
+        "execution_count": 1,
+        "output_count": 2,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 4,
+        "source_sha256": "819bd4d00231c9f4e92d1b37afc057c1e0cdc5ed8d988d9f5214fc269a6ad8fb",
+        "execution_count": 2,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": [
+          {
+            "name": "RuntimeError",
+            "message": "Llama 3.2 requires an approved Hugging Face account. Run `hf auth login` locally or set HF_TOKEN, then rerun."
+          }
+        ]
+      },
+      {
+        "index": 8,
+        "source_sha256": "56c0735d556b32107c6852ec9e1d252e38b4d46fde9a9cb22cc10c649c213e44",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 10,
+        "source_sha256": "0502fff72fa6c134e2a22f8012692617b22d8abe30556e43b2131dbfd2beb6b2",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 12,
+        "source_sha256": "0d10274c4cdca8af2b670b31655e7b7fa58c06ced63612fa8deb32deb37bdab4",
+        "execution_count": 2,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 14,
+        "source_sha256": "ddbdd263da0ce66466f8505965e3b072cf4328961062f3a042c7c455763e9f1c",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 15,
+        "source_sha256": "bbe47852e540dac0d2ef1e49d8d88a771033861b316b94863bda105f042c069e",
+        "execution_count": 3,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 17,
+        "source_sha256": "d80dbd1629c28d5e0604989ebe46f45b144e575cc7ecb2d0146d6920d8eb08b2",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 19,
+        "source_sha256": "cdb90bb5da67931241e825e0955945ce55f1a77cbe38331b8343054d71965548",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 21,
+        "source_sha256": "9f6e6aee8660c79b3b89251cce515c0d2d7b8177f57c66560a03a076c792db21",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 24,
+        "source_sha256": "9c3416c7a2679742e2a3fe5e80efcd31fa8482fdbf0201aa486fb118bcd80a54",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 26,
+        "source_sha256": "5fc77adf50bf2b98fe6df6ec6a476ca779a47b1ca83e8be60aaac069b339e4f5",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 29,
+        "source_sha256": "9b1a4f06ae574ddcfaf74e4ebc1d4f1aff3389b900c8ee377d109699e810171a",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 32,
+        "source_sha256": "04942a2b7a11ed4c11893bc01c27d0e471ff1de605d7e3b2da178fedd494459f",
+        "execution_count": 4,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 34,
+        "source_sha256": "aafc2120e867513a8447451d8880dcbeb4a3b3f6a3754299ae8dfceb5449d927",
+        "execution_count": 5,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 36,
+        "source_sha256": "49b817fbd01221bacb802b6777eba8e5a87d3b3a64cf09227c92107ae57ca478",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 37,
+        "source_sha256": "bbb6347798f4da8605fe94947ca94e99acb6dbbd9f3de5acaae01d68b4a670e6",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      }
+    ]
+  },
+  {
+    "path": "lab05/text-01-quantization.ipynb",
+    "notebook_sha256": "cdf0fb14f12ab68baa760892e2d467ea119afb1144ffbfd0f4d90fb051a2f91b",
+    "code_cell_count": 28,
+    "executed_cell_count": 20,
+    "unexecuted_cells": [
+      42,
+      43,
+      45,
+      48,
+      50,
+      51,
+      53,
+      54
+    ],
+    "error_cells": [
+      40
+    ],
+    "ellipsis_cells": [],
+    "saved_execution_complete": false,
+    "cells": [
+      {
+        "index": 3,
+        "source_sha256": "36d8465a225041e4137948f7d288391a1f9f36d6ec456b55ece09ba07798521d",
+        "execution_count": 1,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 6,
+        "source_sha256": "1f4bacc662bf07b1d5372d3f59e743e82b87f396e5466e15ac548647347ef0e4",
+        "execution_count": 2,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 8,
+        "source_sha256": "8c7d867fc3092e6060e1083236561c150562e008a487e91817552beaf6d68b50",
+        "execution_count": 3,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 10,
+        "source_sha256": "a6b840a526c66e13538d8eb87bd63f2b9e18ea000c890372ac2561a0dd523dbe",
+        "execution_count": 4,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 12,
+        "source_sha256": "2571a85a736ce0fe9697c2b88713c40564459a6a0f63d1b5f3bc4e7934e6823c",
+        "execution_count": 5,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 13,
+        "source_sha256": "f78cda457b8df435ce3033bc8e83502f51d5cd14867f356df2e94e90b44007ad",
+        "execution_count": 6,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 14,
+        "source_sha256": "09bbfce39abaafce8a1c91c90a8dd7fc60fbfc80a62d4511a8c8d51ab9aeda8f",
+        "execution_count": 7,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 16,
+        "source_sha256": "fe70f75003c82158d2218d9a4e23820576157618d2a5dc7ed47440c6f559318e",
+        "execution_count": 8,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 18,
+        "source_sha256": "40eae42eb16ae6379677517a1fb68a6812f53d6063e3f5504be8bf79fa7240ad",
+        "execution_count": 9,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 20,
+        "source_sha256": "3dd9051ceb253099e4fc2b89e8c3c159b631413877b48159a3d0d723feea1cf0",
+        "execution_count": 10,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 23,
+        "source_sha256": "a4bf1731585299bb47c670e6407a029c5141cd84ef37347ebeb047f4eda0cacc",
+        "execution_count": 11,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 25,
+        "source_sha256": "d924192bc836c363dea51d2e97eee56082be65c8685775f6b16894acb7255b1d",
+        "execution_count": 12,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 27,
+        "source_sha256": "8a037bebce3505ae2dc7cfe56ece70c4aef4fea1e1b9ce3806a93cd37979da9e",
+        "execution_count": 13,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 28,
+        "source_sha256": "3920cad1836b47424c3255e371d4547333fc4429c31b776c649282b2bac9ebde",
+        "execution_count": 14,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 30,
+        "source_sha256": "15c66182080f859f7e740bbb3b93e40b6b647c6a733b2191eca46d9558c53faa",
+        "execution_count": 15,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 32,
+        "source_sha256": "d5071257c3c5310e50035bf34acedfab20ab8af7cd1eb74a84880ee0cb11b32f",
+        "execution_count": 16,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 34,
+        "source_sha256": "a940eaea7835d18ec81db76bd512163db90e1e7c24dce79665e67e00c1b2378a",
+        "execution_count": 17,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 35,
+        "source_sha256": "3299dd5d820e4764bec27d0a17a433c035f246288e7f1949daa5ac0cc99bbc0e",
+        "execution_count": 18,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 39,
+        "source_sha256": "ecb57f6ce8cd22a8e692be6567e699644285989780439c7bf99b7248558a910d",
+        "execution_count": 19,
+        "output_count": 2,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 40,
+        "source_sha256": "0af76bfb60e6b23719edd9edb11436f963f4a8256c164dba3de531dad72ed0f5",
+        "execution_count": 20,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": [
+          {
+            "name": "RuntimeError",
+            "message": "Llama 3.2 requires an approved Hugging Face account. Run `hf auth login` locally or set HF_TOKEN, then rerun."
+          }
+        ]
+      },
+      {
+        "index": 42,
+        "source_sha256": "d5c6eb13071b2d277cd8e38bcc1d6b5ea2b8b265e044a8b15183a5067613d29b",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 43,
+        "source_sha256": "436f527eff5ba01c6e92351d2955a72ee0aa6a60da0c08120bdeb3a375bd247c",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 45,
+        "source_sha256": "5c56947488a052671e88eeaf088b19ba04a20fe9962f58f898e3979a8a81e3b6",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 48,
+        "source_sha256": "d949e1a8c6c6379f118a305b16dda2abb7462c36ccfa6f45d6690ff9b190578e",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 50,
+        "source_sha256": "1d3277c13f05dd2b8b1684379854fe1b128855946126d6026621c36ac45f016f",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 51,
+        "source_sha256": "c7fc5f23532e09877b128f6631fa274af8c7535ed358d1029ce0a8755c050623",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 53,
+        "source_sha256": "4665cdab318fe281f11959a7c468ca0564bc4828c121f25b1cf88e4f857f52e3",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 54,
+        "source_sha256": "b8e663622208d206af255358926e83985c9d0574d38a789e1e30ff4c80c91d62",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      }
+    ]
+  },
+  {
+    "path": "lab05/text-02-LoRA.ipynb",
+    "notebook_sha256": "4b408a42649cea8b1745567422c7d53c868c03dee4dffa9fba97bf4238ba5518",
+    "code_cell_count": 23,
+    "executed_cell_count": 16,
+    "unexecuted_cells": [
+      21,
+      22,
+      23,
+      24,
+      36,
+      37,
+      38
+    ],
+    "error_cells": [],
+    "ellipsis_cells": [],
+    "saved_execution_complete": false,
+    "cells": [
+      {
+        "index": 3,
+        "source_sha256": "4a0f92d213bdbac061973b4b78ee1ae2085ab61fc15d839d1d3ec82ef996d1c4",
+        "execution_count": 1,
+        "output_count": 2,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 4,
+        "source_sha256": "08a5bd64657dd2bc5a920070c7a5debf107d29ebc4b891bd0165b7da8540deea",
+        "execution_count": 2,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 7,
+        "source_sha256": "06bb9ab2a6d9f8dfb456f3e64025a38ea80fde36b4f0a87de4de4dd72aec98b2",
+        "execution_count": 3,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 8,
+        "source_sha256": "d1e9cdfe5bf69f65e5d02083904883e892776f67fa57efd2573d6e6e0725c2d2",
+        "execution_count": 4,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 10,
+        "source_sha256": "7441134571dd57c21cd9c12e0facea0fe926f6e5d83e2007b57d929e7b463133",
+        "execution_count": 5,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 12,
+        "source_sha256": "874659a35c7f990db050fe16bccddc5599f89de4373e4e9338b4392b04096c7e",
+        "execution_count": 6,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 14,
+        "source_sha256": "e34aa8de27b8f6cb74166cafe6d77afdceedcdb3adb1903c11beed12ce55e7a8",
+        "execution_count": 7,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 16,
+        "source_sha256": "8d2681065ff9c607a7e121b2fa58b471afac57c9e1c0cbc17c669b7954e18dcf",
+        "execution_count": 8,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 18,
+        "source_sha256": "01370b312d1c2ab4df81a516c617011c341056b58e2bb3a536ee5df65447657e",
+        "execution_count": 9,
+        "output_count": 2,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 19,
+        "source_sha256": "b1cc69dce7358f1fe538d859cf4dc542bbe1c076d574afc0bdf090d01670d8b0",
+        "execution_count": 10,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 20,
+        "source_sha256": "93020f6ffe151bae1ee4268d7d11778efdd31cefcde17d882cccd5049d949958",
+        "execution_count": 11,
+        "output_count": 9,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 21,
+        "source_sha256": "7d8849387903055cc551113722e7ec1fa4514bc2a49d44ebee1668e2b2451d8d",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 22,
+        "source_sha256": "885876575d5ec172025ca598be7a53b5fe4c2649d7f654a91a6fbb29531b13b0",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 23,
+        "source_sha256": "dbb6eab86ae5240fa958245aa64c194ce49903e7b474cea74524fbc3adf03e5d",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 24,
+        "source_sha256": "885876575d5ec172025ca598be7a53b5fe4c2649d7f654a91a6fbb29531b13b0",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 27,
+        "source_sha256": "7bd0791787a21da125e8490e2208d325e79b15ad93db6883f06949789b6e2785",
+        "execution_count": 12,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 29,
+        "source_sha256": "882cbe44477848b502e19ef82ffb5cffb370c5755343a64b743032232d6a41e4",
+        "execution_count": 13,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 30,
+        "source_sha256": "9ff926a47cc4ee6d276c5924e17430173ce49c2da5ab80950dc783a2d9a7e831",
+        "execution_count": 14,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 32,
+        "source_sha256": "9c035399ab5f1a2c41c7d5b06a05c10bd97585f9bdb718ba1f7af03aca4a8d03",
+        "execution_count": 15,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 34,
+        "source_sha256": "8622472c22954188c6e70551ec322752bcb1b07cf3c2b9439efe1e8b82c355ed",
+        "execution_count": 16,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 36,
+        "source_sha256": "e5822d2c0f6d83063dd90a397b028f7796226a3e82b90aeeffe5a01d406dbccf",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 37,
+        "source_sha256": "a2c3063cd5a534cfca2e804c13bc1931abfb77a8aab492c6ab2507ecdb8de9a1",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 38,
+        "source_sha256": "885876575d5ec172025ca598be7a53b5fe4c2649d7f654a91a6fbb29531b13b0",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      }
+    ]
+  },
+  {
+    "path": "lab06/text-06-prompt-engineering-rag.ipynb",
+    "notebook_sha256": "31011538a2712b8e4ded7d6b14cfbf6758df4e6ae78ba6ebe4f7679667c55497",
+    "code_cell_count": 12,
+    "executed_cell_count": 5,
+    "unexecuted_cells": [
+      5,
+      7,
+      9,
+      11,
+      13,
+      15,
+      23
+    ],
+    "error_cells": [
+      1
+    ],
+    "ellipsis_cells": [],
+    "saved_execution_complete": false,
+    "cells": [
+      {
+        "index": 1,
+        "source_sha256": "17407bc03d3294369b05a02c09820ec1355b92a336691c05e2faf610d4568f36",
+        "execution_count": 1,
+        "output_count": 3,
+        "ellipsis_placeholder": false,
+        "errors": [
+          {
+            "name": "OSError",
+            "message": "You are trying to access a gated repo.\nMake sure to have access to it at https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct.\n401 Client Error. (Request ID: Root=1-6ade7c9b-140973480bb2bc3938614f9e;805694ea-735b-43be-ab53-1ebbeeb776cb)\n\nCannot access gated repo for url https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct/resolve/main/config.json.\nAccess to model meta-llama/Llama-3.2-3B-Instruct is restricted. You must have access to it and be authenticated to access it. Please log in."
+          }
+        ]
+      },
+      {
+        "index": 3,
+        "source_sha256": "a16c1de1c9b9ca18339ccaeadb0646da3cf7266acdb30f8804033b172dbc76c2",
+        "execution_count": 2,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 5,
+        "source_sha256": "0b408f31a8ba33a0a19cea6b784f73cc6b3f911df9dffa9d6615604e93616621",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 7,
+        "source_sha256": "22feef229af1b79ae18d1c22e5125d099e4a1376d10065c5d4e5343c4fc9df90",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 9,
+        "source_sha256": "99bcf535b4007f15d706444d7c28145e0f81369ce245ae181769e38ee4be54c6",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 11,
+        "source_sha256": "0f7bbe803cc12f069126b606733950b80c4ff3c40fc423a234680aed8dc0024d",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 13,
+        "source_sha256": "0cd0e520a248ecaff89626fcd02a8cc203b3605d1d1e20cded273b61c2c58cc4",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 15,
+        "source_sha256": "774a2406687eaa5c5ddc2aee9a7b875750edee932fd840d8bfc63bd83914d245",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 17,
+        "source_sha256": "b65c8832a34fe27c3ce9ef4e3c4e870c0fb40e97246f7b6f534b467fcfe7c0f4",
+        "execution_count": 3,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 19,
+        "source_sha256": "767e063fcaaf467358e825d40b8424fcb5c766cc79432a739b6b85491654e507",
+        "execution_count": 4,
+        "output_count": 2,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 21,
+        "source_sha256": "3a1a24381ac1026afbfc633537eec2500d22775e63d3cf25ef757af71bb3801b",
+        "execution_count": 5,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 23,
+        "source_sha256": "8db23af63980819f141f76b51c53d7b16a75a7e1fc61ef79e9c4ad79cef1b3cd",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      }
+    ]
+  },
+  {
+    "path": "lab07/text-07-stories.ipynb",
+    "notebook_sha256": "55e5ffb13a76be62f20f7bb503f6e31ddabba36cca34961414c12f7704ffff5b",
+    "code_cell_count": 7,
+    "executed_cell_count": 2,
+    "unexecuted_cells": [
+      2,
+      4,
+      7,
+      9,
+      11
+    ],
+    "error_cells": [
+      0
+    ],
+    "ellipsis_cells": [],
+    "saved_execution_complete": false,
+    "cells": [
+      {
+        "index": 0,
+        "source_sha256": "ac54503d61c571c434826ed24f184e927f8e80b258b58256776442e307343e2c",
+        "execution_count": 1,
+        "output_count": 3,
+        "ellipsis_placeholder": false,
+        "errors": [
+          {
+            "name": "OSError",
+            "message": "You are trying to access a gated repo.\nMake sure to have access to it at https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct.\n401 Client Error. (Request ID: Root=1-6ade7d97-535a81864731279911f274c2;5a0386ab-8064-4ff4-9a5c-c11fb1945f1b)\n\nCannot access gated repo for url https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct/resolve/main/config.json.\nAccess to model meta-llama/Llama-3.2-3B-Instruct is restricted. You must have access to it and be authenticated to access it. Please log in."
+          }
+        ]
+      },
+      {
+        "index": 2,
+        "source_sha256": "dcee2b7c138d7ddb33002e041be56790a0b7c4e6b1eb7b9ae4e173896bb40656",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 4,
+        "source_sha256": "d898f780b1603d3ced081093f6e431417e51d77c9948426aed03eee15e1cf47b",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 6,
+        "source_sha256": "4141c85a2502c519eeb8581224f5cb591704f5b3081b45e1ff4efb4b10677740",
+        "execution_count": 2,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 7,
+        "source_sha256": "c90bb51175b30d8a6ddd5f7a02266d6837669894e45ab654f595930d061ac97f",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 9,
+        "source_sha256": "b5bd548b2ee1e73faa672a6a9562058ca0a6dd631d5850fe2cff431443068707",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 11,
+        "source_sha256": "fbaf5b4566cbc157dfbe6e7edd7fd05198b03767adbeb0422246a01b2b0430cd",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      }
+    ]
+  },
+  {
+    "path": "lab08/text-08-roc-router-design.ipynb",
+    "notebook_sha256": "362e7feeb5519421e8d5966eced543d8e83ff3bb10f4ba3ca503c720d3a7d599",
+    "code_cell_count": 6,
+    "executed_cell_count": 4,
+    "unexecuted_cells": [
+      10,
+      12
+    ],
+    "error_cells": [
+      8
+    ],
+    "ellipsis_cells": [],
+    "saved_execution_complete": false,
+    "cells": [
+      {
+        "index": 1,
+        "source_sha256": "51da99b505dec12f391f132eb09d479515ac15dc51ed1694809d3df140563435",
+        "execution_count": 1,
+        "output_count": 2,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 3,
+        "source_sha256": "554908a77a54f752dca5e022501f904b695ba32d29e4136e9dc60dc516a3ebc8",
+        "execution_count": 2,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 5,
+        "source_sha256": "6a2f390d300a9a00d283b762e4d903c73aea724a0a52d43dfa297bd3979ca89d",
+        "execution_count": 3,
+        "output_count": 2,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 8,
+        "source_sha256": "2524a484cca0e36240c334f1a2fb9500ac43783ab54c4238565a2c1a7bb4c496",
+        "execution_count": 4,
+        "output_count": 3,
+        "ellipsis_placeholder": false,
+        "errors": [
+          {
+            "name": "OSError",
+            "message": "You are trying to access a gated repo.\nMake sure to have access to it at https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct.\n401 Client Error. (Request ID: Root=1-6ade7ec5-691ec8652b233991493e6199;eb2c3bee-c88a-4a78-a871-fe6aff01b363)\n\nCannot access gated repo for url https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct/resolve/main/config.json.\nAccess to model meta-llama/Llama-3.2-3B-Instruct is restricted. You must have access to it and be authenticated to access it. Please log in."
+          }
+        ]
+      },
+      {
+        "index": 10,
+        "source_sha256": "234faf7e2d475b88a22bb2bdce74e5d6921f3dafe466d65511460c18ba60e100",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 12,
+        "source_sha256": "40c850426217f62210c2a38b89f47307bd9b7a99af37856a7132f762548ca2cc",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      }
+    ]
+  },
+  {
+    "path": "lab09/text-09-code-generation.ipynb",
+    "notebook_sha256": "4e9b9bba535daf5509ba4b51ae03e175dfc7db978242ea30156fa714b4953977",
+    "code_cell_count": 12,
+    "executed_cell_count": 8,
+    "unexecuted_cells": [
+      8,
+      12,
+      18,
+      21
+    ],
+    "error_cells": [
+      7
+    ],
+    "ellipsis_cells": [],
+    "saved_execution_complete": false,
+    "cells": [
+      {
+        "index": 1,
+        "source_sha256": "8dd68aba9dbab4d7ab39f142b94af5a9cc64a1d5a0af4c9e69897fad0853e50c",
+        "execution_count": 1,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 3,
+        "source_sha256": "bdc8c2e15919968abfed734da21dcda9329e3566b803b0515929121a8a96c8a1",
+        "execution_count": 2,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 5,
+        "source_sha256": "ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5",
+        "execution_count": 3,
+        "output_count": 46,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 7,
+        "source_sha256": "c9c19a76b65da5f143fa2d720bb233b443dcc1fa029cf1bf3c013c39304569e8",
+        "execution_count": 4,
+        "output_count": 3,
+        "ellipsis_placeholder": false,
+        "errors": [
+          {
+            "name": "OSError",
+            "message": "You are trying to access a gated repo.\nMake sure to have access to it at https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct.\n401 Client Error. (Request ID: Root=1-6ade7f19-534d61876d24173f095e9b30;c71faab0-08ec-4da9-960a-7ae4ee6bfc3a)\n\nCannot access gated repo for url https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct/resolve/main/config.json.\nAccess to model meta-llama/Llama-3.2-3B-Instruct is restricted. You must have access to it and be authenticated to access it. Please log in."
+          }
+        ]
+      },
+      {
+        "index": 8,
+        "source_sha256": "438e1a5ac6dd089cdf2cdd02e62fa39ef23306bf92d5aea5681184fb4d905209",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 10,
+        "source_sha256": "1daeed1554491deb6421c00cb61d7ad76dba507839602ffd097b75fb481185f7",
+        "execution_count": 2,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 12,
+        "source_sha256": "b05ac5bcb1f4489e3da8be9127335396e61d5eb49a8de8f6720b5c7c4efc0a16",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 14,
+        "source_sha256": "52d5f042bd7bdf89d23730b9aedc1fb0943831bb6a70c07b98032fa5cb31fa80",
+        "execution_count": 3,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 16,
+        "source_sha256": "ebaf2737dae25738187d265f85df50ac75ecc656491a761ca6c90e23e57c6b02",
+        "execution_count": 4,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 18,
+        "source_sha256": "5a2dba39c66ca0604987d1e5fcd68ecfec2f26b91f0a5fa2ca7e3fede5a095f0",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 20,
+        "source_sha256": "b6fcf4beed137e2fe82a492045d2e369d21e00d4ec819076b0284db31ea41efb",
+        "execution_count": 8,
+        "output_count": 2,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 21,
+        "source_sha256": "e682c516e3b2027f8d174f89d5af39c30a787930d93ae940a071c75c999f053b",
+        "execution_count": null,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      }
+    ]
+  },
+  {
+    "path": "lab10/text-10-test-generation.ipynb",
+    "notebook_sha256": "cb982682e0c0d055360a506950385f4e0c151b8153161ec66ac58d13f47a771d",
+    "code_cell_count": 7,
+    "executed_cell_count": 7,
+    "unexecuted_cells": [],
+    "error_cells": [],
+    "ellipsis_cells": [],
+    "saved_execution_complete": true,
+    "cells": [
+      {
+        "index": 1,
+        "source_sha256": "fb6dd31a2378400de74691b2e78fd45fa8634fec9d61ef5eb9bd2f6fa683a4aa",
+        "execution_count": 1,
+        "output_count": 0,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 3,
+        "source_sha256": "9d1d9a983d9312345b1b30605da6e38ae77f8ce3eb9d8efb05a5ad942cf8b9ae",
+        "execution_count": 2,
+        "output_count": 45,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 5,
+        "source_sha256": "47d2e4717bcf001ccbcaf38a2717bff6d37eae3cd9044e077f35bb888bc1cfad",
+        "execution_count": 3,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 7,
+        "source_sha256": "f010d8056cf9fc54e956d16b804a7fdc4b926f6d58293ef597b0118ba6ba1418",
+        "execution_count": 4,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 9,
+        "source_sha256": "8421fd6c53bafe46d4b407a8b3e8aabf645743d27c8c0db24f79847fa0118c7f",
+        "execution_count": 5,
+        "output_count": 1,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 11,
+        "source_sha256": "5d3036c4bfdd22adb8f9bbe15dea0c4ca3fbc9871c51088869c56e668d4366c6",
+        "execution_count": 6,
+        "output_count": 5,
+        "ellipsis_placeholder": false,
+        "errors": []
+      },
+      {
+        "index": 13,
+        "source_sha256": "e9f7f0d27105c20fa004900306ec966b688535c808a34f70853d852376eff9bb",
+        "execution_count": 7,
+        "output_count": 29,
+        "ellipsis_placeholder": false,
+        "errors": []
+      }
+    ]
+  }
+]

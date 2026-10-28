@@ -1,0 +1,22 @@
+
+Question: How can workload-aware scheduling across heterogeneous CPU and GPU systems reduce LLM inference energy consumption?
+Retrieved sources: ['paper2.pdf', 'paper9.pdf', 'paper0.pdf']
+With RAG:
+ According [paper2], running multiple workloads concurrently is shown that it reduces overall system utilization but increases power usage due mainly because many components have idle periods.
+
+However there isn't any information about how reducing these inefficiencies could be achieved by implementing "work load aware" schedules or other techniques such those described here:
+
+*   Using different hardware configurations based upon task requirements - This would allow more efficient use resources while minimizing waste from unused capacity 
+    *Source:[40]* 
+
+Workforce
+Without RAG:
+ Workload-Aware Scheduling (WAS) is indeed one of the techniques that has been proposed to optimize power efficiency in Large Language Models' Inference on Heterogeneous Systems.
+
+Here's how it works:
+
+**Background**: Modern deep learning models like large language transformers require significant computational resources from both CPUs/GPUs for efficient training/inferring processes but also consume considerable amounts due their high memory requirements or data transfer times between different hardware components within these complex architectures.
+
+
+1.)
+Compare the observed answers for source citations, supported detail, and unsupported assertions.

@@ -1,0 +1,1 @@
+RuntimeError: Llama 3.2 requires an approved Hugging Face account. Run `hf auth login` locally or set HF_TOKEN, then rerun.

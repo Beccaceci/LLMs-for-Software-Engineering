@@ -1,0 +1,6 @@
+
+
+[32m======================================== [32m[1m22 passed[0m[32m in 0.04s[0m[32m ========================================[0m
+All notebook reference boundary/validation tests passed.
+Supplied test_valid_grades_with_30laude expects 27.75 with 1% tolerance; exact answer is 28.0.
+The supplied test file is preserved; strict tests above check the exact result.

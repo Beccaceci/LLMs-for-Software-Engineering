@@ -1,0 +1,1 @@
+print_trainable_parameters(model)

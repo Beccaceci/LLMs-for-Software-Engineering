@@ -1,0 +1,18 @@
+{
+  "text-07-stories.ipynb": {
+    "sha256": "55e5ffb13a76be62f20f7bb503f6e31ddabba36cca34961414c12f7704ffff5b",
+    "bytes": 177043
+  },
+  "stories.csv": {
+    "sha256": "cc6b1755b71995e0417dc9a149f7bcdca758da5b09bad6ab8d1e8908bd3d8b9f",
+    "bytes": 4462
+  },
+  "architecture_diagram.png": {
+    "sha256": "3c9f79de17d3953b8c804d63df80ffad6138d2e54a652153228c69de6f5e7aca",
+    "bytes": 73099
+  },
+  "execution/source-preservation/text-07-stories.before-successful-run.ipynb": {
+    "sha256": "55e5ffb13a76be62f20f7bb503f6e31ddabba36cca34961414c12f7704ffff5b",
+    "bytes": 177043
+  }
+}

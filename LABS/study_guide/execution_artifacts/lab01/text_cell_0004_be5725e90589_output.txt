@@ -1,0 +1,3 @@
+Tensor c: tensor([5., 7., 9.])
+Shape of tensor c: torch.Size([3])
+Data type of tensor c: torch.float32

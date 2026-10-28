@@ -1,0 +1,25 @@
+--- notebook output 0 ---
+/Users/nicolabeccaceci/.venvs/llms-lab09/lib/python3.11/site-packages/tqdm/auto.py:21: TqdmWarning: IProgress not found. Please update jupyter and ipywidgets. See https://ipywidgets.readthedocs.io/en/stable/user_install.html
+  from .autonotebook import tqdm as notebook_tqdm
+
+--- notebook output 1 ---
+Using device: mps
+
+--- notebook output 2 ---
+
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]
+
+--- notebook output 3 ---
+
+Loading checkpoint shards:  50%|#####     | 1/2 [00:12<00:12, 12.47s/it]
+
+--- notebook output 4 ---
+
+Loading checkpoint shards: 100%|##########| 2/2 [00:16<00:00,  7.30s/it]
+
+--- notebook output 5 ---
+
+Loading checkpoint shards: 100%|##########| 2/2 [00:16<00:00,  8.07s/it]
+
+--- notebook output 6 ---
+

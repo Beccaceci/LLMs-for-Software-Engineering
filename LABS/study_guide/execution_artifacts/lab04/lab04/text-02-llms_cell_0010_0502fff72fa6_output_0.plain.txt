@@ -1,0 +1,5 @@
+['<|begin_of_text|>Hello, my name is Jessica. I am a certified massage therapist, and I am currently in school for acupuncture. I have been practicing massage for 10 years and have been practicing acupuncture for 6 years. I have a passion for helping people',
+ '<|begin_of_text|>Hello, my name is J. K. Dobbins and I am a 3rd year PhD student at the University of Colorado Boulder. I am currently working on a project to develop a model of the history of the American West, with',
+ '<|begin_of_text|>Hello, my name is Rhiannon. I am a wife and mother of two beautiful girls. I have been married for 16 years and we have two little girls, ages 4 and 2. I have been a stay at home',
+ '<|begin_of_text|>Hello, my name is Nellie and I am a 3 year old beagle mix. I am 25 pounds and I am a sweet girl. I am very friendly and I get along great with other dogs and people. I am',
+ '<|begin_of_text|>Hello, my name is Sarah, and I am a proud member of the team at the National Institute for Health and Care Excellence (NICE). I am responsible for the development of NICE guidance on children and young people’s health and care.']

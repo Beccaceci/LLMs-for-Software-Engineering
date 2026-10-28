@@ -64,9 +64,23 @@ htmlcov/
 .mypy_cache/
 
 # ==============================================================================
+# Laboratory Checkpoints, Model Weights, and Downloaded Datasets
+# ==============================================================================
+LABS/**/results/
+LABS/**/checkpoint-*/
+LABS/**/gpt2-medical-finetuned/
+LABS/**/static_quantized_model/
+LABS/**/data/
+LABS/**/*.safetensors
+LABS/**/*.pt
+LABS/**/*.pth
+LABS/**/*.tar.gz
+LABS/**/*.onnx
+LABS/**/hf_token.txt
+
+# ==============================================================================
 # Course Materials Excluded from Repository (Only Study Guide & Exams published)
 # ==============================================================================
-LABS/
 SLIDES/
 TRANSCRIPTIONS/
 SOURCES/
@@ -78,3 +92,7 @@ SOURCES/
 .vscode/
 .idea/
 .system_generated/
+STUDY_GUIDE/scratch/
+STUDY_GUIDE/coverage/
+LABS/study_guide/coverage/
+LABS/study_guide/scratch/

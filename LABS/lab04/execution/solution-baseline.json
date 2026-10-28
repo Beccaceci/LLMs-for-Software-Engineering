@@ -1,0 +1,297 @@
+{
+  "created_utc": "2026-10-26T09:29:37.062222+00:00",
+  "whisper": {
+    "originalFilename": "Lab04",
+    "playbackDurationSeconds": 4933.054666666667,
+    "segments": 801,
+    "firstSegmentMs": 1860,
+    "lastSegmentEndMs": 4934440,
+    "transcriptPath": "transcriptions/Lab04-Causal-Language-Modeling-And-Instruction-Tuned-LLMs.md",
+    "transcriptSha256": "314c02fb419763b321f34bfda6a9e6ebeb2c5cc86e6f3a34cf29564e255bdbcb"
+  },
+  "inputs": [
+    {
+      "path": "lab04/text-01-clm.ipynb",
+      "sha256": "a861feedacff806da0b657e6a80e3f957b85702c904859d67d957087f5f49025",
+      "code_cells": [
+        {
+          "index": 2,
+          "source_sha256": "cb8ed58a968014e96f3a117c12421bb49cf0745d7de963b4254240d0a573ef05",
+          "execution_count": 1,
+          "output_types": [
+            "stream",
+            "stream"
+          ],
+          "mime_types": [],
+          "has_error": false
+        },
+        {
+          "index": 5,
+          "source_sha256": "c9928d2abedc802588a6b9046c655788a1620c7f267ce1b5fdcd195e07aa3dad",
+          "execution_count": 2,
+          "output_types": [],
+          "mime_types": [],
+          "has_error": false
+        },
+        {
+          "index": 7,
+          "source_sha256": "7078f6ee92efc42b3e50a03bcfb2ba6af316950a8b621b510c4efdc8186793ff",
+          "execution_count": 3,
+          "output_types": [
+            "execute_result"
+          ],
+          "mime_types": [
+            "text/plain"
+          ],
+          "has_error": false
+        },
+        {
+          "index": 10,
+          "source_sha256": "ff1882d3ed4da13a310091ce599f95615b7b09fff126ab994fddf3b610f8d158",
+          "execution_count": 4,
+          "output_types": [],
+          "mime_types": [],
+          "has_error": false
+        },
+        {
+          "index": 12,
+          "source_sha256": "219d07079f38b8d691d6d3ec1273191a7fd134754b95437308265a351ce7b50a",
+          "execution_count": 5,
+          "output_types": [],
+          "mime_types": [],
+          "has_error": false
+        },
+        {
+          "index": 15,
+          "source_sha256": "35276a03b3039a4a7ac069c36e582f42cc0382954526193bb371934273dd0938",
+          "execution_count": 6,
+          "output_types": [
+            "display_data",
+            "stream",
+            "execute_result"
+          ],
+          "mime_types": [
+            "text/html",
+            "text/plain"
+          ],
+          "has_error": false
+        },
+        {
+          "index": 18,
+          "source_sha256": "686545b2f5aba057c3dacc69be58f7797b4eb1d822bb50826839d5d752d8e760",
+          "execution_count": 7,
+          "output_types": [],
+          "mime_types": [],
+          "has_error": false
+        },
+        {
+          "index": 19,
+          "source_sha256": "db16c5764da53c279ac8f16f3d9ca6df05fa9bdf1583b3ab28dcd8e96203c6b9",
+          "execution_count": 8,
+          "output_types": [
+            "stream"
+          ],
+          "mime_types": [],
+          "has_error": false
+        },
+        {
+          "index": 20,
+          "source_sha256": "47b78221489607d456b45374117a15ee3388aa066d08debfd816d54c6f34f31c",
+          "execution_count": 9,
+          "output_types": [
+            "stream"
+          ],
+          "mime_types": [],
+          "has_error": false
+        }
+      ]
+    },
+    {
+      "path": "lab04/text-02-llms.ipynb",
+      "sha256": "afb31984bb95e74a4f6265b9700f773b8fc90b0b80273cfd312ee503bf1dd77e",
+      "code_cells": [
+        {
+          "index": 3,
+          "source_sha256": "d4b466cc38181a760d8844e3c5f398b1fff4571ebbf142828d9c53d2cc4fc838",
+          "execution_count": 1,
+          "output_types": [
+            "stream",
+            "stream"
+          ],
+          "mime_types": [],
+          "has_error": false
+        },
+        {
+          "index": 4,
+          "source_sha256": "819bd4d00231c9f4e92d1b37afc057c1e0cdc5ed8d988d9f5214fc269a6ad8fb",
+          "execution_count": 2,
+          "output_types": [
+            "error"
+          ],
+          "mime_types": [],
+          "has_error": true
+        },
+        {
+          "index": 8,
+          "source_sha256": "56c0735d556b32107c6852ec9e1d252e38b4d46fde9a9cb22cc10c649c213e44",
+          "execution_count": null,
+          "output_types": [],
+          "mime_types": [],
+          "has_error": false
+        },
+        {
+          "index": 10,
+          "source_sha256": "0502fff72fa6c134e2a22f8012692617b22d8abe30556e43b2131dbfd2beb6b2",
+          "execution_count": null,
+          "output_types": [],
+          "mime_types": [],
+          "has_error": false
+        },
+        {
+          "index": 12,
+          "source_sha256": "0d10274c4cdca8af2b670b31655e7b7fa58c06ced63612fa8deb32deb37bdab4",
+          "execution_count": 2,
+          "output_types": [],
+          "mime_types": [],
+          "has_error": false
+        },
+        {
+          "index": 14,
+          "source_sha256": "ddbdd263da0ce66466f8505965e3b072cf4328961062f3a042c7c455763e9f1c",
+          "execution_count": null,
+          "output_types": [],
+          "mime_types": [],
+          "has_error": false
+        },
+        {
+          "index": 15,
+          "source_sha256": "bbe47852e540dac0d2ef1e49d8d88a771033861b316b94863bda105f042c069e",
+          "execution_count": 3,
+          "output_types": [
+            "stream"
+          ],
+          "mime_types": [],
+          "has_error": false
+        },
+        {
+          "index": 17,
+          "source_sha256": "d80dbd1629c28d5e0604989ebe46f45b144e575cc7ecb2d0146d6920d8eb08b2",
+          "execution_count": null,
+          "output_types": [],
+          "mime_types": [],
+          "has_error": false
+        },
+        {
+          "index": 19,
+          "source_sha256": "5fe9a0edd6cf2bc49bf93b380feb4cbd2553c9219b9908b06f4a52e1c3d2d8b0",
+          "execution_count": null,
+          "output_types": [],
+          "mime_types": [],
+          "has_error": false
+        },
+        {
+          "index": 21,
+          "source_sha256": "9f6e6aee8660c79b3b89251cce515c0d2d7b8177f57c66560a03a076c792db21",
+          "execution_count": null,
+          "output_types": [],
+          "mime_types": [],
+          "has_error": false
+        },
+        {
+          "index": 24,
+          "source_sha256": "9c3416c7a2679742e2a3fe5e80efcd31fa8482fdbf0201aa486fb118bcd80a54",
+          "execution_count": null,
+          "output_types": [],
+          "mime_types": [],
+          "has_error": false
+        },
+        {
+          "index": 26,
+          "source_sha256": "5fc77adf50bf2b98fe6df6ec6a476ca779a47b1ca83e8be60aaac069b339e4f5",
+          "execution_count": null,
+          "output_types": [],
+          "mime_types": [],
+          "has_error": false
+        },
+        {
+          "index": 29,
+          "source_sha256": "9b1a4f06ae574ddcfaf74e4ebc1d4f1aff3389b900c8ee377d109699e810171a",
+          "execution_count": 2,
+          "output_types": [
+            "stream",
+            "stream",
+            "stream",
+            "stream",
+            "stream",
+            "stream",
+            "stream",
+            "stream",
+            "stream",
+            "stream"
+          ],
+          "mime_types": [],
+          "has_error": false
+        },
+        {
+          "index": 32,
+          "source_sha256": "04942a2b7a11ed4c11893bc01c27d0e471ff1de605d7e3b2da178fedd494459f",
+          "execution_count": 3,
+          "output_types": [],
+          "mime_types": [],
+          "has_error": false
+        },
+        {
+          "index": 34,
+          "source_sha256": "aafc2120e867513a8447451d8880dcbeb4a3b3f6a3754299ae8dfceb5449d927",
+          "execution_count": 4,
+          "output_types": [],
+          "mime_types": [],
+          "has_error": false
+        },
+        {
+          "index": 36,
+          "source_sha256": "49b817fbd01221bacb802b6777eba8e5a87d3b3a64cf09227c92107ae57ca478",
+          "execution_count": 5,
+          "output_types": [
+            "stream",
+            "stream",
+            "stream",
+            "stream",
+            "stream",
+            "stream",
+            "stream",
+            "stream"
+          ],
+          "mime_types": [],
+          "has_error": false
+        },
+        {
+          "index": 37,
+          "source_sha256": "bbb6347798f4da8605fe94947ca94e99acb6dbbd9f3de5acaae01d68b4a670e6",
+          "execution_count": 6,
+          "output_types": [
+            "stream"
+          ],
+          "mime_types": [],
+          "has_error": false
+        }
+      ]
+    },
+    {
+      "path": "lab04/execution/text-01-clm.execution.json",
+      "sha256": "8c42e9471081f5fd6d42787ead331b9aca77fc8a4c1297e75ff0a1666261a184"
+    },
+    {
+      "path": "lab04/execution/text-02-llms.execution.json",
+      "sha256": "8c92616eaf628d00fc3f109e931f6bae658e2faa9a551e337d44b982df299a8f"
+    },
+    {
+      "path": "lab04/execution/environment.json",
+      "sha256": "a18037135c6e73a6622d5d6fde7c0904b16f22b695bcd7d4eb2e6022e0f15619"
+    },
+    {
+      "path": "lab04/model_answers.json",
+      "sha256": "ba4794797d373dfd9a4e67195781a02abad66e6c34751146fd2969cf2254db49"
+    }
+  ]
+}

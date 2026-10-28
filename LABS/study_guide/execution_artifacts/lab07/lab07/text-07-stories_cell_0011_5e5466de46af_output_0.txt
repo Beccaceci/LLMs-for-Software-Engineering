@@ -1,0 +1,2 @@
+Role: Visitors
+Function: Browse hiking trails

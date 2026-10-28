@@ -1,0 +1,12 @@
+{
+  "batch_first_shape": [
+    3,
+    7,
+    8
+  ],
+  "same_position_equal_across_batch": true,
+  "different_positions_distinct": true,
+  "relative_bias_registered": true,
+  "relative_bias_has_gradient": true,
+  "attention_rows_normalized": true
+}

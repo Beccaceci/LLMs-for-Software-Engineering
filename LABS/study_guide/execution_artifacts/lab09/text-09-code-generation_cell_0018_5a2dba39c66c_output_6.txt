@@ -1,0 +1,42 @@
+Qwen2.5-Coder-1.5B-Instruct_grades {'Passed': 8, 'Failed': 6, 'Errors': 0, 'Skipped': 0, 'FunctionalCorrectness': 0.5714285714285714, 'pytest_exit_code': 1, 'SourceSHA256': '41c70d817e176461bff36f9832cc21ab5a592899a3461532fd320a4f32ac2ce4'}
+{
+  "Codex": {
+    "CC": 9,
+    "MI": 58.00073622123373,
+    "LOC": 14,
+    "Comments": 0,
+    "Passed": 14,
+    "Failed": 0,
+    "Errors": 0,
+    "Skipped": 0,
+    "FunctionalCorrectness": 1.0,
+    "pytest_exit_code": 0,
+    "SourceSHA256": "42d51761595f164133f1f4ef76c696cfab648dae72a55d2c2d8b3121030b8462"
+  },
+  "Llama-3.2-3B-Instruct": {
+    "CC": 7,
+    "MI": 89.72051787423352,
+    "LOC": 38,
+    "Comments": 6,
+    "Passed": 9,
+    "Failed": 5,
+    "Errors": 0,
+    "Skipped": 0,
+    "FunctionalCorrectness": 0.6428571428571429,
+    "pytest_exit_code": 1,
+    "SourceSHA256": "71df77699c59cf835031a0116601738837086882f18d4b502d6fab131bffe79a"
+  },
+  "Qwen2.5-Coder-1.5B-Instruct": {
+    "CC": 7,
+    "MI": 62.30659087147264,
+    "LOC": 14,
+    "Comments": 0,
+    "Passed": 8,
+    "Failed": 6,
+    "Errors": 0,
+    "Skipped": 0,
+    "FunctionalCorrectness": 0.5714285714285714,
+    "pytest_exit_code": 1,
+    "SourceSHA256": "41c70d817e176461bff36f9832cc21ab5a592899a3461532fd320a4f32ac2ce4"
+  }
+}

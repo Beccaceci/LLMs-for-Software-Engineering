@@ -1,0 +1,65 @@
+{
+  "path": "LABS/lab08/text-08-roc-router-design.ipynb",
+  "sha256": "362e7feeb5519421e8d5966eced543d8e83ff3bb10f4ba3ca503c720d3a7d599",
+  "cells": [
+    {
+      "index": 1,
+      "source_sha256": "51da99b505dec12f391f132eb09d479515ac15dc51ed1694809d3df140563435",
+      "execution_count": 1,
+      "output_types": [
+        "stream",
+        "stream"
+      ],
+      "errors": []
+    },
+    {
+      "index": 3,
+      "source_sha256": "554908a77a54f752dca5e022501f904b695ba32d29e4136e9dc60dc516a3ebc8",
+      "execution_count": 2,
+      "output_types": [
+        "stream"
+      ],
+      "errors": []
+    },
+    {
+      "index": 5,
+      "source_sha256": "6a2f390d300a9a00d283b762e4d903c73aea724a0a52d43dfa297bd3979ca89d",
+      "execution_count": 3,
+      "output_types": [
+        "display_data",
+        "stream"
+      ],
+      "errors": []
+    },
+    {
+      "index": 8,
+      "source_sha256": "2524a484cca0e36240c334f1a2fb9500ac43783ab54c4238565a2c1a7bb4c496",
+      "execution_count": 4,
+      "output_types": [
+        "stream",
+        "stream",
+        "error"
+      ],
+      "errors": [
+        {
+          "name": "OSError",
+          "message": "You are trying to access a gated repo.\nMake sure to have access to it at https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct.\n401 Client Error. (Request ID: Root=1-6ade7ec5-691ec8652b233991493e6199;eb2c3bee-c88a-4a78-a871-fe6aff01b363)\n\nCannot access gated repo for url https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct/resolve/main/config.json.\nAccess to model meta-llama/Llama-3.2-3B-Instruct is restricted. You must have access to it and be authenticated to access it. Please log in."
+        }
+      ]
+    },
+    {
+      "index": 10,
+      "source_sha256": "234faf7e2d475b88a22bb2bdce74e5d6921f3dafe466d65511460c18ba60e100",
+      "execution_count": null,
+      "output_types": [],
+      "errors": []
+    },
+    {
+      "index": 12,
+      "source_sha256": "40c850426217f62210c2a38b89f47307bd9b7a99af37856a7132f762548ca2cc",
+      "execution_count": null,
+      "output_types": [],
+      "errors": []
+    }
+  ]
+}

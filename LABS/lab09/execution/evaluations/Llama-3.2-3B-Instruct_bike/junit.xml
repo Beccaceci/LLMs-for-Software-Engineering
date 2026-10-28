@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="8" skipped="0" tests="19" time="0.034" timestamp="2026-10-26T17:54:53.225645+01:00" hostname="Nicolas-MacBook-Pro.local"><testcase classname="test_cases_03" name="test_boundaries[A-30-105]" time="0.000" /><testcase classname="test_cases_03" name="test_boundaries[A-30.001-110]" time="0.001"><failure message="assert 100 == 110 ± 1.1e-04&#10;  &#10;  comparison failed&#10;  Obtained: 100&#10;  Expected: 110 ± 1.1e-04">test_cases_03.py:4: in test_boundaries
+    def test_boundaries(category,speed,expected): assert computeMaxTime(100,speed,category) == pytest.approx(expected)
+                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   assert 100 == 110 ± 1.1e-04
+E     
+E     comparison failed
+E     Obtained: 100
+E     Expected: 110 ± 1.1e-04</failure></testcase><testcase classname="test_cases_03" name="test_boundaries[A-35-110]" time="0.000"><failure message="assert 100 == 110 ± 1.1e-04&#10;  &#10;  comparison failed&#10;  Obtained: 100&#10;  Expected: 110 ± 1.1e-04">test_cases_03.py:4: in test_boundaries
+    def test_boundaries(category,speed,expected): assert computeMaxTime(100,speed,category) == pytest.approx(expected)
+                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   assert 100 == 110 ± 1.1e-04
+E     
+E     comparison failed
+E     Obtained: 100
+E     Expected: 110 ± 1.1e-04</failure></testcase><testcase classname="test_cases_03" name="test_boundaries[A-35.001-115]" time="0.000"><failure message="assert 100 == 115 ± 1.1e-04&#10;  &#10;  comparison failed&#10;  Obtained: 100&#10;  Expected: 115 ± 1.1e-04">test_cases_03.py:4: in test_boundaries
+    def test_boundaries(category,speed,expected): assert computeMaxTime(100,speed,category) == pytest.approx(expected)
+                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   assert 100 == 115 ± 1.1e-04
+E     
+E     comparison failed
+E     Obtained: 100
+E     Expected: 115 ± 1.1e-04</failure></testcase><testcase classname="test_cases_03" name="test_boundaries[B-30-120]" time="0.000" /><testcase classname="test_cases_03" name="test_boundaries[B-30.001-125]" time="0.000"><failure message="assert 120.0 == 125 ± 1.3e-04&#10;  &#10;  comparison failed&#10;  Obtained: 120.0&#10;  Expected: 125 ± 1.3e-04">test_cases_03.py:4: in test_boundaries
+    def test_boundaries(category,speed,expected): assert computeMaxTime(100,speed,category) == pytest.approx(expected)
+                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   assert 120.0 == 125 ± 1.3e-04
+E     
+E     comparison failed
+E     Obtained: 120.0
+E     Expected: 125 ± 1.3e-04</failure></testcase><testcase classname="test_cases_03" name="test_boundaries[B-35-125]" time="0.000"><failure message="assert 120.0 == 125 ± 1.3e-04&#10;  &#10;  comparison failed&#10;  Obtained: 120.0&#10;  Expected: 125 ± 1.3e-04">test_cases_03.py:4: in test_boundaries
+    def test_boundaries(category,speed,expected): assert computeMaxTime(100,speed,category) == pytest.approx(expected)
+                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   assert 120.0 == 125 ± 1.3e-04
+E     
+E     comparison failed
+E     Obtained: 120.0
+E     Expected: 125 ± 1.3e-04</failure></testcase><testcase classname="test_cases_03" name="test_boundaries[B-35.001-130]" time="0.000"><failure message="assert 100 == 130 ± 1.3e-04&#10;  &#10;  comparison failed&#10;  Obtained: 100&#10;  Expected: 130 ± 1.3e-04">test_cases_03.py:4: in test_boundaries
+    def test_boundaries(category,speed,expected): assert computeMaxTime(100,speed,category) == pytest.approx(expected)
+                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   assert 100 == 130 ± 1.3e-04
+E     
+E     comparison failed
+E     Obtained: 100
+E     Expected: 130 ± 1.3e-04</failure></testcase><testcase classname="test_cases_03" name="test_boundaries[C-20-150]" time="0.000" /><testcase classname="test_cases_03" name="test_boundaries[C-40-150]" time="0.000" /><testcase classname="test_cases_03" name="test_invalid[args0]" time="0.000" /><testcase classname="test_cases_03" name="test_invalid[args1]" time="0.000" /><testcase classname="test_cases_03" name="test_invalid[args2]" time="0.000" /><testcase classname="test_cases_03" name="test_invalid[args3]" time="0.000" /><testcase classname="test_cases_03" name="test_invalid[args4]" time="0.000" /><testcase classname="test_cases_03" name="test_invalid[args5]" time="0.000" /><testcase classname="test_cases_03" name="test_invalid[args6]" time="0.000"><failure message="AssertionError: assert nan == 0&#10; +  where nan = computeMaxTime(*(nan, 30, 'A'))">test_cases_03.py:6: in test_invalid
+    def test_invalid(args): assert computeMaxTime(*args) == 0
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AssertionError: assert nan == 0
+E    +  where nan = computeMaxTime(*(nan, 30, 'A'))</failure></testcase><testcase classname="test_cases_03" name="test_invalid[args7]" time="0.000"><failure message="AssertionError: assert 105.0 == 0&#10; +  where 105.0 = computeMaxTime(*(100, True, 'A'))">test_cases_03.py:6: in test_invalid
+    def test_invalid(args): assert computeMaxTime(*args) == 0
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AssertionError: assert 105.0 == 0
+E    +  where 105.0 = computeMaxTime(*(100, True, 'A'))</failure></testcase><testcase classname="test_cases_03" name="test_invalid[args8]" time="0.000" /></testsuite></testsuites>

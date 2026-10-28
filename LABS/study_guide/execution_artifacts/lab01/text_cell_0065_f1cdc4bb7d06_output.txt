@@ -1,0 +1,4 @@
+Downloading: "https://download.pytorch.org/models/resnet18-f37072fd.pth" to /Users/nicolabeccaceci/.cache/torch/hub/checkpoints/resnet18-f37072fd.pth
+
+
+100%|██████████| 44.7M/44.7M [00:06<00:00, 7.69MB/s]

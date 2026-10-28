@@ -1,0 +1,695 @@
+\documentclass[../labs.tex]{subfiles}
+egin{document}
+
+\section[Grade generation]{Exercise 1: generating and evaluating the grade function}
+
+\label{sec:lab09-grades}
+
+The first exercise turns a precise grade rule into an executable reference, checks it at boundaries, and measures two observed generated implementations against the same test suite. The process moves from specification and tests to inference, evaluation, static analysis, and a compact metric plot.
+
+\begin{figure}[htbp]\centering\resizebox{\linewidth}{!}{\begin{tikzpicture}[>=Stealth,stage/.style={draw=steelBlue,fill=skyBlue,rounded corners,align=center,text width=3.0cm,minimum height=.85cm,font=\small\sffamily}]\node[stage](a){Grade requirement};\node[stage,right=7mm of a](b){Reference code\\and tests};\node[stage,right=7mm of b](c){Llama generation};\node[stage,right=7mm of c](d){pytest and\\Radon metrics};\node[stage,right=7mm of d](e){Metric figure};\draw[->,thick,steelBlue](a)--(b);\draw[->,thick,steelBlue](b)--(c);\draw[->,thick,steelBlue](c)--(d);\draw[->,thick,steelBlue](d)--(e);\end{tikzpicture}}\caption{The grade solution is evaluated against a fixed contract and test suite.}\end{figure}
+
+\medskip\noindent The input is six grades and an explicit validity rule; the desired result is a trimmed mean and predictable exceptions. A useful comparison must therefore check both valid numerical results and rejection behavior, then interpret test outcomes alongside static metrics.
+
+\medskip\noindent We start with an executable reference for the grade requirement: exactly six finite real values, each from 18 through 30 or equal to 33 for laude; one minimum and one maximum are removed, and the input must remain unchanged. The function checks types and values before sorting, so malformed input cannot silently become a plausible average. A fresh Codex-authored baseline is stored with its provenance; it is not presented as a ChatGPT response.
+
+% coverage-cell: LABS/lab09/text-09-code-generation.ipynb cell=1 source_sha256=8dd68aba9dbab4d7ab39f142b94af5a9cc64a1d5a0af4c9e69897fad0853e50c
+
+\begin{lstlisting}[style=studycode]
+def compute_average(grades):
+    """Trim one minimum and maximum from six valid grades; do not mutate input."""
+    from numbers import Real
+    import math
+    if not isinstance(grades, (list, tuple)) or len(grades) != 6:
+        raise ValueError("Exactly six grades are required")
+    for grade in grades:
+        if isinstance(grade, bool):
+            raise ValueError("Boolean values are not grades")
+        if not isinstance(grade, Real):
+            raise TypeError("Grades must be real numbers")
+        if not math.isfinite(grade) or not (18 <= grade <= 30 or grade == 33):
+            raise ValueError("Grades must be between 18 and 30, or 33 for laude")
+    return sum(sorted(grades)[1:-1]) / 4
+
+from pathlib import Path
+import json
+
+print(f"The computed average is: {compute_average([18,25,30,33,22,28]):.2f}")
+# Fresh code authored by this Codex agent in this session, not a captured ChatGPT UI response.
+# Preserve provenance rather than falsely labeling this as an external GPT run.
+codex_result = 'def compute_average(grades):\n    """Return the trimmed mean of six grades, with 33 representing laude."""\n    import math\n    from numbers import Real\n    if not isinstance(grades, (list, tuple)) or len(grades) != 6:\n        raise ValueError("Expected exactly six grades")\n    for value in grades:\n        if isinstance(value, bool):\n            raise ValueError("A boolean is not a grade")\n        if not isinstance(value, Real):\n            raise TypeError("Expected numeric grades")\n        if not math.isfinite(value) or not (18 <= value <= 30 or value == 33):\n            raise ValueError("Invalid grade")\n    return (sum(grades) - min(grades) - max(grades)) / 4\n'
+my_codes = {"Codex": codex_result}
+code_provenance = {"Codex": "Fresh Codex-generated baseline from this solving session"}
+Path("function_01.py").write_text(codex_result)
+print(code_provenance)
+
+sys_prompt = "You are a Python programmer. Return only valid Python source, without Markdown fences or explanations."
+query = """Implement compute_average(grades). Require exactly six grades; accept real values from 18 to 30 inclusive or 33 for laude. Reject booleans/invalid values with ValueError and nonnumeric values with TypeError. Return the arithmetic mean after removing exactly one minimum and one maximum. Do not mutate the input."""
+\end{lstlisting}
+
+\label{out:lab09-cell-0001}
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=1 output=0 source_sha256=8dd68aba9dbab4d7ab39f142b94af5a9cc64a1d5a0af4c9e69897fad0853e50c payload_sha256=42f5ca716961aab0113d02b24823f69783086497e6e398fbb3a1d18e768002e5 artifact=study_guide/execution_artifacts/lab09/lab09-cell-0001-outputs.txt
+
+\lstinputlisting[style=terminalOutput]{../../execution_artifacts/lab09/lab09-cell-0001-outputs.txt}
+
+The sample \texttt{[18, 25, 30, 33, 22, 28]} produces 26.25 after removing 18 and 33 and averaging the remaining four grades. The accompanying provenance dictionary identifies the generated source as a new Codex baseline from this session.
+
+\medskip\noindent The next cell expresses the contract as black-box pytest tests. Parametrized cases cover ordinary and laude values, tied minima or maxima, fractional grades, invalid list lengths and bounds, NaN/infinity, booleans, and nonnumeric types. It also verifies that valid lists are not mutated. These tests establish the reference oracle before generated implementations are compared.
+
+% coverage-cell: LABS/lab09/text-09-code-generation.ipynb cell=3 source_sha256=bdc8c2e15919968abfed734da21dcda9329e3566b803b0515929121a8a96c8a1
+
+\begin{lstlisting}[style=studycode]
+import pytest
+
+@pytest.mark.parametrize("grades, expected", [
+    ([18,25,30,33,22,28],26.25),
+    ([20,25,30,33,29,28],28.0),
+    ([18,19,20,30,33,25],23.5),
+    ([18]*6,18.0), ([30]*6,30.0), ([33]*6,33.0),
+    ([25]*6,25.0), ([18,18,18,33,33,33],25.5),
+    ([18.5,20,22,24,26,30],23.0),
+])
+def test_valid_grades(grades, expected):
+    original = grades.copy()
+    assert compute_average(grades) == pytest.approx(expected, abs=1e-10)
+    assert grades == original
+
+@pytest.mark.parametrize("grades", [[18]*5,[18]*7,[],[17,20,22,24,26,30],
+    [34,20,22,24,26,30],[31,20,22,24,26,30],[32,20,22,24,26,30],
+    [float("nan"),20,22,24,26,30],[float("inf"),20,22,24,26,30],
+    [True,20,22,24,26,30]])
+def test_invalid_grades(grades):
+    with pytest.raises(ValueError): compute_average(grades)
+
+@pytest.mark.parametrize("value", ["25",None,complex(25,0)])
+def test_non_numeric_grades(value):
+    with pytest.raises(TypeError): compute_average([value,20,22,24,26,30])
+\end{lstlisting}
+
+This cell defines the test cases but does not execute them; the following cell runs them against the reference function.
+
+\medskip\noindent The notebook runs the tests in a fresh ipytest module and stops immediately if the reference fails. That guard prevents subsequent model comparisons from measuring a faulty oracle. The run also calls out a disagreement in one unchanged supplied test: its 1% tolerance accepts an expectation of 27.75 for a case whose exact trimmed average is 28.0.
+
+% coverage-cell: LABS/lab09/text-09-code-generation.ipynb cell=5 source_sha256=ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5
+
+\begin{lstlisting}[style=studycode]
+import ipytest
+ipytest.autoconfig()
+# A clean notebook test module, independent of test files used for model comparison.
+reference_exit_code = ipytest.run("-vv")
+if int(reference_exit_code) != 0:
+    raise RuntimeError("Reference tests failed; fix the reference before comparing generated code")
+print("All notebook reference boundary/validation tests passed.")
+print("Supplied test_valid_grades_with_30laude expects 27.75 with 1% tolerance; exact answer is 28.0.")
+print("The supplied test file is preserved; strict tests above check the exact result.")
+\end{lstlisting}
+
+\label{out:lab09-cell-0005}
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=5 output=0 source_sha256=ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5 payload_sha256=b1f048b0e34b4ce3cfba768c7b851bfa4e9e4b304e8576b5e9afc51c88c48fbf artifact=study_guide/execution_artifacts/lab09/lab09-cell-0005-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=5 output=1 source_sha256=ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5 payload_sha256=4346e3ec25500311b72f71c5c203b3c726e2a8e5746608e0e6cdcd0197426270 artifact=study_guide/execution_artifacts/lab09/lab09-cell-0005-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=5 output=2 source_sha256=ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5 payload_sha256=2ce7700ef18fa8ffc3896dd9f9d7ea1e8ae53c0486d03a88ed00418de281bfcb artifact=study_guide/execution_artifacts/lab09/lab09-cell-0005-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=5 output=3 source_sha256=ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5 payload_sha256=1abdb597a44a638ef5e47d407e5812468e89b65f8b4a2d347b920c7a6653b8af artifact=study_guide/execution_artifacts/lab09/lab09-cell-0005-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=5 output=4 source_sha256=ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5 payload_sha256=0754c74b23805fd2f69eae23419973440422ec85a42d406a067aa2f44b43bcc0 artifact=study_guide/execution_artifacts/lab09/lab09-cell-0005-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=5 output=5 source_sha256=ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5 payload_sha256=cdc0b0da32843d30d38cf4e9994ce3497008cb5d9bc0dc620ee6101e29dc6302 artifact=study_guide/execution_artifacts/lab09/lab09-cell-0005-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=5 output=6 source_sha256=ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5 payload_sha256=61f3a3c3bf7a9609081e789f5e0589093ac29d72601fd88e7f5a8188e8b917be artifact=study_guide/execution_artifacts/lab09/lab09-cell-0005-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=5 output=7 source_sha256=ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5 payload_sha256=6ba611e9de2ff0d74d96f05fa0f241dc6f33bdc0ff91aa6098a74a8f4907623e artifact=study_guide/execution_artifacts/lab09/lab09-cell-0005-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=5 output=8 source_sha256=ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5 payload_sha256=80d5b4d132fcc9342bf63f5c38846829b4949c20302bbf90ffe0d1c881b5784b artifact=study_guide/execution_artifacts/lab09/lab09-cell-0005-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=5 output=9 source_sha256=ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5 payload_sha256=5677aedf900053dfcc46bec605f4132a7bf5f6fad51dcffd4173b1d4fa09b267 artifact=study_guide/execution_artifacts/lab09/lab09-cell-0005-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=5 output=10 source_sha256=ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5 payload_sha256=2aa74cddb1f5bc7a1018e3c9a6fe4ab9969fa09d21e4d4f2580b11071a22ba5d artifact=study_guide/execution_artifacts/lab09/lab09-cell-0005-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=5 output=11 source_sha256=ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5 payload_sha256=d6d2e3c1704dd958bd9e35b049b6800bcf103ae8d5d674fd2a8d019aceb76e71 artifact=study_guide/execution_artifacts/lab09/lab09-cell-0005-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=5 output=12 source_sha256=ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5 payload_sha256=fb01ab75fe7ff4911bfe8126ff6924266f5c181a7e899c8a53bd01826902dc93 artifact=study_guide/execution_artifacts/lab09/lab09-cell-0005-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=5 output=13 source_sha256=ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5 payload_sha256=65dc43c76b3840e64e919ce3735242daa7b536207adc247f9c4628f208cd5478 artifact=study_guide/execution_artifacts/lab09/lab09-cell-0005-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=5 output=14 source_sha256=ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5 payload_sha256=072b08e34785eac811b5a3ed80ff39430eea6b96d2a3e065e60e7ac03458de5c artifact=study_guide/execution_artifacts/lab09/lab09-cell-0005-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=5 output=15 source_sha256=ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5 payload_sha256=15e7e31a6d2c62e4d051f8f7ca6d86269e46a9aab1b5f92a4a61d5a976d520e0 artifact=study_guide/execution_artifacts/lab09/lab09-cell-0005-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=5 output=16 source_sha256=ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5 payload_sha256=ce896eeae9e95e47fee35d2698aaa386246e71a90cf882760a218007c0200bc7 artifact=study_guide/execution_artifacts/lab09/lab09-cell-0005-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=5 output=17 source_sha256=ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5 payload_sha256=43d2c7e750b331c1a8ec163b388ce037a869935ace0fa0bedf00b1dfa589b7f2 artifact=study_guide/execution_artifacts/lab09/lab09-cell-0005-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=5 output=18 source_sha256=ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5 payload_sha256=c45c62ff2ff9a19e8c5f6c3d6fda0d8f51476609148ab269e5b082ad1e1daecf artifact=study_guide/execution_artifacts/lab09/lab09-cell-0005-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=5 output=19 source_sha256=ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5 payload_sha256=612d3461c10b5b92369757b2ae4d94d2f22b97658000db64229c3da00f380453 artifact=study_guide/execution_artifacts/lab09/lab09-cell-0005-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=5 output=20 source_sha256=ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5 payload_sha256=d84cab7535eac38b39c553b0dfb0a0d2edd7c7c27b857589c0abf00a145e3638 artifact=study_guide/execution_artifacts/lab09/lab09-cell-0005-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=5 output=21 source_sha256=ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5 payload_sha256=b2ed98b246aec805cc921c279c356e60f64c4284d371e4306fc664c89298cdfb artifact=study_guide/execution_artifacts/lab09/lab09-cell-0005-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=5 output=22 source_sha256=ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5 payload_sha256=cbe3924e8b1b850fcdfa30409b37c434e9bcf7df3349a139f08ebc587552fd05 artifact=study_guide/execution_artifacts/lab09/lab09-cell-0005-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=5 output=23 source_sha256=ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5 payload_sha256=05b4003a80594096d343062fc4330dee93088bf9aaf7213b6cfcc043d4e7bcb7 artifact=study_guide/execution_artifacts/lab09/lab09-cell-0005-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=5 output=24 source_sha256=ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5 payload_sha256=20742adf2f358f6f37f53edb60346c4042a28a355d4a33a1a3047d03ed7a39ad artifact=study_guide/execution_artifacts/lab09/lab09-cell-0005-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=5 output=25 source_sha256=ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5 payload_sha256=0f21ec4b67e68928362a3f522d01abc3e3a0e76837fdb64bc525adb76ef71e50 artifact=study_guide/execution_artifacts/lab09/lab09-cell-0005-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=5 output=26 source_sha256=ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5 payload_sha256=6c61147e9baaaa95f785c13e95e10c8146a0584aa342ccd8fc57e1120ebb4eff artifact=study_guide/execution_artifacts/lab09/lab09-cell-0005-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=5 output=27 source_sha256=ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5 payload_sha256=bdb0f4afdc9d0644bbffe6d48f670153640775f7ceafe302e272339629e1df68 artifact=study_guide/execution_artifacts/lab09/lab09-cell-0005-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=5 output=28 source_sha256=ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5 payload_sha256=49a1b0849839266472f6ca40b6671307b228b79c316194b73e83283b02b5daee artifact=study_guide/execution_artifacts/lab09/lab09-cell-0005-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=5 output=29 source_sha256=ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5 payload_sha256=f70f77af58443acc74ca280b49a1d7a6827a8e6b8798a236457296c59bf9df1e artifact=study_guide/execution_artifacts/lab09/lab09-cell-0005-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=5 output=30 source_sha256=ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5 payload_sha256=cef0fc19def31a641d9476967440c6fee79b5394277a9baf4c5607f82b214b2d artifact=study_guide/execution_artifacts/lab09/lab09-cell-0005-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=5 output=31 source_sha256=ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5 payload_sha256=966b64b410b8fe6dd3a65c622dead93fcf2b8c625a7718ef77a78ca33134bf95 artifact=study_guide/execution_artifacts/lab09/lab09-cell-0005-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=5 output=32 source_sha256=ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5 payload_sha256=41eba66d43f69601e69b7a6a52a08c37ffcfdd766dbc043b7e4bcd83fe163766 artifact=study_guide/execution_artifacts/lab09/lab09-cell-0005-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=5 output=33 source_sha256=ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5 payload_sha256=3416b15a0b3c835e138d4b152ecf9e0a8485d8b63e32c1d5c42228e3e67c33aa artifact=study_guide/execution_artifacts/lab09/lab09-cell-0005-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=5 output=34 source_sha256=ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5 payload_sha256=2ab0b883fae657c3c828e206f94669cc6f43b09438c8181defcc935a575b440b artifact=study_guide/execution_artifacts/lab09/lab09-cell-0005-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=5 output=35 source_sha256=ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5 payload_sha256=2d7f8fa44961a01d2892e8e26078de5056e205109c70cf24c5a3200da3a19f17 artifact=study_guide/execution_artifacts/lab09/lab09-cell-0005-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=5 output=36 source_sha256=ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5 payload_sha256=6a4065bdce4ff214e1d5f55d0e13996e31587c241cedb55d9ffdc3ede695ceb3 artifact=study_guide/execution_artifacts/lab09/lab09-cell-0005-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=5 output=37 source_sha256=ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5 payload_sha256=83d0c516744011fa93ed830b73d5e5ff005de00534587e05fc7e0f02680ec777 artifact=study_guide/execution_artifacts/lab09/lab09-cell-0005-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=5 output=38 source_sha256=ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5 payload_sha256=bef0b1880e696b3ff9d87aa7896a840e73b6cd83949f26ab47294ca57c7bb3a3 artifact=study_guide/execution_artifacts/lab09/lab09-cell-0005-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=5 output=39 source_sha256=ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5 payload_sha256=c27df7e289a713ad786abf448fcf57361bbfa7ae0a5685fafa714809009597c9 artifact=study_guide/execution_artifacts/lab09/lab09-cell-0005-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=5 output=40 source_sha256=ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5 payload_sha256=69959b09fce619c0067b9f2f83ae4c7c964d669e7ccb157c84f64c8710dea387 artifact=study_guide/execution_artifacts/lab09/lab09-cell-0005-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=5 output=41 source_sha256=ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5 payload_sha256=24cdc207fc7bbdaa9994f323f2a1a423f82f00e2579a9b680818fa54f9a138ba artifact=study_guide/execution_artifacts/lab09/lab09-cell-0005-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=5 output=42 source_sha256=ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5 payload_sha256=b819612dfb4b5151dff61ce2ac73ca449110941b775481035393c943e77f18cb artifact=study_guide/execution_artifacts/lab09/lab09-cell-0005-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=5 output=43 source_sha256=ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5 payload_sha256=243a7cf00fc79451affa177888a27ba672e424f1cc32ff24763a1ba6b2d6acf9 artifact=study_guide/execution_artifacts/lab09/lab09-cell-0005-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=5 output=44 source_sha256=ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5 payload_sha256=263a685c9b232ba22b9f9f55f5eccde13ccbbf358db2c12130695c0eba4c9fac artifact=study_guide/execution_artifacts/lab09/lab09-cell-0005-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=5 output=45 source_sha256=ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5 payload_sha256=614c34ad70d4d21a97c2a50a6501d532123596a6ea801ac9c66846eadc4a176f artifact=study_guide/execution_artifacts/lab09/lab09-cell-0005-outputs.txt
+
+\lstinputlisting[style=terminalOutput]{../../execution_artifacts/lab09/lab09-cell-0005-outputs.txt}
+
+All 22 notebook-authored reference tests pass. The supplied test is preserved rather than edited; a strict exact-value assertion checks the 28.0 result independently.
+
+\medskip\noindent With a passing reference, this cell prepares the pinned local inference workflow. It chooses MPS when available, seeds generation, and keeps only one model resident at a time, explicitly clearing accelerator memory before switching. The requested Hugging Face model ID is \texttt{meta-llama/Llama-3.2-3B-Instruct}; despite the original notebook wording, it is Llama 3.2, not CodeLlama. The helper returns only generated continuation text, while \texttt{apply\_chat\_template} will serialize system and user messages for the model.
+
+% coverage-cell: LABS/lab09/text-09-code-generation.ipynb cell=7 source_sha256=c9c19a76b65da5f143fa2d720bb233b443dcc1fa029cf1bf3c013c39304569e8
+
+\begin{lstlisting}[style=studycode]
+import gc
+import torch
+from huggingface_hub import get_token
+from transformers import AutoTokenizer, AutoModelForCausalLM, set_seed
+
+set_seed(42)
+torch.set_num_threads(2)
+device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
+print("Using device:", device)
+model = tokenizer = None
+current_model_id = None
+
+def select_engine(model_id):
+    """Hold one model at a time so comparisons fit the local memory budget."""
+    global model, tokenizer, current_model_id
+    if current_model_id == model_id and model is not None:
+        return
+    model = tokenizer = None
+    current_model_id = None
+    gc.collect()
+    if device == "mps": torch.mps.empty_cache()
+    if device == "cuda": torch.cuda.empty_cache()
+    dtype = torch.float16 if device != "cpu" else torch.float32
+    model = AutoModelForCausalLM.from_pretrained(
+        model_id, torch_dtype=dtype, low_cpu_mem_usage=True,
+        token=get_token(),
+    ).to(device).eval()
+    tokenizer = AutoTokenizer.from_pretrained(model_id, token=get_token())
+    tokenizer.pad_token = tokenizer.eos_token
+    current_model_id = model_id
+
+def make_a_query(prompt, tokenizer, model, device, max_new_tokens=768):
+    inputs = tokenizer(prompt, return_tensors="pt", add_special_tokens=False).to(device)
+    with torch.inference_mode():
+        output = model.generate(**inputs, max_new_tokens=max_new_tokens,
+            do_sample=False, pad_token_id=tokenizer.eos_token_id)
+    return tokenizer.decode(output[0, inputs["input_ids"].shape[1]:], skip_special_tokens=True).strip()
+
+# The supplied checkpoint is Llama 3.2, despite the original heading saying CodeLlama.
+model_id = "meta-llama/Llama-3.2-3B-Instruct"
+select_engine(model_id)
+\end{lstlisting}
+
+\label{out:lab09-cell-0007}
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=7 output=0 source_sha256=c9c19a76b65da5f143fa2d720bb233b443dcc1fa029cf1bf3c013c39304569e8 payload_sha256=ba7c6f9a0b658c37797699083ea9956e0b5fe58468fa3517346192ecd8fbee41 artifact=study_guide/execution_artifacts/lab09/lab09-cell-0007-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=7 output=1 source_sha256=c9c19a76b65da5f143fa2d720bb233b443dcc1fa029cf1bf3c013c39304569e8 payload_sha256=b41efeece60cddf239ffc076476f5b040c0c482e4748d1045be6be5a9ef70b2d artifact=study_guide/execution_artifacts/lab09/lab09-cell-0007-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=7 output=2 source_sha256=c9c19a76b65da5f143fa2d720bb233b443dcc1fa029cf1bf3c013c39304569e8 payload_sha256=fa52eeb332a913bde139573dd57f4c07ecd15b7fb5674d04824f0776fd330e88 artifact=study_guide/execution_artifacts/lab09/lab09-cell-0007-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=7 output=3 source_sha256=c9c19a76b65da5f143fa2d720bb233b443dcc1fa029cf1bf3c013c39304569e8 payload_sha256=e44c0a64d44b07f48af07806c3ba9955d220588cf3cd8d0b19925305719e1722 artifact=study_guide/execution_artifacts/lab09/lab09-cell-0007-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=7 output=4 source_sha256=c9c19a76b65da5f143fa2d720bb233b443dcc1fa029cf1bf3c013c39304569e8 payload_sha256=fe1ce7da5ce4e25c2a44d11c1e0c83bb6f328f748b8d59357fc12bda3fd997f6 artifact=study_guide/execution_artifacts/lab09/lab09-cell-0007-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=7 output=5 source_sha256=c9c19a76b65da5f143fa2d720bb233b443dcc1fa029cf1bf3c013c39304569e8 payload_sha256=ce54914de2dfa25834e5c8d51b3c56fbea61debaba828003ae34a2bd147ea983 artifact=study_guide/execution_artifacts/lab09/lab09-cell-0007-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=7 output=6 source_sha256=c9c19a76b65da5f143fa2d720bb233b443dcc1fa029cf1bf3c013c39304569e8 payload_sha256=20edaa3e50bf40ea9d7f0ac1fb0c44b3e7771949761d7a46df51f9ab1ceac876 artifact=study_guide/execution_artifacts/lab09/lab09-cell-0007-outputs.txt
+
+\lstinputlisting[style=terminalOutput]{../../execution_artifacts/lab09/lab09-cell-0007-outputs.txt}
+
+The clean execution selected MPS and loaded both checkpoint shards. The widget progress warning is environmental display noise; the weights loaded successfully. The notebook does not pin a repository commit, so the PDF records the model ID and runtime environment without inventing a revision.
+
+\medskip\noindent Now the grade requirements are framed as a system instruction and a user task, then serialized with the model's official chat template and an assistant-generation prefix. Greedy decoding requests at most 768 new tokens. The code removes only an enclosing Markdown fence if one appears and stores the actual result and model ID for downstream test execution.
+
+% coverage-cell: LABS/lab09/text-09-code-generation.ipynb cell=8 source_sha256=438e1a5ac6dd089cdf2cdd02e62fa39ef23306bf92d5aea5681184fb4d905209
+
+\begin{lstlisting}[style=studycode]
+sys_prompt = "You are a Python programmer. Return only valid Python source, without Markdown fences or explanations."
+query = """Implement compute_average(grades). Require exactly six grades; accept real values from 18 to 30 inclusive or 33 for laude. Reject booleans/invalid values with ValueError and nonnumeric values with TypeError. Return the arithmetic mean after removing exactly one minimum and one maximum. Do not mutate the input."""
+prompt = tokenizer.apply_chat_template([
+    {"role":"system","content":sys_prompt},
+    {"role":"user","content":query},
+], tokenize=False, add_generation_prompt=True)
+generated_code = make_a_query(prompt, tokenizer, model, device)
+# Remove only an enclosing Markdown code fence if the instruction was not followed.
+if generated_code.startswith("```"):
+    generated_code = generated_code.split("\n",1)[1].rsplit("```",1)[0].strip()
+my_codes["Llama-3.2-3B-Instruct"] = generated_code
+code_provenance["Llama-3.2-3B-Instruct"] = current_model_id
+print(generated_code)
+\end{lstlisting}
+
+\label{out:lab09-cell-0008}
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=8 output=0 source_sha256=438e1a5ac6dd089cdf2cdd02e62fa39ef23306bf92d5aea5681184fb4d905209 payload_sha256=82451a8209c52ec24e9b5d6ba8a84f2157fa57de367a4f348376a3d66cc6bc98 artifact=study_guide/execution_artifacts/lab09/lab09-cell-0008-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=8 output=1 source_sha256=438e1a5ac6dd089cdf2cdd02e62fa39ef23306bf92d5aea5681184fb4d905209 payload_sha256=6b102530af96399a5c855f08070d0ff0fe51a055b74bd9b6d3c1832e4a7a899f artifact=study_guide/execution_artifacts/lab09/lab09-cell-0008-outputs.txt
+
+\lstinputlisting[style=terminalOutput]{../../execution_artifacts/lab09/lab09-cell-0008-outputs.txt}
+
+The recorded Llama completion is printed in full in the output block. The generation configuration also emits warnings because temperature and top-p are set while \texttt{do\_sample=False}; those sampling controls are inert under greedy decoding. The generated function is tested next without rewriting or repairing it.
+
+\medskip\noindent To evaluate generated code, this helper runs pytest in a temporary directory with a fresh import path, writes JUnit XML, and parses individual test outcomes instead of relying on fragile summary-text parsing. It saves stdout and the report under \texttt{execution/evaluations/}, then returns passed, failed, error, skipped, and functional-correctness values. This isolates each candidate from stale bytecode and earlier models' files.
+
+% coverage-cell: LABS/lab09/text-09-code-generation.ipynb cell=10 source_sha256=1daeed1554491deb6421c00cb61d7ad76dba507839602ffd097b75fb481185f7
+
+\begin{lstlisting}[style=studycode]
+import hashlib
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import xml.etree.ElementTree as ET
+from pathlib import Path
+
+def parse_test_results(result_string):
+    def count(pattern):
+        match = re.search(pattern, result_string)
+        return int(match.group(1)) if match else 0
+    return count(r"(\d+)\s+errors?"), count(r"(\d+)\s+failed"), count(r"(\d+)\s+passed")
+
+def evaluate_code(code, test_file="test_cases_01.py", function_file="function_01.py", name="generated"):
+    # Each subprocess gets a fresh import directory; no model can inherit the prior code's bytecode.
+    evidence = Path("execution") / "evaluations" / re.sub(r"[^A-Za-z0-9_.-]", "_", name)
+    evidence.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="lab09-tests-") as temporary:
+        run_dir = Path(temporary)
+        (run_dir/function_file).write_text(code)
+        shutil.copy2(test_file, run_dir/Path(test_file).name)
+        result = subprocess.run([sys.executable,"-m","pytest",Path(test_file).name,
+            "-q","--disable-warnings","--tb=short","--color=no","--junitxml=report.xml"],
+            cwd=run_dir, capture_output=True, text=True, timeout=60)
+        (evidence/"stdout.txt").write_text(result.stdout+result.stderr)
+        report = run_dir/"report.xml"
+        if not report.exists(): raise RuntimeError("pytest produced no test report: "+result.stderr)
+        shutil.copy2(report,evidence/"junit.xml")
+        cases = ET.parse(report).getroot().findall(".//testcase")
+        failures = sum(case.find("failure") is not None for case in cases)
+        errors = sum(case.find("error") is not None for case in cases)
+        skipped = sum(case.find("skipped") is not None for case in cases)
+        passes = len(cases)-failures-errors-skipped
+        total = passes+failures+errors
+        if total == 0: raise RuntimeError("No tests ran")
+        metrics = {"Passed":passes,"Failed":failures,"Errors":errors,"Skipped":skipped,
+            "FunctionalCorrectness":passes/total,"pytest_exit_code":result.returncode,
+            "SourceSHA256":hashlib.sha256(code.encode()).hexdigest()}
+        (evidence/"metrics.json").write_text(json.dumps(metrics,indent=2))
+        print(name,metrics)
+        return metrics
+
+codex_metrics = evaluate_code(my_codes["Codex"],name="Codex_grades")
+codex_functional_correctness = codex_metrics["FunctionalCorrectness"]
+\end{lstlisting}
+
+\label{out:lab09-cell-0010}
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=10 output=0 source_sha256=1daeed1554491deb6421c00cb61d7ad76dba507839602ffd097b75fb481185f7 payload_sha256=cd205113b2cc40b09983087b924f71a6b98320b4e9597ba799facf67eb379fdb artifact=study_guide/execution_artifacts/lab09/lab09-cell-0010-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=10 output=1 source_sha256=1daeed1554491deb6421c00cb61d7ad76dba507839602ffd097b75fb481185f7 payload_sha256=5224b378131f45051274369a072151b6faab3c0cc3fba8f2dc24536a3c0fdbe0 artifact=study_guide/execution_artifacts/lab09/lab09-cell-0010-outputs.txt
+
+\lstinputlisting[style=terminalOutput]{../../execution_artifacts/lab09/lab09-cell-0010-outputs.txt}
+
+The separately authored Codex baseline passes 14 of 14 supplied tests, yielding functional correctness 1.0. The tokenizers-after-fork messages come from subprocess evaluation and do not alter the tests.
+
+\medskip\noindent The Llama source is now passed through that same evaluator against the same preserved grade tests. The cell stores the observed functional-correctness fraction for the later comparison; it does not infer success from the source looking plausible.
+
+% coverage-cell: LABS/lab09/text-09-code-generation.ipynb cell=12 source_sha256=b05ac5bcb1f4489e3da8be9127335396e61d5eb49a8de8f6720b5c7c4efc0a16
+
+\begin{lstlisting}[style=studycode]
+llama_label = "Llama-3.2-3B-Instruct"
+llama_metrics = evaluate_code(my_codes[llama_label],name="Llama_grades")
+llama_functional_correctness = llama_metrics["FunctionalCorrectness"]
+\end{lstlisting}
+
+\label{out:lab09-cell-0012}
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=12 output=0 source_sha256=b05ac5bcb1f4489e3da8be9127335396e61d5eb49a8de8f6720b5c7c4efc0a16 payload_sha256=f41e33ffe94b2b4cbaa72e4805672898823bfdc3a6b8e3297b2f5e18454ab038 artifact=study_guide/execution_artifacts/lab09/lab09-cell-0012-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=12 output=1 source_sha256=b05ac5bcb1f4489e3da8be9127335396e61d5eb49a8de8f6720b5c7c4efc0a16 payload_sha256=cd205113b2cc40b09983087b924f71a6b98320b4e9597ba799facf67eb379fdb artifact=study_guide/execution_artifacts/lab09/lab09-cell-0012-outputs.txt
+
+\lstinputlisting[style=terminalOutput]{../../execution_artifacts/lab09/lab09-cell-0012-outputs.txt}
+
+Llama passes 9 of 14 grade tests and fails 5, so the measured functional correctness is 9/14 = 0.6429. The nonzero pytest exit is retained as a real model result, not hidden by the later metrics.
+
+\medskip\noindent This cell combines static and dynamic evaluation. Radon measures cyclomatic complexity, maintainability index, lines of code, and comments; pytest measures behavior on the shared suite. Each actual source is written to a provenance-named file before analysis. Only sources present in \texttt{my\_codes} are compared, avoiding a fabricated GPT or ChatGPT result.
+
+% coverage-cell: LABS/lab09/text-09-code-generation.ipynb cell=14 source_sha256=52d5f042bd7bdf89d23730b9aedc1fb0943831bb6a70c07b98032fa5cb31fa80
+
+\begin{lstlisting}[style=studycode]
+import radon.complexity as radon_complexity
+import radon.metrics as radon_metrics
+import radon.raw as radon_raw
+
+def analyze_code_with_radon(file_path):
+    code = Path(file_path).read_text()
+    functions = radon_complexity.cc_visit(code)
+    raw = radon_raw.analyze(code)
+    return {"CC":max((block.complexity for block in functions),default=0),
+        "MI":radon_metrics.mi_visit(code,multi=False),"LOC":raw.loc,
+        "Comments":raw.comments}
+
+def compare_codes(codes, test_file="test_cases_01.py", function_file="function_01.py", suffix="grades"):
+    results = {}
+    for name, code in codes.items():
+        # Export each exact observed source, then measure the same source.
+        source_path = Path("execution")/"sources"/(re.sub(r"[^A-Za-z0-9_.-]","_",name)+"_"+suffix+".py")
+        source_path.parent.mkdir(parents=True,exist_ok=True)
+        source_path.write_text(code)
+        static = analyze_code_with_radon(source_path)
+        dynamic = evaluate_code(code,test_file,function_file,name+"_"+suffix)
+        results[name] = {**static,**dynamic}
+    return results
+
+overall_results = compare_codes(my_codes)
+print(json.dumps(overall_results,indent=2))
+print("Only actually generated sources are included:",code_provenance)
+\end{lstlisting}
+
+\label{out:lab09-cell-0014}
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=14 output=0 source_sha256=52d5f042bd7bdf89d23730b9aedc1fb0943831bb6a70c07b98032fa5cb31fa80 payload_sha256=e102033e7b0b0b809d63014e7f65b4ccc2b79d507675c298f0fc6515a5af2632 artifact=study_guide/execution_artifacts/lab09/lab09-cell-0014-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=14 output=1 source_sha256=52d5f042bd7bdf89d23730b9aedc1fb0943831bb6a70c07b98032fa5cb31fa80 payload_sha256=5224b378131f45051274369a072151b6faab3c0cc3fba8f2dc24536a3c0fdbe0 artifact=study_guide/execution_artifacts/lab09/lab09-cell-0014-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=14 output=2 source_sha256=52d5f042bd7bdf89d23730b9aedc1fb0943831bb6a70c07b98032fa5cb31fa80 payload_sha256=6e929a9efae715ea106d57748fdb1c78b222f2416c7c8a0a6086e62e5fb2873c artifact=study_guide/execution_artifacts/lab09/lab09-cell-0014-outputs.txt
+
+\lstinputlisting[style=terminalOutput]{../../execution_artifacts/lab09/lab09-cell-0014-outputs.txt}
+
+For grades, Codex records CC 9, MI 58.00, 14 LOC, and 0 comments, with 14/14 tests passing. Llama records CC 7, MI 89.72, 38 LOC, and 6 comments, with 9/14 passing. A higher maintainability score in this single run does not compensate for failures or establish an overall quality ranking.
+
+\medskip\noindent The metrics are plotted on separate axes because they use different scales: complexity, maintainability, lines, comments, and test pass fraction are not directly commensurate quantities. The plot gives a compact view of the two observed grade implementations; it is a visualization of this run, not a statistical comparison across repeated samples.
+
+% coverage-cell: LABS/lab09/text-09-code-generation.ipynb cell=16 source_sha256=ebaf2737dae25738187d265f85df50ac75ecc656491a761ca6c90e23e57c6b02
+
+\begin{lstlisting}[style=studycode]
+import matplotlib.pyplot as plt
+import numpy as np
+
+
+languages = list(overall_results.keys())  
+
+
+
+cc_values = [overall_results[language]['CC'] for language in languages]
+mi_values = [overall_results[language]['MI'] for language in languages]
+loc_values = [overall_results[language]['LOC'] for language in languages]
+comments_values = [overall_results[language]['Comments'] for language in languages]
+functional_correctness = [overall_results[language]['FunctionalCorrectness'] for language in languages]
+
+# Create a figure with subplots for each metric
+fig, axs = plt.subplots(3, 2, figsize=(10, 8))
+
+# Plotting CC values
+axs[0, 0].bar(languages, cc_values, color='skyblue')
+axs[0, 0].set_title('Cyclomatic Complexity (CC)')
+axs[0, 0].set_ylabel('CC')
+
+# Plotting MI values
+axs[0, 1].bar(languages, mi_values, color='lightgreen')
+axs[0, 1].set_title('Maintainability Index (MI)')
+axs[0, 1].set_ylabel('MI')
+
+# Plotting LOC values
+axs[1, 0].bar(languages, loc_values, color='blue')
+axs[1, 0].set_title('Lines of Code (LOC)')
+axs[1, 0].set_ylabel('LOC')
+
+# Plotting Comments values
+axs[1, 1].bar(languages, comments_values, color='lightcoral')
+axs[1, 1].set_title('Number of Comments')
+axs[1, 1].set_ylabel('Comments')
+axs[1, 1].set_ylim(0, max(comments_values + [1]) * 1.1)
+
+#plotting functional correctness
+axs[2, 0].bar(languages, functional_correctness, color='green')
+axs[2, 0].set_title('Functional correctness')
+axs[2, 0].set_ylabel('Passed / executed tests')
+axs[2, 0].set_ylim(0, 1.05)
+axs[2, 1].axis('off')
+
+# Adjust layout and display the plot
+plt.tight_layout()
+Path("execution/figures").mkdir(parents=True,exist_ok=True)
+fig.savefig("execution/figures/grade_code_metrics.png",dpi=160,bbox_inches="tight")
+plt.show()
+\end{lstlisting}
+
+\label{out:lab09-cell-0016}
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=16 output=0 source_sha256=ebaf2737dae25738187d265f85df50ac75ecc656491a761ca6c90e23e57c6b02 payload_sha256=0b933047a2f52afdadb1ea082fbce9dcbb3b768b27501c631df21763f1aa47bb artifact=study_guide/execution_artifacts/lab09/lab09-cell-0016-outputs.txt
+
+\lstinputlisting[style=terminalOutput]{../../execution_artifacts/lab09/lab09-cell-0016-outputs.txt}
+
+% exported notebook image: text-09-code-generation_cell_0016_ebaf2737dae2_output_0.png
+
+\begin{figure}[htbp]\centering\includegraphics[width=0.93\linewidth]{../../figures/lab09/grade_code_metrics.png}\caption{Recorded grade-code comparison: complexity, maintainability, size, comments, and functional correctness.}\end{figure}
+
+The saved figure reproduces the cell's five metric panels. The coverage inventory also retains the notebook's original figure payload, and the rendered version is included at readable resolution.
+
+\clearpage
+
+\section[Multiple agents]{Exercise 2: comparing additional code-generation agents}
+
+\label{sec:lab09-agents}
+
+The second exercise keeps the same grade requirement and test oracle while adding the public Qwen 2.5 Coder model. This isolates the comparison to the generated implementation and measured outcome for this task; no external ChatGPT response is claimed.
+
+\medskip\noindent The second exercise adds the explicitly requested Qwen comparison while keeping the original Llama result and Codex baseline. \texttt{select\_engine} releases Llama before loading \texttt{Qwen/Qwen2.5-Coder-1.5B-Instruct}; the same task prompt, greedy decoding helper, and grading test suite are reused. The additional model is a supplementary local comparison and does not replace the prescribed Llama run.
+
+% coverage-cell: LABS/lab09/text-09-code-generation.ipynb cell=18 source_sha256=5a2dba39c66ca0604987d1e5fcd68ecfec2f26b91f0a5fa2ca7e3fede5a095f0
+
+\begin{lstlisting}[style=studycode]
+# A separate additional-engine comparison, not a replacement for the specified Llama model.
+# Run this when a heavy-compute slot is available; it downloads the named public checkpoint.
+additional_model_id = "Qwen/Qwen2.5-Coder-1.5B-Instruct"
+select_engine(additional_model_id)
+additional_prompt = tokenizer.apply_chat_template([
+    {"role":"system","content":sys_prompt},{"role":"user","content":query},
+], tokenize=False, add_generation_prompt=True)
+qwen_chat = make_a_query(additional_prompt,tokenizer,model,device)
+if qwen_chat.startswith("```"):
+    qwen_chat = qwen_chat.split("\n",1)[1].rsplit("```",1)[0].strip()
+my_codes["Qwen2.5-Coder-1.5B-Instruct"] = qwen_chat
+code_provenance["Qwen2.5-Coder-1.5B-Instruct"] = additional_model_id
+print(qwen_chat)
+overall_results = compare_codes(my_codes)
+print(json.dumps(overall_results,indent=2))
+\end{lstlisting}
+
+\label{out:lab09-cell-0018}
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=18 output=0 source_sha256=5a2dba39c66ca0604987d1e5fcd68ecfec2f26b91f0a5fa2ca7e3fede5a095f0 payload_sha256=71a2056b13a74e25560ff4adc9fdb0a81f84316443d0d6d8df598509067ef854 artifact=study_guide/execution_artifacts/lab09/lab09-cell-0018-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=18 output=1 source_sha256=5a2dba39c66ca0604987d1e5fcd68ecfec2f26b91f0a5fa2ca7e3fede5a095f0 payload_sha256=6237e97e70f569013cb71b09f8442f46ba1bba22ffe217cab3a8591fc66ebcd4 artifact=study_guide/execution_artifacts/lab09/lab09-cell-0018-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=18 output=2 source_sha256=5a2dba39c66ca0604987d1e5fcd68ecfec2f26b91f0a5fa2ca7e3fede5a095f0 payload_sha256=cd205113b2cc40b09983087b924f71a6b98320b4e9597ba799facf67eb379fdb artifact=study_guide/execution_artifacts/lab09/lab09-cell-0018-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=18 output=3 source_sha256=5a2dba39c66ca0604987d1e5fcd68ecfec2f26b91f0a5fa2ca7e3fede5a095f0 payload_sha256=5224b378131f45051274369a072151b6faab3c0cc3fba8f2dc24536a3c0fdbe0 artifact=study_guide/execution_artifacts/lab09/lab09-cell-0018-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=18 output=4 source_sha256=5a2dba39c66ca0604987d1e5fcd68ecfec2f26b91f0a5fa2ca7e3fede5a095f0 payload_sha256=cd205113b2cc40b09983087b924f71a6b98320b4e9597ba799facf67eb379fdb artifact=study_guide/execution_artifacts/lab09/lab09-cell-0018-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=18 output=5 source_sha256=5a2dba39c66ca0604987d1e5fcd68ecfec2f26b91f0a5fa2ca7e3fede5a095f0 payload_sha256=4efa65a109372e4728587681f790fafc82d5c30a9745847cc46390b7660ad922 artifact=study_guide/execution_artifacts/lab09/lab09-cell-0018-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=18 output=6 source_sha256=5a2dba39c66ca0604987d1e5fcd68ecfec2f26b91f0a5fa2ca7e3fede5a095f0 payload_sha256=bbcd99ef1c873de1f0c45c67824e218f6c277fb2490d49c6e12c741a9ef2c05f artifact=study_guide/execution_artifacts/lab09/lab09-cell-0018-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=18 output=7 source_sha256=5a2dba39c66ca0604987d1e5fcd68ecfec2f26b91f0a5fa2ca7e3fede5a095f0 payload_sha256=cd205113b2cc40b09983087b924f71a6b98320b4e9597ba799facf67eb379fdb artifact=study_guide/execution_artifacts/lab09/lab09-cell-0018-outputs.txt
+
+\lstinputlisting[style=terminalOutput]{../../execution_artifacts/lab09/lab09-cell-0018-outputs.txt}
+
+Qwen passes 8/14 grade tests (0.5714). Static metrics are CC 7, MI 62.31, 14 LOC, and 0 comments; Llama is 9/14 and Codex is 14/14. The full generated Qwen code, warnings, JSON metrics, and recorded model provenance appear in the output. These scores describe this prompt, test set, checkpoints, and single run only.
+
+\clearpage
+
+\section[Additional functions]{Exercise 3: extending the comparison to railway and bike tasks}
+
+\label{sec:lab09-additional}
+
+The final exercise changes the specification to two different branching problems. A railway discount depends on group composition and size, while the bike task maps speed bands and track types to a maximum time. The same source-generation, test-execution, and static-analysis pipeline is reused so the comparison includes actual observed code and outcomes for each task.
+
+\begin{figure}[htbp]\centering\resizebox{\linewidth}{!}{\begin{tikzpicture}[>=Stealth,stage/.style={draw=steelBlue,fill=skyBlue,rounded corners,align=center,text width=3.2cm,minimum height=.85cm,font=\small\sffamily}]\node[stage](a){Railway and bike\\requirements};\node[stage,right=9mm of a](b){Codex reference\\and focused tests};\node[stage,right=9mm of b](c){Llama and Qwen\\generation};\node[stage,right=9mm of c](d){Fresh pytest and\\Radon evaluation};\draw[->,thick,steelBlue](a)--(b);\draw[->,thick,steelBlue](b)--(c);\draw[->,thick,steelBlue](c)--(d);\end{tikzpicture}}\caption{The additional tasks reuse the same validated comparison pipeline.}\end{figure}
+
+\medskip\noindent The third exercise introduces two more requirements: a group railway fee and a track-dependent maximum time. This cell creates a fresh Codex implementation and focused black-box tests for each task, writes the source and test files, and validates the local baselines before generating any further model candidates. The fee rule gives a discount only when a group has at least two passengers and an adult; the bike rule has exact speed boundaries for track types A and B and a fixed multiplier for C.
+
+% coverage-cell: LABS/lab09/text-09-code-generation.ipynb cell=20 source_sha256=b6fcf4beed137e2fe82a492045d2e369d21e00d4ec819076b0284db31ea41efb
+
+\begin{lstlisting}[style=studycode]
+# Fresh Codex-generated source and black-box tests for the two additional requirements.
+# These are genuine local agent outputs; Llama/Qwen comparison requires actual generation below.
+fee_source = 'def computeFee(basePrice, n_passengers, n_over18, n_under15):\n    from numbers import Real\n    import math\n    if isinstance(basePrice,bool) or not isinstance(basePrice,Real) or not math.isfinite(basePrice) or basePrice < 0:\n        raise ValueError("Invalid base price")\n    counts = (n_passengers,n_over18,n_under15)\n    if any(isinstance(n,bool) or not isinstance(n,int) for n in counts):\n        raise ValueError("Passenger counts must be integers")\n    if not 1 <= n_passengers <= 5 or min(n_over18,n_under15) < 0 or n_over18+n_under15 > n_passengers:\n        raise ValueError("Inconsistent group counts")\n    eligible = n_passengers >= 2 and n_over18 >= 1\n    return float(basePrice * (n_passengers-n_under15 if eligible else n_passengers))\n'
+bike_source = 'def computeMaxTime(winner_time, avg_speed, track_type):\n    import math\n    from numbers import Real\n    if any(isinstance(v,bool) or not isinstance(v,Real) or not math.isfinite(v) or v <= 0 for v in (winner_time,avg_speed)):\n        return 0\n    if track_type not in ("A","B","C"):\n        return 0\n    if track_type == "C":\n        return winner_time * 1.5\n    band = 0 if avg_speed <= 30 else 1 if avg_speed <= 35 else 2\n    increment = {"A":(0.05,0.10,0.15),"B":(0.20,0.25,0.30)}[track_type][band]\n    return winner_time * (1 + increment)\n'
+Path("function_02.py").write_text(fee_source)
+Path("function_03.py").write_text(bike_source)
+Path("test_cases_02.py").write_text('import pytest\nfrom function_02 import computeFee\n@pytest.mark.parametrize("args,expected", [((10,2,1,1),10),((10,5,1,4),10),((10,5,1,0),50),((10,1,1,0),10),((10,2,0,2),20),((0,3,1,2),0)])\ndef test_fee(args,expected): assert computeFee(*args) == pytest.approx(expected)\n@pytest.mark.parametrize("args", [(10,6,1,2),(10,0,0,0),(10,3,2,2),(10,3,-1,1),(-1,2,1,1),(10,2.5,1,1),(10,True,0,0)])\ndef test_invalid_fee(args):\n    with pytest.raises(ValueError): computeFee(*args)\n')
+Path("test_cases_03.py").write_text('import pytest\nfrom function_03 import computeMaxTime\n@pytest.mark.parametrize("category,speed,expected", [("A",30,105),("A",30.001,110),("A",35,110),("A",35.001,115),("B",30,120),("B",30.001,125),("B",35,125),("B",35.001,130),("C",20,150),("C",40,150)])\ndef test_boundaries(category,speed,expected): assert computeMaxTime(100,speed,category) == pytest.approx(expected)\n@pytest.mark.parametrize("args", [(0,30,"A"),(-1,30,"A"),(100,0,"A"),(100,-1,"A"),(100,30,"D"),(100,30,"a"),(float("nan"),30,"A"),(100,True,"A"),("100",30,"A")])\ndef test_invalid(args): assert computeMaxTime(*args) == 0\n')
+additional_tasks = {
+ "railway": {"function_file":"function_02.py","test_file":"test_cases_02.py","sources":{"Codex":fee_source},
+ "prompt":"Implement computeFee(basePrice,n_passengers,n_over18,n_under15). Groups of 2 to 5 with at least one adult aged 18+ pay only for members aged 15+. Others pay basePrice each. Reject invalid counts, groups larger than 5, negative price, counts inconsistent with group size. Ages under15 and at least18 are disjoint. Raise ValueError for invalid inputs."},
+ "bike": {"function_file":"function_03.py","test_file":"test_cases_03.py","sources":{"Codex":bike_source},
+ "prompt":"Implement computeMaxTime(winner_time,avg_speed,track_type). Positive finite numeric time and speed required; invalid input returns 0. Track A increases winner time by 5% at speed<=30,10% at 30<speed<=35,15% at speed>35. B uses20%,25%,30% on the same intervals. C always adds50%. Valid track types are uppercase A,B,C."},
+}
+additional_results = {}
+for task_name, task in additional_tasks.items():
+    additional_results[task_name] = compare_codes(task["sources"],task["test_file"],task["function_file"],task_name)
+print(json.dumps(additional_results,indent=2))
+\end{lstlisting}
+
+\label{out:lab09-cell-0020}
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=20 output=0 source_sha256=b6fcf4beed137e2fe82a492045d2e369d21e00d4ec819076b0284db31ea41efb payload_sha256=cd205113b2cc40b09983087b924f71a6b98320b4e9597ba799facf67eb379fdb artifact=study_guide/execution_artifacts/lab09/lab09-cell-0020-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=20 output=1 source_sha256=b6fcf4beed137e2fe82a492045d2e369d21e00d4ec819076b0284db31ea41efb payload_sha256=d39951d646e80dce6604ad982b3a3f68b626ba5124bd18dad9c639f2329f63cb artifact=study_guide/execution_artifacts/lab09/lab09-cell-0020-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=20 output=2 source_sha256=b6fcf4beed137e2fe82a492045d2e369d21e00d4ec819076b0284db31ea41efb payload_sha256=696819b6c64cfb0edc2f4c650eb50afbf521162b2eba6889b1b7a92d52214aec artifact=study_guide/execution_artifacts/lab09/lab09-cell-0020-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=20 output=3 source_sha256=b6fcf4beed137e2fe82a492045d2e369d21e00d4ec819076b0284db31ea41efb payload_sha256=cd205113b2cc40b09983087b924f71a6b98320b4e9597ba799facf67eb379fdb artifact=study_guide/execution_artifacts/lab09/lab09-cell-0020-outputs.txt
+
+\lstinputlisting[style=terminalOutput]{../../execution_artifacts/lab09/lab09-cell-0020-outputs.txt}
+
+The two Codex baselines pass their observed suites: 13/13 railway cases and 19/19 bike cases. The source strings and test files become the comparison state consumed by the final cell.
+
+\medskip\noindent Finally, the workflow loops over Llama and Qwen sequentially and over both new tasks. Each candidate is generated from the matching task prompt, saved as the observed source, and evaluated with the same test and Radon pipeline. The loop prints candidate code and a JSON result object for every engine-task pair; it never loads both checkpoints together.
+
+% coverage-cell: LABS/lab09/text-09-code-generation.ipynb cell=21 source_sha256=e682c516e3b2027f8d174f89d5af39c30a787930d93ae940a071c75c999f053b
+
+\begin{lstlisting}[style=studycode]
+# Adapt the same actual generation/test/static-analysis workflow to the two new tasks.
+# Checkpoints are sequentially released by select_engine, never loaded together.
+for engine_label, engine_id in [("Llama-3.2-3B-Instruct","meta-llama/Llama-3.2-3B-Instruct"),
+                                ("Qwen2.5-Coder-1.5B-Instruct",additional_model_id)]:
+    select_engine(engine_id)
+    for task_name, task in additional_tasks.items():
+        prompt = tokenizer.apply_chat_template([
+            {"role":"system","content":sys_prompt},{"role":"user","content":task["prompt"]}],
+            tokenize=False,add_generation_prompt=True)
+        code = make_a_query(prompt,tokenizer,model,device)
+        if code.startswith("```"): code = code.split("\n",1)[1].rsplit("```",1)[0].strip()
+        print(engine_label,task_name,code)
+        task["sources"][engine_label] = code
+        additional_results[task_name] = compare_codes(task["sources"],task["test_file"],task["function_file"],task_name)
+print(json.dumps(additional_results,indent=2))
+\end{lstlisting}
+
+\label{out:lab09-cell-0021}
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=21 output=0 source_sha256=e682c516e3b2027f8d174f89d5af39c30a787930d93ae940a071c75c999f053b payload_sha256=fa52eeb332a913bde139573dd57f4c07ecd15b7fb5674d04824f0776fd330e88 artifact=study_guide/execution_artifacts/lab09/lab09-cell-0021-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=21 output=1 source_sha256=e682c516e3b2027f8d174f89d5af39c30a787930d93ae940a071c75c999f053b payload_sha256=10300db894d8283e7b25ab77d56124bb471edd569fdc2853da2f49759ae62a3c artifact=study_guide/execution_artifacts/lab09/lab09-cell-0021-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=21 output=2 source_sha256=e682c516e3b2027f8d174f89d5af39c30a787930d93ae940a071c75c999f053b payload_sha256=d84400333f54235849d4a30ef3016a6b756c0bd5904ab00cd2bec1bdf9b8d07e artifact=study_guide/execution_artifacts/lab09/lab09-cell-0021-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=21 output=3 source_sha256=e682c516e3b2027f8d174f89d5af39c30a787930d93ae940a071c75c999f053b payload_sha256=352ba0223fe9f4300111936487ce7bc45d2ea26d0a2efe4d4a961bb498db407a artifact=study_guide/execution_artifacts/lab09/lab09-cell-0021-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=21 output=4 source_sha256=e682c516e3b2027f8d174f89d5af39c30a787930d93ae940a071c75c999f053b payload_sha256=20edaa3e50bf40ea9d7f0ac1fb0c44b3e7771949761d7a46df51f9ab1ceac876 artifact=study_guide/execution_artifacts/lab09/lab09-cell-0021-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=21 output=5 source_sha256=e682c516e3b2027f8d174f89d5af39c30a787930d93ae940a071c75c999f053b payload_sha256=82451a8209c52ec24e9b5d6ba8a84f2157fa57de367a4f348376a3d66cc6bc98 artifact=study_guide/execution_artifacts/lab09/lab09-cell-0021-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=21 output=6 source_sha256=e682c516e3b2027f8d174f89d5af39c30a787930d93ae940a071c75c999f053b payload_sha256=1b7fca5eb70f81a193c55c75a18c4e050c9844fa4576da199745e3a0247970eb artifact=study_guide/execution_artifacts/lab09/lab09-cell-0021-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=21 output=7 source_sha256=e682c516e3b2027f8d174f89d5af39c30a787930d93ae940a071c75c999f053b payload_sha256=cd205113b2cc40b09983087b924f71a6b98320b4e9597ba799facf67eb379fdb artifact=study_guide/execution_artifacts/lab09/lab09-cell-0021-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=21 output=8 source_sha256=e682c516e3b2027f8d174f89d5af39c30a787930d93ae940a071c75c999f053b payload_sha256=f8b060cbecfe2ea396c39c90c4c5b7b6929e359908aec351d2ef236ca76ab039 artifact=study_guide/execution_artifacts/lab09/lab09-cell-0021-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=21 output=9 source_sha256=e682c516e3b2027f8d174f89d5af39c30a787930d93ae940a071c75c999f053b payload_sha256=cd205113b2cc40b09983087b924f71a6b98320b4e9597ba799facf67eb379fdb artifact=study_guide/execution_artifacts/lab09/lab09-cell-0021-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=21 output=10 source_sha256=e682c516e3b2027f8d174f89d5af39c30a787930d93ae940a071c75c999f053b payload_sha256=9a1e1bd2c48d1d29a4710f67c7801155865b2e6a4656638b807aab6816a2811f artifact=study_guide/execution_artifacts/lab09/lab09-cell-0021-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=21 output=11 source_sha256=e682c516e3b2027f8d174f89d5af39c30a787930d93ae940a071c75c999f053b payload_sha256=cd205113b2cc40b09983087b924f71a6b98320b4e9597ba799facf67eb379fdb artifact=study_guide/execution_artifacts/lab09/lab09-cell-0021-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=21 output=12 source_sha256=e682c516e3b2027f8d174f89d5af39c30a787930d93ae940a071c75c999f053b payload_sha256=47effa697cf5a02c43bb467c0fd9d580efe425cfd5e853f4427d6f23a89a3ed0 artifact=study_guide/execution_artifacts/lab09/lab09-cell-0021-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=21 output=13 source_sha256=e682c516e3b2027f8d174f89d5af39c30a787930d93ae940a071c75c999f053b payload_sha256=cd205113b2cc40b09983087b924f71a6b98320b4e9597ba799facf67eb379fdb artifact=study_guide/execution_artifacts/lab09/lab09-cell-0021-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=21 output=14 source_sha256=e682c516e3b2027f8d174f89d5af39c30a787930d93ae940a071c75c999f053b payload_sha256=4ebe72b17c6a3b3b5a357031ee25808bb00c05627616a2b310db719094d30181 artifact=study_guide/execution_artifacts/lab09/lab09-cell-0021-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=21 output=15 source_sha256=e682c516e3b2027f8d174f89d5af39c30a787930d93ae940a071c75c999f053b payload_sha256=334e14ba0476a7a2ec41fcdc836ac0b086d915ee30893ce065d819798d62988a artifact=study_guide/execution_artifacts/lab09/lab09-cell-0021-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=21 output=16 source_sha256=e682c516e3b2027f8d174f89d5af39c30a787930d93ae940a071c75c999f053b payload_sha256=cd205113b2cc40b09983087b924f71a6b98320b4e9597ba799facf67eb379fdb artifact=study_guide/execution_artifacts/lab09/lab09-cell-0021-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=21 output=17 source_sha256=e682c516e3b2027f8d174f89d5af39c30a787930d93ae940a071c75c999f053b payload_sha256=d39951d646e80dce6604ad982b3a3f68b626ba5124bd18dad9c639f2329f63cb artifact=study_guide/execution_artifacts/lab09/lab09-cell-0021-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=21 output=18 source_sha256=e682c516e3b2027f8d174f89d5af39c30a787930d93ae940a071c75c999f053b payload_sha256=cd205113b2cc40b09983087b924f71a6b98320b4e9597ba799facf67eb379fdb artifact=study_guide/execution_artifacts/lab09/lab09-cell-0021-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=21 output=19 source_sha256=e682c516e3b2027f8d174f89d5af39c30a787930d93ae940a071c75c999f053b payload_sha256=58f2ca851a76eb98079d95054006da158c42984a7a303dd18248519b51242efd artifact=study_guide/execution_artifacts/lab09/lab09-cell-0021-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=21 output=20 source_sha256=e682c516e3b2027f8d174f89d5af39c30a787930d93ae940a071c75c999f053b payload_sha256=cd205113b2cc40b09983087b924f71a6b98320b4e9597ba799facf67eb379fdb artifact=study_guide/execution_artifacts/lab09/lab09-cell-0021-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=21 output=21 source_sha256=e682c516e3b2027f8d174f89d5af39c30a787930d93ae940a071c75c999f053b payload_sha256=0285f27ca36a4cc53fb5f3b669ae832b93b82a197be33a8f9cd66b0472b9c02a artifact=study_guide/execution_artifacts/lab09/lab09-cell-0021-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=21 output=22 source_sha256=e682c516e3b2027f8d174f89d5af39c30a787930d93ae940a071c75c999f053b payload_sha256=49cf05b6523588568f213ca9324967d3211c5451ea6fb98500dcb94589a239df artifact=study_guide/execution_artifacts/lab09/lab09-cell-0021-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=21 output=23 source_sha256=e682c516e3b2027f8d174f89d5af39c30a787930d93ae940a071c75c999f053b payload_sha256=cd205113b2cc40b09983087b924f71a6b98320b4e9597ba799facf67eb379fdb artifact=study_guide/execution_artifacts/lab09/lab09-cell-0021-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=21 output=24 source_sha256=e682c516e3b2027f8d174f89d5af39c30a787930d93ae940a071c75c999f053b payload_sha256=47effa697cf5a02c43bb467c0fd9d580efe425cfd5e853f4427d6f23a89a3ed0 artifact=study_guide/execution_artifacts/lab09/lab09-cell-0021-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=21 output=25 source_sha256=e682c516e3b2027f8d174f89d5af39c30a787930d93ae940a071c75c999f053b payload_sha256=cd205113b2cc40b09983087b924f71a6b98320b4e9597ba799facf67eb379fdb artifact=study_guide/execution_artifacts/lab09/lab09-cell-0021-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=21 output=26 source_sha256=e682c516e3b2027f8d174f89d5af39c30a787930d93ae940a071c75c999f053b payload_sha256=4ebe72b17c6a3b3b5a357031ee25808bb00c05627616a2b310db719094d30181 artifact=study_guide/execution_artifacts/lab09/lab09-cell-0021-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=21 output=27 source_sha256=e682c516e3b2027f8d174f89d5af39c30a787930d93ae940a071c75c999f053b payload_sha256=1580ee8f96b588b7bab16d7c7ab23824d0c5a4a6694f9279b2872e6c581ba8fb artifact=study_guide/execution_artifacts/lab09/lab09-cell-0021-outputs.txt
+
+% coverage-output: LABS/lab09/text-09-code-generation.ipynb cell=21 output=28 source_sha256=e682c516e3b2027f8d174f89d5af39c30a787930d93ae940a071c75c999f053b payload_sha256=cd205113b2cc40b09983087b924f71a6b98320b4e9597ba799facf67eb379fdb artifact=study_guide/execution_artifacts/lab09/lab09-cell-0021-outputs.txt
+
+\lstinputlisting[style=terminalOutput]{../../execution_artifacts/lab09/lab09-cell-0021-outputs.txt}
+
+For railway, Llama passes 8/13 tests (0.6154); Qwen's generated source yields one collection/runtime error before any tests run, so its 0.0 metric is not equivalent to a tested 0% pass rate. For bike, Llama passes 11/19 (0.5789) and Qwen 17/19 (0.8947). The Codex baselines remain 13/13 and 19/19. The complete generated implementations and all recorded result fields follow the cell. This comparison demonstrates variation across tasks and tests; it does not establish general model capability.
+
+\subsection{What these comparisons do and do not show}
+
+The reference and fresh Codex baseline pass the observed grade, railway, and bike tests. Llama and Qwen results vary by task, and one Qwen railway run raises a test-collection error rather than producing a measured set of passes and failures. Static metrics such as lines of code and cyclomatic complexity describe the source's structure; they do not guarantee that it follows the requirements. Each pass fraction is tied to a specific finite suite, prompt, checkpoint ID, and local run.
+
+The Lab 09 lecture recording was not provided for this notebook-only pass. This solution makes no lecture-derived claims; its explanations and results come from the assignment notebook, local model execution, and saved test artifacts.
+
+\end{document}

@@ -1,0 +1,1 @@
+Loading checkpoint shards:  50%|█████     | 1/2 [00:30<00:30, 30.54s/it]

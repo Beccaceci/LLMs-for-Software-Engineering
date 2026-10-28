@@ -1,0 +1,2 @@
+
+t_1032c35a5d7f4ed4b89f850c009b245f.py::test_disqualification_rules[times10-penalties10-True]

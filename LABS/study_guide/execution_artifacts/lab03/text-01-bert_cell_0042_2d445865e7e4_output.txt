@@ -1,0 +1,2 @@
+Tokens: ['[CLS]', 'arthur', 'conan', 'doyle', 'is', 'my', 'favorite', 'author', '[SEP]', 'however', ',', 'it', "'", 's', 'raining', 'today', '[SEP]']
+True: 0.004302, False: 0.995698

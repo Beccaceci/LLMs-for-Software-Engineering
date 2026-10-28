@@ -1,0 +1,418 @@
+{
+  "started_utc": "2026-10-25T22:16:14.032513+00:00",
+  "python": "3.11.16",
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "backend": "CPU",
+  "offline_cache": true,
+  "ipython_output_cache": false,
+  "cells": [
+    {
+      "cell_index": 2,
+      "source_sha256": "b927b535296be2d3c1a8cae69506587d441b354bd2c884735fe60bc4b537ee38",
+      "execution_count": 1,
+      "seconds": 7.065763790975325,
+      "kernel_rss_bytes": 321732608,
+      "status": "ok"
+    },
+    {
+      "cell_index": 5,
+      "source_sha256": "0b92899d5a03a1d993a5cb2804b8ee29e6716c098ee2a713e2292a8d5739b9c7",
+      "execution_count": 2,
+      "seconds": 0.009635458001866937,
+      "kernel_rss_bytes": 322142208,
+      "status": "ok"
+    },
+    {
+      "cell_index": 7,
+      "source_sha256": "07801de2b657d4aa9fe27a2f692c0c2456080805b92dd08f685355e04190806a",
+      "execution_count": 3,
+      "seconds": 0.008270290971267968,
+      "kernel_rss_bytes": 322142208,
+      "status": "ok"
+    },
+    {
+      "cell_index": 10,
+      "source_sha256": "37639b4d8948730120d4015a21e3a1aeb43fa6e5703e0221944586e9e4396042",
+      "execution_count": 4,
+      "seconds": 0.02561954199336469,
+      "kernel_rss_bytes": 326090752,
+      "status": "ok"
+    },
+    {
+      "cell_index": 11,
+      "source_sha256": "5ddd06561c4bfc5d3b147cf345c812023d3c279ea2d8044a301e6de134d9facf",
+      "execution_count": 5,
+      "seconds": 0.009269749978557229,
+      "kernel_rss_bytes": 326090752,
+      "status": "ok"
+    },
+    {
+      "cell_index": 14,
+      "source_sha256": "c30252f4942b17134fd8c222f902923ef80284efcaa9043d82fcb3f9e23f5ed7",
+      "execution_count": 6,
+      "seconds": 0.008545332995709032,
+      "kernel_rss_bytes": 326090752,
+      "status": "ok"
+    },
+    {
+      "cell_index": 16,
+      "source_sha256": "d657c3d13c304e5d224eef161f715c58e4b9e33b864a909791f61a6b62ac8b3f",
+      "execution_count": 7,
+      "seconds": 0.011874749965500087,
+      "kernel_rss_bytes": 326090752,
+      "status": "ok"
+    },
+    {
+      "cell_index": 18,
+      "source_sha256": "3ffc82e1d4c5f8c72ab179f43c4a215f39d2647a2df142f9569b8e548ac76c46",
+      "execution_count": 8,
+      "seconds": 0.007296124997083098,
+      "kernel_rss_bytes": 326123520,
+      "status": "ok"
+    },
+    {
+      "cell_index": 21,
+      "source_sha256": "00379626e33282fab8f6b381534ba583075aad6dfe906f7703f295e72c464852",
+      "execution_count": 9,
+      "seconds": 0.007078459020704031,
+      "kernel_rss_bytes": 326139904,
+      "status": "ok"
+    },
+    {
+      "cell_index": 23,
+      "source_sha256": "c539047211c577ecd4d3fdf821f879278fcc550d85fb6216335bed8493fa0972",
+      "execution_count": 10,
+      "seconds": 0.007163791975472122,
+      "kernel_rss_bytes": 326205440,
+      "status": "ok"
+    },
+    {
+      "cell_index": 26,
+      "source_sha256": "d7380f47e9053eca0db14f12141f07c2135774aa5696370fd423d4bfd317135e",
+      "execution_count": 11,
+      "seconds": 0.007689999998547137,
+      "kernel_rss_bytes": 326205440,
+      "status": "ok"
+    },
+    {
+      "cell_index": 28,
+      "source_sha256": "8cd92e832794c0b2cdd98f0169ea9a85fe48debc235c32c492da9850ea3bf1ac",
+      "execution_count": 12,
+      "seconds": 0.007290000037755817,
+      "kernel_rss_bytes": 326221824,
+      "status": "ok"
+    },
+    {
+      "cell_index": 30,
+      "source_sha256": "68f1a6b0ae14348a02b6156da3d97cef22d4406396de01f5237cf6944bb1f174",
+      "execution_count": 13,
+      "seconds": 0.006384750013239682,
+      "kernel_rss_bytes": 326320128,
+      "status": "ok"
+    },
+    {
+      "cell_index": 32,
+      "source_sha256": "7e9c342928efeb085ccecbdfa54254ce772cd99f4512ed8d19f5c11bc2d09a25",
+      "execution_count": 14,
+      "seconds": 0.00797845801571384,
+      "kernel_rss_bytes": 326336512,
+      "status": "ok"
+    },
+    {
+      "cell_index": 34,
+      "source_sha256": "0610dc2f78d7156629c65d8a134aff2c7c5a306b63bdd7259bb7cd27d6f6ec5b",
+      "execution_count": 15,
+      "seconds": 0.012759250006638467,
+      "kernel_rss_bytes": 327745536,
+      "status": "ok"
+    },
+    {
+      "cell_index": 36,
+      "source_sha256": "357c4c7fdc036750b78aee1b0557d1acaf445e5a44a48ce4df1fad1751163d99",
+      "execution_count": 16,
+      "seconds": 0.008700291975401342,
+      "kernel_rss_bytes": 327761920,
+      "status": "ok"
+    },
+    {
+      "cell_index": 39,
+      "source_sha256": "da13192b7689c67797bfc4727bed4078571f5b8c6e694b6c21bd7da0530f387c",
+      "execution_count": 17,
+      "seconds": 20.7152640420245,
+      "kernel_rss_bytes": 474185728,
+      "status": "ok"
+    },
+    {
+      "cell_index": 41,
+      "source_sha256": "961f983b042d1d45ff85e2edd5884535a06242e3cb277feae36d43c37f7e8aa1",
+      "execution_count": 18,
+      "seconds": 0.0095739999669604,
+      "kernel_rss_bytes": 474202112,
+      "status": "ok"
+    },
+    {
+      "cell_index": 44,
+      "source_sha256": "9372c470eeadd5ecd9c3c74c2b3cb633f8e2f2fad799250a0f70d652b6b825e4",
+      "execution_count": 19,
+      "seconds": 0.009259290993213654,
+      "kernel_rss_bytes": 474234880,
+      "status": "ok"
+    },
+    {
+      "cell_index": 47,
+      "source_sha256": "b10c9c9b642ca626082edaeabea185059fd7db955428b8f48562e8ee9fb05061",
+      "execution_count": 20,
+      "seconds": 0.00655079196440056,
+      "kernel_rss_bytes": 474234880,
+      "status": "ok"
+    },
+    {
+      "cell_index": 49,
+      "source_sha256": "7ec48c9db6ec9002b192e4a6791de856b8e320001ede678f0e3ab7abcdfe4e18",
+      "execution_count": 21,
+      "seconds": 0.007376792025752366,
+      "kernel_rss_bytes": 474234880,
+      "status": "ok"
+    },
+    {
+      "cell_index": 51,
+      "source_sha256": "8c3644ba0ec12144eeada842d9e5724825a1acb17451b955e72f92f634835f3f",
+      "execution_count": 22,
+      "seconds": 0.00578312500147149,
+      "kernel_rss_bytes": 474234880,
+      "status": "ok"
+    },
+    {
+      "cell_index": 52,
+      "source_sha256": "4a2c4bb789a7a495d104c09e5813a833f0b0886135d51d4531293770bc670af1",
+      "execution_count": 23,
+      "seconds": 0.01054433302488178,
+      "kernel_rss_bytes": 475070464,
+      "status": "ok"
+    },
+    {
+      "cell_index": 53,
+      "source_sha256": "9e6a6473a481330bc02bc5be8041c55644ce819a7feb711028e1dc09df9261c0",
+      "execution_count": 24,
+      "seconds": 25.6172209160286,
+      "kernel_rss_bytes": 448954368,
+      "status": "ok"
+    },
+    {
+      "cell_index": 54,
+      "source_sha256": "5d437c751e71b63389cc62a8a67172b9600324dceae95519f5f84c638c2286a4",
+      "execution_count": 25,
+      "seconds": 0.16732862498611212,
+      "kernel_rss_bytes": 452444160,
+      "status": "ok"
+    },
+    {
+      "cell_index": 57,
+      "source_sha256": "72309e25e574d2af57382a876c15ab97eb8284a6d6c6d695b8b5cfaba02a1dff",
+      "execution_count": 26,
+      "seconds": 0.00715566601138562,
+      "kernel_rss_bytes": 452460544,
+      "status": "ok"
+    },
+    {
+      "cell_index": 59,
+      "source_sha256": "33ac656b7dc398de3d863d57f1f48dd736afbd543f0012b001b5fdc7ba951421",
+      "execution_count": 27,
+      "seconds": 0.0062720419955439866,
+      "kernel_rss_bytes": 452460544,
+      "status": "ok"
+    },
+    {
+      "cell_index": 61,
+      "source_sha256": "d53d8daef20e79b0239b27b88c522e14b4b2aaa682134bf8b334374d44c5ef4b",
+      "execution_count": 28,
+      "seconds": 0.0057669999659992754,
+      "kernel_rss_bytes": 452460544,
+      "status": "ok"
+    },
+    {
+      "cell_index": 64,
+      "source_sha256": "cf8c5d45aca140218229da3e7a345ffc7a0407a0de47032a5bfa672b8f3c0ed6",
+      "execution_count": 29,
+      "seconds": 0.006370665971189737,
+      "kernel_rss_bytes": 452460544,
+      "status": "ok"
+    },
+    {
+      "cell_index": 67,
+      "source_sha256": "f8b0967b2beced1c943241df463ee1892f3c675c2a79935c1b36ab63398acb35",
+      "execution_count": 30,
+      "seconds": 0.006056500016711652,
+      "kernel_rss_bytes": 452460544,
+      "status": "ok"
+    },
+    {
+      "cell_index": 69,
+      "source_sha256": "cb1adb19e4f0dc7844ffc69f67f413b23bd1ac7ed603a69f45baef9273b2b89c",
+      "execution_count": 31,
+      "seconds": 0.006429667002521455,
+      "kernel_rss_bytes": 453279744,
+      "status": "ok"
+    },
+    {
+      "cell_index": 70,
+      "source_sha256": "29285e89fa1b6c472caa56e14f374f37f44346dc76cf983342bfcf3bca829c8b",
+      "execution_count": 32,
+      "seconds": 0.006906374997925013,
+      "kernel_rss_bytes": 453279744,
+      "status": "ok"
+    },
+    {
+      "cell_index": 72,
+      "source_sha256": "6ebfd27a077082f5c831bb279dd96f6cf841a44d33afe319ce98810358261623",
+      "execution_count": 33,
+      "seconds": 2.835564874985721,
+      "kernel_rss_bytes": 1341898752,
+      "status": "ok"
+    },
+    {
+      "cell_index": 74,
+      "source_sha256": "2013d6cfe757314cfb04c2d7c5a511b9c15848f0ea39925cf2a43205e67807d6",
+      "execution_count": 34,
+      "seconds": 0.005799499980639666,
+      "kernel_rss_bytes": 1341980672,
+      "status": "ok"
+    },
+    {
+      "cell_index": 76,
+      "source_sha256": "c00a1951c6e5f40f39092a2d1bc642d8a3c0390e7ecfcf3889c5fba81e267694",
+      "execution_count": 35,
+      "seconds": 0.006659207982011139,
+      "kernel_rss_bytes": 1342160896,
+      "status": "ok"
+    },
+    {
+      "cell_index": 78,
+      "source_sha256": "07d2ed09cfbe00da1f7718ec1a53cb811f08d2bde084fbb1fcdede1952bf9d95",
+      "execution_count": 36,
+      "seconds": 0.007684792042709887,
+      "kernel_rss_bytes": 1342423040,
+      "status": "ok"
+    },
+    {
+      "cell_index": 79,
+      "source_sha256": "016e474bab203b4bbad77edad84a968e45de1775560baed1d384a5e0ebd3c7be",
+      "execution_count": 37,
+      "seconds": 0.22351512499153614,
+      "kernel_rss_bytes": 1352876032,
+      "status": "ok"
+    },
+    {
+      "cell_index": 81,
+      "source_sha256": "e1244ccef27b10ca2114a8d34dff6880bcd36fed5b6fb38de421196a5ec291ee",
+      "execution_count": 38,
+      "seconds": 0.0081912080058828,
+      "kernel_rss_bytes": 1352892416,
+      "status": "ok"
+    },
+    {
+      "cell_index": 83,
+      "source_sha256": "e2e6e0f6e088254e6df2373a3e91d381f5146b9e9afe2377aa692720091f2a72",
+      "execution_count": 39,
+      "seconds": 6.10324716597097,
+      "kernel_rss_bytes": 1250934784,
+      "status": "ok"
+    },
+    {
+      "cell_index": 84,
+      "source_sha256": "16576b6895deb56e86e24203bb4becd3fe0cb0ca0b78922507a3b65d6e55f5e3",
+      "execution_count": 40,
+      "seconds": 0.008928499999456108,
+      "kernel_rss_bytes": 1251409920,
+      "status": "ok"
+    },
+    {
+      "cell_index": 85,
+      "source_sha256": "0238b7a3ba41a2156c1a3ea4264d25a69b46659d0847ac910f678559c57f4f21",
+      "execution_count": 41,
+      "seconds": 1.9211446669651195,
+      "kernel_rss_bytes": 1272758272,
+      "status": "ok"
+    },
+    {
+      "cell_index": 87,
+      "source_sha256": "69d405c99489b86d22644948fe759c6963bab56221deb0b68160ba24e66b19ea",
+      "execution_count": 42,
+      "seconds": 0.48446070798672736,
+      "kernel_rss_bytes": 1272823808,
+      "status": "ok"
+    },
+    {
+      "cell_index": 90,
+      "source_sha256": "e711d2196e72f00d09ba4d76fc05fe4bbe166ea8a33b0a04de4f4102f94a22eb",
+      "execution_count": 43,
+      "seconds": 0.6722340830019675,
+      "kernel_rss_bytes": 456409088,
+      "status": "ok"
+    },
+    {
+      "cell_index": 91,
+      "source_sha256": "f18bef82b91199b69ced82b1b284e250797dc9643ba54b5e83cb1aa7e62ae48d",
+      "execution_count": 44,
+      "seconds": 0.3128419580170885,
+      "kernel_rss_bytes": 1354252288,
+      "status": "ok"
+    },
+    {
+      "cell_index": 92,
+      "source_sha256": "6b798d7e06481c0ed6317e689ea2b3aa3c669da89f6a9061b48c643f4bf7ff3f",
+      "execution_count": 45,
+      "seconds": 0.007615624985191971,
+      "kernel_rss_bytes": 1354252288,
+      "status": "ok"
+    },
+    {
+      "cell_index": 94,
+      "source_sha256": "504242aae736f67186a8d6e5cf8027f95cead95d0f8b19cf79904be7846ffc60",
+      "execution_count": 46,
+      "seconds": 0.007866083004046232,
+      "kernel_rss_bytes": 1354252288,
+      "status": "ok"
+    },
+    {
+      "cell_index": 96,
+      "source_sha256": "f6327c0301004dd0217f69c5d44ccd1800b4132d124ccb53faff33742c8ab28e",
+      "execution_count": 47,
+      "seconds": 0.0070773750194348395,
+      "kernel_rss_bytes": 1354252288,
+      "status": "ok"
+    },
+    {
+      "cell_index": 98,
+      "source_sha256": "b81e8d3efc3f63a1525ea19714a2f63cbf51a10aa5fe342566a40adadd1593c2",
+      "execution_count": 48,
+      "seconds": 0.15284274995792657,
+      "kernel_rss_bytes": 1362444288,
+      "status": "ok"
+    },
+    {
+      "cell_index": 100,
+      "source_sha256": "baa26aea00108ecdb816457af4ea31cfcc363ae8aa8a05cefe06ff4b24d2f0da",
+      "execution_count": 49,
+      "seconds": 0.6972927500028163,
+      "kernel_rss_bytes": 1259274240,
+      "status": "ok"
+    },
+    {
+      "cell_index": 102,
+      "source_sha256": "d3691b484aa6d90a8856d9d9d645c004788dbc94d6b377c4683ec879dfbda01e",
+      "execution_count": 50,
+      "seconds": 1.6705552079947665,
+      "kernel_rss_bytes": 1279574016,
+      "status": "ok"
+    },
+    {
+      "cell_index": 104,
+      "source_sha256": "1482f81a37b91a9693b7e9393946e68a89105ef8335275d3ef7e50af95026733",
+      "execution_count": 51,
+      "seconds": 0.13878833298804238,
+      "kernel_rss_bytes": 1284374528,
+      "status": "ok"
+    }
+  ]
+}

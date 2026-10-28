@@ -1,0 +1,80 @@
+{
+  "started_utc": "2026-10-26T16:42:02.748783+00:00",
+  "python": "3.11.16",
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "mode": "full",
+  "cells": [
+    {
+      "index": 1,
+      "status": "ok",
+      "seconds": 0.03344233400093799,
+      "source_sha256": "8dd68aba9dbab4d7ab39f142b94af5a9cc64a1d5a0af4c9e69897fad0853e50c"
+    },
+    {
+      "index": 3,
+      "status": "ok",
+      "seconds": 0.228860707999047,
+      "source_sha256": "bdc8c2e15919968abfed734da21dcda9329e3566b803b0515929121a8a96c8a1"
+    },
+    {
+      "index": 5,
+      "status": "ok",
+      "seconds": 0.11916887500046869,
+      "source_sha256": "ee07ffab7f476628f4738976cac033044ad3e8e6c21ae8ada72ee405f081efe5"
+    },
+    {
+      "index": 7,
+      "status": "ok",
+      "seconds": 79.53522404200157,
+      "source_sha256": "c9c19a76b65da5f143fa2d720bb233b443dcc1fa029cf1bf3c013c39304569e8"
+    },
+    {
+      "index": 8,
+      "status": "ok",
+      "seconds": 30.19632733400067,
+      "source_sha256": "438e1a5ac6dd089cdf2cdd02e62fa39ef23306bf92d5aea5681184fb4d905209"
+    },
+    {
+      "index": 10,
+      "status": "ok",
+      "seconds": 0.31083850000140956,
+      "source_sha256": "1daeed1554491deb6421c00cb61d7ad76dba507839602ffd097b75fb481185f7"
+    },
+    {
+      "index": 12,
+      "status": "ok",
+      "seconds": 0.21570766699915112,
+      "source_sha256": "b05ac5bcb1f4489e3da8be9127335396e61d5eb49a8de8f6720b5c7c4efc0a16"
+    },
+    {
+      "index": 14,
+      "status": "ok",
+      "seconds": 0.4088876249988971,
+      "source_sha256": "52d5f042bd7bdf89d23730b9aedc1fb0943831bb6a70c07b98032fa5cb31fa80"
+    },
+    {
+      "index": 16,
+      "status": "ok",
+      "seconds": 6.93337716699898,
+      "source_sha256": "ebaf2737dae25738187d265f85df50ac75ecc656491a761ca6c90e23e57c6b02"
+    },
+    {
+      "index": 18,
+      "status": "ok",
+      "seconds": 522.0125030830004,
+      "source_sha256": "5a2dba39c66ca0604987d1e5fcd68ecfec2f26b91f0a5fa2ca7e3fede5a095f0"
+    },
+    {
+      "index": 20,
+      "status": "ok",
+      "seconds": 0.459321665999596,
+      "source_sha256": "b6fcf4beed137e2fe82a492045d2e369d21e00d4ec819076b0284db31ea41efb"
+    },
+    {
+      "index": 21,
+      "status": "ok",
+      "seconds": 125.17645358399932,
+      "source_sha256": "e682c516e3b2027f8d174f89d5af39c30a787930d93ae940a071c75c999f053b"
+    }
+  ]
+}

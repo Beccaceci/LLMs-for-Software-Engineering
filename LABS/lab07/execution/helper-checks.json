@@ -1,0 +1,17 @@
+{
+  "kind": "helper validation with explicitly synthetic cases; not model-generated results",
+  "status": "passed",
+  "checks": 13,
+  "reference_roles_from_csv": [
+    "friend (of a hiker)",
+    "hiker",
+    "hut worker",
+    "local guide",
+    "platform manager",
+    "visitor"
+  ],
+  "checked_cell_source_sha256": {
+    "6": "4aa3588c78580c37180c2ae11f3104e64c4f14bf82c16b2b01f4047d58d8553c",
+    "9": "ff9552db17b0693deeb4bac390c32031c36a4a26cc7e5cbde43cf8617cdd487d"
+  }
+}

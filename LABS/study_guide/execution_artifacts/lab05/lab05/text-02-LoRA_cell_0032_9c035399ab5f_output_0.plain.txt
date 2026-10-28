@@ -1,0 +1,108 @@
+BertLayer(
+  (attention): BertAttention(
+    (self): BertSdpaSelfAttention(
+      (query): lora.Linear(
+        (base_layer): Linear(in_features=768, out_features=768, bias=True)
+        (lora_dropout): ModuleDict(
+          (default): Dropout(p=0.1, inplace=False)
+        )
+        (lora_A): ModuleDict(
+          (default): Linear(in_features=768, out_features=8, bias=False)
+        )
+        (lora_B): ModuleDict(
+          (default): Linear(in_features=8, out_features=768, bias=False)
+        )
+        (lora_embedding_A): ParameterDict()
+        (lora_embedding_B): ParameterDict()
+        (lora_magnitude_vector): ModuleDict()
+      )
+      (key): lora.Linear(
+        (base_layer): Linear(in_features=768, out_features=768, bias=True)
+        (lora_dropout): ModuleDict(
+          (default): Dropout(p=0.1, inplace=False)
+        )
+        (lora_A): ModuleDict(
+          (default): Linear(in_features=768, out_features=8, bias=False)
+        )
+        (lora_B): ModuleDict(
+          (default): Linear(in_features=8, out_features=768, bias=False)
+        )
+        (lora_embedding_A): ParameterDict()
+        (lora_embedding_B): ParameterDict()
+        (lora_magnitude_vector): ModuleDict()
+      )
+      (value): lora.Linear(
+        (base_layer): Linear(in_features=768, out_features=768, bias=True)
+        (lora_dropout): ModuleDict(
+          (default): Dropout(p=0.1, inplace=False)
+        )
+        (lora_A): ModuleDict(
+          (default): Linear(in_features=768, out_features=8, bias=False)
+        )
+        (lora_B): ModuleDict(
+          (default): Linear(in_features=8, out_features=768, bias=False)
+        )
+        (lora_embedding_A): ParameterDict()
+        (lora_embedding_B): ParameterDict()
+        (lora_magnitude_vector): ModuleDict()
+      )
+      (dropout): Dropout(p=0.1, inplace=False)
+    )
+    (output): BertSelfOutput(
+      (dense): lora.Linear(
+        (base_layer): Linear(in_features=768, out_features=768, bias=True)
+        (lora_dropout): ModuleDict(
+          (default): Dropout(p=0.1, inplace=False)
+        )
+        (lora_A): ModuleDict(
+          (default): Linear(in_features=768, out_features=8, bias=False)
+        )
+        (lora_B): ModuleDict(
+          (default): Linear(in_features=8, out_features=768, bias=False)
+        )
+        (lora_embedding_A): ParameterDict()
+        (lora_embedding_B): ParameterDict()
+        (lora_magnitude_vector): ModuleDict()
+      )
+      (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)
+      (dropout): Dropout(p=0.1, inplace=False)
+    )
+  )
+  (intermediate): BertIntermediate(
+    (dense): lora.Linear(
+      (base_layer): Linear(in_features=768, out_features=3072, bias=True)
+      (lora_dropout): ModuleDict(
+        (default): Dropout(p=0.1, inplace=False)
+      )
+      (lora_A): ModuleDict(
+        (default): Linear(in_features=768, out_features=8, bias=False)
+      )
+      (lora_B): ModuleDict(
+        (default): Linear(in_features=8, out_features=3072, bias=False)
+      )
+      (lora_embedding_A): ParameterDict()
+      (lora_embedding_B): ParameterDict()
+      (lora_magnitude_vector): ModuleDict()
+    )
+    (intermediate_act_fn): GELUActivation()
+  )
+  (output): BertOutput(
+    (dense): lora.Linear(
+      (base_layer): Linear(in_features=3072, out_features=768, bias=True)
+      (lora_dropout): ModuleDict(
+        (default): Dropout(p=0.1, inplace=False)
+      )
+      (lora_A): ModuleDict(
+        (default): Linear(in_features=3072, out_features=8, bias=False)
+      )
+      (lora_B): ModuleDict(
+        (default): Linear(in_features=8, out_features=768, bias=False)
+      )
+      (lora_embedding_A): ParameterDict()
+      (lora_embedding_B): ParameterDict()
+      (lora_magnitude_vector): ModuleDict()
+    )
+    (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)
+    (dropout): Dropout(p=0.1, inplace=False)
+  )
+)

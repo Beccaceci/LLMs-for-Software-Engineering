@@ -1,0 +1,2 @@
+Training examples: 1000; evaluation examples: 500
+Training token lengths: min=12, median=244, max=823

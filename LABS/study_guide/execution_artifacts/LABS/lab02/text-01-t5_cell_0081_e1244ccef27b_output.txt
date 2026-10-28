@@ -1,0 +1,3 @@
+Token ids tensor([2501,   32])
+Mapped tokens ['▁Hall', 'o']
+Decoded string Hallo

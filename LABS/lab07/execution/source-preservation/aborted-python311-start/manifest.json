@@ -1,0 +1,14 @@
+{
+  "text-07-stories.ipynb": {
+    "sha256": "7ec207af7faa95f09bca476a72bc9a0388e993792fddf575a18f1405074e0a7d",
+    "bytes": 147280
+  },
+  "full-run.log": {
+    "sha256": "ca30f3b2991ff3525133b6283623eefcaf75b34160bfa4ac0a110aa555e830a0",
+    "bytes": 299
+  },
+  "execution.json": {
+    "sha256": "3aa9e905c0366b78fd9a9bf0a1409f0ad5e37c20aec9d9a60028bb5cd39ed019",
+    "bytes": 597
+  }
+}

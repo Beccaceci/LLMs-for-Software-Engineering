@@ -1,0 +1,35 @@
+....FF....FF.F                                                           [100%]
+=================================== FAILURES ===================================
+__________________________ test_more_than_six_grades ___________________________
+test_cases_01.py:31: in test_more_than_six_grades
+    with pytest.raises(ValueError):
+E   Failed: DID NOT RAISE ValueError
+__________________________ test_less_than_six_grades ___________________________
+test_cases_01.py:36: in test_less_than_six_grades
+    with pytest.raises(ValueError):
+E   Failed: DID NOT RAISE ValueError
+________________________ test_non_numeric_input_string _________________________
+test_cases_01.py:64: in test_non_numeric_input_string
+    compute_average(grades)
+function_01.py:22: in compute_average
+    raise ValueError("List must contain only real numbers between 18 and 30 inclusive or 33 for laude")
+E   ValueError: List must contain only real numbers between 18 and 30 inclusive or 33 for laude
+_________________________ test_non_numeric_input_none __________________________
+test_cases_01.py:69: in test_non_numeric_input_none
+    compute_average(grades)
+function_01.py:22: in compute_average
+    raise ValueError("List must contain only real numbers between 18 and 30 inclusive or 33 for laude")
+E   ValueError: List must contain only real numbers between 18 and 30 inclusive or 33 for laude
+_________________________ test_non_numeric_input_mixed _________________________
+test_cases_01.py:79: in test_non_numeric_input_mixed
+    compute_average(grades)
+function_01.py:22: in compute_average
+    raise ValueError("List must contain only real numbers between 18 and 30 inclusive or 33 for laude")
+E   ValueError: List must contain only real numbers between 18 and 30 inclusive or 33 for laude
+=========================== short test summary info ============================
+FAILED test_cases_01.py::test_more_than_six_grades - Failed: DID NOT RAISE Va...
+FAILED test_cases_01.py::test_less_than_six_grades - Failed: DID NOT RAISE Va...
+FAILED test_cases_01.py::test_non_numeric_input_string - ValueError: List mus...
+FAILED test_cases_01.py::test_non_numeric_input_none - ValueError: List must ...
+FAILED test_cases_01.py::test_non_numeric_input_mixed - ValueError: List must...
+5 failed, 9 passed in 0.04s

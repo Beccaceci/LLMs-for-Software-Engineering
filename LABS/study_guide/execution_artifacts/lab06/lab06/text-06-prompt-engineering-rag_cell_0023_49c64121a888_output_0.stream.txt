@@ -1,0 +1,1 @@
+Context shortened from 33188 to 1024 tokens for local memory.

@@ -1,0 +1,1 @@
+Model size after quantization 2288.87 MB

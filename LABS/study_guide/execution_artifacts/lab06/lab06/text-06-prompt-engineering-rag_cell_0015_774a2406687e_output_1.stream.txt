@@ -1,0 +1,16 @@
+Zero-shot response: ```
+[
+  {
+    "name": "AC Milan",
+    "type": "club",
+    "_explanation": " AssociazioneCalcioMilan, commonlyreferred to asACMilan orsimplyMilan,is anItalian professionalfootballclubbasedinMilan,Lombardy."
+  },
+  {
+      "name":"San Siro",
+      "type":"stadium",
+      "_explanations": "TheSanSiro,whichwasbuiltbyMilanssecondchairman,PieroPirelliandhasbeensharedwithInterMilan since1947,is thelargestinItalianfootball,withatotalcapacityof75517."
+  }
+]
+```
+few-shot invalid entity JSON: JSONDecodeError
+zero-shot invalid entity JSON: JSONDecodeError

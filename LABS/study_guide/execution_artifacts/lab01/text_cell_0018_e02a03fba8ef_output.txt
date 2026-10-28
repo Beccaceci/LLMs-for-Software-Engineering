@@ -1,0 +1,4 @@
+Weight Parameter containing:
+tensor([[0.4561]], requires_grad=True)
+Bias Parameter containing:
+tensor([-0.2282], requires_grad=True)

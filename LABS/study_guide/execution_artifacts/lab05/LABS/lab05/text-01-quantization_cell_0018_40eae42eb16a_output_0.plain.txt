@@ -1,0 +1,2 @@
+(tensor([   0,  -17, -127,   33,  -63], dtype=torch.int8),
+ tensor([   0,  -48,   31,  -75, -127], dtype=torch.int8))

@@ -1,0 +1,68 @@
+\documentclass[10pt,a4paper,oneside]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{newpxtext}
+\usepackage[scaled=0.88]{sourcecodepro}
+\usepackage{microtype}
+\usepackage[a4paper,top=19mm,bottom=19mm,left=20mm,right=20mm,headheight=16pt,footskip=10mm]{geometry}
+\usepackage[dvipsnames,table]{xcolor}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs,tabularx,array}
+\usepackage{enumitem}
+\usepackage{listings}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{hyperref}
+\definecolor{politoNavy}{RGB}{0,45,98}
+\definecolor{steelBlue}{RGB}{35,100,160}
+\definecolor{skyBlue}{RGB}{230,240,250}
+\definecolor{bodyGray}{RGB}{80,85,90}
+\definecolor{codeBg}{RGB}{248,249,251}
+\definecolor{codeFrame}{RGB}{220,225,230}
+\hypersetup{colorlinks=true,linkcolor=politoNavy,urlcolor=steelBlue,pdftitle={Laboratory 06 solution: Prompt Engineering and RAG},pdfauthor={Politecnico di Torino}}
+\titleformat{\section}{\normalfont\sffamily\Large\bfseries\color{politoNavy}}{\thesection}{0.8em}{}
+\titleformat{\subsection}{\normalfont\sffamily\large\bfseries\color{steelBlue}}{\thesubsection}{0.8em}{}
+\pagestyle{fancy}\fancyhf{}
+\fancyhead[L]{\small\sffamily\color{bodyGray}\nouppercase{Laboratory 06: Prompt Engineering and RAG}}
+\fancyhead[R]{\small\sffamily\bfseries\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\fancypagestyle{plain}{\fancyhf{}\fancyfoot[C]{\small\sffamily\thepage}\renewcommand{\headrulewidth}{0pt}}
+\lstdefinestyle{studycode}{
+  language=Python,basicstyle=\fontsize{7.6}{9.1}\ttfamily,
+  keywordstyle=\bfseries\color{politoNavy},commentstyle=\itshape\color{bodyGray},
+  stringstyle=\color{ForestGreen},numbers=none,tabsize=4,showstringspaces=false,
+  breaklines=true,breakatwhitespace=false,columns=fullflexible,keepspaces=true,
+  frame=single,rulecolor=\color{codeFrame},backgroundcolor=\color{codeBg},
+  literate={█}{{\ensuremath{\blacksquare}}}1 {▎}{{|}}1 {▋}{{|}}1 {—}{{---}}1 {–}{{--}}1 {’}{{'}}1 {•}{{\textbullet}}1 {†}{{\ensuremath{\dagger}}}1 {∗}{{*}}1 {ﬁ}{{fi}}1 {ﬃ}{{ffi}}1 {©}{{\textcopyright}}1 {´}{{'}}1 {˜}{{\ensuremath{\sim}}}1 {𝑅}{{R}}1
+}
+\lstdefinestyle{terminalOutput}{
+  basicstyle=\fontsize{7.5}{9.0}\ttfamily,breaklines=true,breakatwhitespace=false,
+  columns=fullflexible,keepspaces=true,showstringspaces=false,
+  frame=single,rulecolor=\color{codeFrame},backgroundcolor=\color{codeBg},
+  literate={█}{{\ensuremath{\blacksquare}}}1 {▎}{{|}}1 {▋}{{|}}1 {—}{{---}}1 {–}{{--}}1 {’}{{'}}1 {•}{{\textbullet}}1 {†}{{\ensuremath{\dagger}}}1 {∗}{{*}}1 {ﬁ}{{fi}}1 {ﬃ}{{ffi}}1 {©}{{\textcopyright}}1 {´}{{'}}1 {˜}{{\ensuremath{\sim}}}1 {𝑅}{{R}}1
+}
+\lstdefinestyle{diagnosticOutput}{
+  basicstyle=\fontsize{6.3}{7.0}\ttfamily,breaklines=true,breakatwhitespace=false,
+  columns=fullflexible,keepspaces=true,showstringspaces=false,
+  aboveskip=0pt,belowskip=0pt,frame=none,backgroundcolor=white,
+  literate={█}{{\ensuremath{\blacksquare}}}1 {▎}{{|}}1 {▋}{{|}}1 {—}{{---}}1 {–}{{--}}1 {’}{{'}}1 {•}{{\textbullet}}1 {†}{{\ensuremath{\dagger}}}1 {∗}{{*}}1 {ﬁ}{{fi}}1 {ﬃ}{{ffi}}1 {©}{{\textcopyright}}1 {´}{{'}}1 {˜}{{\ensuremath{\sim}}}1 {𝑅}{{R}}1
+}
+\lstset{style=studycode}
+\setlist{nosep,leftmargin=1.5em}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{4pt}
+\newcommand{\labSolutionTitle}{Laboratory 06: Prompt Engineering and Retrieval-Augmented Generation}
+\newcommand{\labSolutionSubtitle}{Complete notebook-aligned solution}
+\begin{document}
+\pagenumbering{roman}
+\hypersetup{pageanchor=false}
+\input{../../frontmatter/solution_titlepage}
+\hypersetup{pageanchor=true}
+\tableofcontents
+\clearpage
+\pagenumbering{arabic}
+\input{../../chapters/06_lab06_prompt_engineering_rag.tex}
+\end{document}

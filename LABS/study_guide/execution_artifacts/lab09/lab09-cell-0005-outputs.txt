@@ -1,0 +1,170 @@
+--- notebook output 0 ---
+======================================= test session starts ========================================
+platform darwin -- Python 3.11.16, pytest-9.1.1, pluggy-1.7.0 -- /Users/nicolabeccaceci/.venvs/llms-lab09/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/nicolabeccaceci/Desktop/LLMs/LABS/lab09
+plugins: platformdirs-4.13.5
+collecting ...
+
+--- notebook output 1 ---
+collected 22 items
+
+t_de183bbd677e46caace029b07ed9ee5e.py::test_valid_grades[grades0-26.25]
+
+--- notebook output 2 ---
+PASSED               [  4%]
+
+--- notebook output 3 ---
+
+t_de183bbd677e46caace029b07ed9ee5e.py::test_valid_grades[grades1-28.0]
+
+--- notebook output 4 ---
+PASSED                [  9%]
+
+--- notebook output 5 ---
+
+t_de183bbd677e46caace029b07ed9ee5e.py::test_valid_grades[grades2-23.5]
+
+--- notebook output 6 ---
+PASSED                [ 13%]
+
+--- notebook output 7 ---
+
+t_de183bbd677e46caace029b07ed9ee5e.py::test_valid_grades[grades3-18.0]
+
+--- notebook output 8 ---
+PASSED                [ 18%]
+
+--- notebook output 9 ---
+
+t_de183bbd677e46caace029b07ed9ee5e.py::test_valid_grades[grades4-30.0]
+
+--- notebook output 10 ---
+PASSED                [ 22%]
+
+--- notebook output 11 ---
+
+t_de183bbd677e46caace029b07ed9ee5e.py::test_valid_grades[grades5-33.0]
+
+--- notebook output 12 ---
+PASSED                [ 27%]
+
+--- notebook output 13 ---
+
+t_de183bbd677e46caace029b07ed9ee5e.py::test_valid_grades[grades6-25.0]
+
+--- notebook output 14 ---
+PASSED                [ 31%]
+
+--- notebook output 15 ---
+
+t_de183bbd677e46caace029b07ed9ee5e.py::test_valid_grades[grades7-25.5]
+
+--- notebook output 16 ---
+PASSED                [ 36%]
+
+--- notebook output 17 ---
+
+t_de183bbd677e46caace029b07ed9ee5e.py::test_valid_grades[grades8-23.0]
+
+--- notebook output 18 ---
+PASSED                [ 40%]
+
+--- notebook output 19 ---
+
+t_de183bbd677e46caace029b07ed9ee5e.py::test_invalid_grades[grades0]
+
+--- notebook output 20 ---
+PASSED                   [ 45%]
+
+--- notebook output 21 ---
+
+t_de183bbd677e46caace029b07ed9ee5e.py::test_invalid_grades[grades1]
+
+--- notebook output 22 ---
+PASSED                   [ 50%]
+
+--- notebook output 23 ---
+
+t_de183bbd677e46caace029b07ed9ee5e.py::test_invalid_grades[grades2]
+
+--- notebook output 24 ---
+PASSED                   [ 54%]
+
+--- notebook output 25 ---
+
+t_de183bbd677e46caace029b07ed9ee5e.py::test_invalid_grades[grades3]
+
+--- notebook output 26 ---
+PASSED                   [ 59%]
+
+--- notebook output 27 ---
+
+t_de183bbd677e46caace029b07ed9ee5e.py::test_invalid_grades[grades4]
+
+--- notebook output 28 ---
+PASSED                   [ 63%]
+
+--- notebook output 29 ---
+
+t_de183bbd677e46caace029b07ed9ee5e.py::test_invalid_grades[grades5]
+
+--- notebook output 30 ---
+PASSED                   [ 68%]
+
+--- notebook output 31 ---
+
+t_de183bbd677e46caace029b07ed9ee5e.py::test_invalid_grades[grades6]
+
+--- notebook output 32 ---
+PASSED                   [ 72%]
+
+--- notebook output 33 ---
+
+t_de183bbd677e46caace029b07ed9ee5e.py::test_invalid_grades[grades7]
+
+--- notebook output 34 ---
+PASSED                   [ 77%]
+
+--- notebook output 35 ---
+
+t_de183bbd677e46caace029b07ed9ee5e.py::test_invalid_grades[grades8]
+
+--- notebook output 36 ---
+PASSED                   [ 81%]
+
+--- notebook output 37 ---
+
+t_de183bbd677e46caace029b07ed9ee5e.py::test_invalid_grades[grades9]
+
+--- notebook output 38 ---
+PASSED                   [ 86%]
+
+--- notebook output 39 ---
+
+t_de183bbd677e46caace029b07ed9ee5e.py::test_non_numeric_grades[25]
+
+--- notebook output 40 ---
+PASSED                    [ 90%]
+
+--- notebook output 41 ---
+
+t_de183bbd677e46caace029b07ed9ee5e.py::test_non_numeric_grades[None]
+
+--- notebook output 42 ---
+PASSED                  [ 95%]
+
+--- notebook output 43 ---
+
+t_de183bbd677e46caace029b07ed9ee5e.py::test_non_numeric_grades[(25+0j)]
+
+--- notebook output 44 ---
+PASSED               [100%]
+
+--- notebook output 45 ---
+
+
+======================================== 22 passed in 0.04s ========================================
+All notebook reference boundary/validation tests passed.
+Supplied test_valid_grades_with_30laude expects 27.75 with 1% tolerance; exact answer is 28.0.
+The supplied test file is preserved; strict tests above check the exact result.

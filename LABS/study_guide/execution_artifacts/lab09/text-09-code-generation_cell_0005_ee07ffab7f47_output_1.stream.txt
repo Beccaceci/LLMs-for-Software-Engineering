@@ -1,0 +1,3 @@
+collected 22 items
+
+t_de183bbd677e46caace029b07ed9ee5e.py::test_valid_grades[grades0-26.25] 

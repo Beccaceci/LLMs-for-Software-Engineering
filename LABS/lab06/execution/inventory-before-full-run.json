@@ -1,0 +1,350 @@
+{
+  "schema_version": 1,
+  "cells": [
+    {
+      "key": "lab06/text-06-prompt-engineering-rag.ipynb::cell-0001",
+      "notebook": "lab06/text-06-prompt-engineering-rag.ipynb",
+      "notebook_sha256": "394e5ad554af5d8de16edcde815cd9682de8ea3ea24c450447271a63d72ff250",
+      "cell_index": 1,
+      "source_sha256": "e3df99e94bb906035b250971c46eec4dc6194435af77dc21bcd8fe4f04d34f8d",
+      "source_sha256_normalized": "e3df99e94bb906035b250971c46eec4dc6194435af77dc21bcd8fe4f04d34f8d",
+      "source_lines": 63,
+      "headings": [
+        "2 Exercise 1: Prompt Engineering"
+      ],
+      "execution_count": null,
+      "outputs": [],
+      "has_error": false,
+      "output_substantive": false,
+      "exported_source": "study_guide/execution_artifacts/lab06-pre-run/lab06/text-06-prompt-engineering-rag_cell_0001_e3df99e94bb9.py",
+      "exported_outputs": [],
+      "exported_figures": []
+    },
+    {
+      "key": "lab06/text-06-prompt-engineering-rag.ipynb::cell-0003",
+      "notebook": "lab06/text-06-prompt-engineering-rag.ipynb",
+      "notebook_sha256": "394e5ad554af5d8de16edcde815cd9682de8ea3ea24c450447271a63d72ff250",
+      "cell_index": 3,
+      "source_sha256": "a16c1de1c9b9ca18339ccaeadb0646da3cf7266acdb30f8804033b172dbc76c2",
+      "source_sha256_normalized": "a16c1de1c9b9ca18339ccaeadb0646da3cf7266acdb30f8804033b172dbc76c2",
+      "source_lines": 5,
+      "headings": [
+        "2 Exercise 1: Prompt Engineering",
+        "3 Pymupdf"
+      ],
+      "execution_count": 2,
+      "outputs": [
+        {
+          "index": 0,
+          "type": "stream",
+          "payload_sha256": "b871b6c3a3de579b7ad737c775f7ca9d9555dcb232d0e8bab9aa247f91c0e66a",
+          "text_sha256": "9dac530af4aec3058de04adebe55718f6f0634247bbfa8bc8d0f219267169c9f"
+        }
+      ],
+      "has_error": false,
+      "output_substantive": true,
+      "exported_source": "study_guide/execution_artifacts/lab06-pre-run/lab06/text-06-prompt-engineering-rag_cell_0003_a16c1de1c9b9.py",
+      "exported_outputs": [
+        {
+          "index": 0,
+          "payload_sha256": "b871b6c3a3de579b7ad737c775f7ca9d9555dcb232d0e8bab9aa247f91c0e66a",
+          "presentation_artifact": "study_guide/execution_artifacts/lab06-pre-run/lab06/text-06-prompt-engineering-rag_cell_0003_a16c1de1c9b9_output_0.txt",
+          "presentation_sha256": "b7942ee8df549c9682dffa1ec1e09dbddedd4ba31ef8696ddea8ef05905177d8",
+          "raw_payload_artifacts": [
+            {
+              "path": "study_guide/execution_artifacts/lab06-pre-run/lab06/text-06-prompt-engineering-rag_cell_0003_a16c1de1c9b9_output_0.stream.txt",
+              "sha256": "9dac530af4aec3058de04adebe55718f6f0634247bbfa8bc8d0f219267169c9f"
+            }
+          ],
+          "figures": []
+        }
+      ],
+      "exported_output": "study_guide/execution_artifacts/lab06-pre-run/lab06/text-06-prompt-engineering-rag_cell_0003_a16c1de1c9b9_output_0.txt",
+      "exported_figures": []
+    },
+    {
+      "key": "lab06/text-06-prompt-engineering-rag.ipynb::cell-0005",
+      "notebook": "lab06/text-06-prompt-engineering-rag.ipynb",
+      "notebook_sha256": "394e5ad554af5d8de16edcde815cd9682de8ea3ea24c450447271a63d72ff250",
+      "cell_index": 5,
+      "source_sha256": "0b408f31a8ba33a0a19cea6b784f73cc6b3f911df9dffa9d6615604e93616621",
+      "source_sha256_normalized": "0b408f31a8ba33a0a19cea6b784f73cc6b3f911df9dffa9d6615604e93616621",
+      "source_lines": 11,
+      "headings": [
+        "2 Exercise 1: Prompt Engineering",
+        "3 Example: Text Summarization"
+      ],
+      "execution_count": null,
+      "outputs": [],
+      "has_error": false,
+      "output_substantive": false,
+      "exported_source": "study_guide/execution_artifacts/lab06-pre-run/lab06/text-06-prompt-engineering-rag_cell_0005_0b408f31a8ba.py",
+      "exported_outputs": [],
+      "exported_figures": []
+    },
+    {
+      "key": "lab06/text-06-prompt-engineering-rag.ipynb::cell-0007",
+      "notebook": "lab06/text-06-prompt-engineering-rag.ipynb",
+      "notebook_sha256": "394e5ad554af5d8de16edcde815cd9682de8ea3ea24c450447271a63d72ff250",
+      "cell_index": 7,
+      "source_sha256": "22feef229af1b79ae18d1c22e5125d099e4a1376d10065c5d4e5343c4fc9df90",
+      "source_sha256_normalized": "22feef229af1b79ae18d1c22e5125d099e4a1376d10065c5d4e5343c4fc9df90",
+      "source_lines": 15,
+      "headings": [
+        "2 Exercise 1: Prompt Engineering",
+        "3 Adding a System Prompt"
+      ],
+      "execution_count": null,
+      "outputs": [],
+      "has_error": false,
+      "output_substantive": false,
+      "exported_source": "study_guide/execution_artifacts/lab06-pre-run/lab06/text-06-prompt-engineering-rag_cell_0007_22feef229af1.py",
+      "exported_outputs": [],
+      "exported_figures": []
+    },
+    {
+      "key": "lab06/text-06-prompt-engineering-rag.ipynb::cell-0009",
+      "notebook": "lab06/text-06-prompt-engineering-rag.ipynb",
+      "notebook_sha256": "394e5ad554af5d8de16edcde815cd9682de8ea3ea24c450447271a63d72ff250",
+      "cell_index": 9,
+      "source_sha256": "99bcf535b4007f15d706444d7c28145e0f81369ce245ae181769e38ee4be54c6",
+      "source_sha256_normalized": "99bcf535b4007f15d706444d7c28145e0f81369ce245ae181769e38ee4be54c6",
+      "source_lines": 10,
+      "headings": [
+        "2 Exercise 1: Prompt Engineering",
+        "3 Customizing the System prompt"
+      ],
+      "execution_count": null,
+      "outputs": [],
+      "has_error": false,
+      "output_substantive": false,
+      "exported_source": "study_guide/execution_artifacts/lab06-pre-run/lab06/text-06-prompt-engineering-rag_cell_0009_99bcf535b400.py",
+      "exported_outputs": [],
+      "exported_figures": []
+    },
+    {
+      "key": "lab06/text-06-prompt-engineering-rag.ipynb::cell-0011",
+      "notebook": "lab06/text-06-prompt-engineering-rag.ipynb",
+      "notebook_sha256": "394e5ad554af5d8de16edcde815cd9682de8ea3ea24c450447271a63d72ff250",
+      "cell_index": 11,
+      "source_sha256": "0f7bbe803cc12f069126b606733950b80c4ff3c40fc423a234680aed8dc0024d",
+      "source_sha256_normalized": "0f7bbe803cc12f069126b606733950b80c4ff3c40fc423a234680aed8dc0024d",
+      "source_lines": 14,
+      "headings": [
+        "2 Exercise 1: Prompt Engineering",
+        "3 Chain-of-Thought prompting"
+      ],
+      "execution_count": null,
+      "outputs": [],
+      "has_error": false,
+      "output_substantive": false,
+      "exported_source": "study_guide/execution_artifacts/lab06-pre-run/lab06/text-06-prompt-engineering-rag_cell_0011_0f7bbe803cc1.py",
+      "exported_outputs": [],
+      "exported_figures": []
+    },
+    {
+      "key": "lab06/text-06-prompt-engineering-rag.ipynb::cell-0013",
+      "notebook": "lab06/text-06-prompt-engineering-rag.ipynb",
+      "notebook_sha256": "394e5ad554af5d8de16edcde815cd9682de8ea3ea24c450447271a63d72ff250",
+      "cell_index": 13,
+      "source_sha256": "0cd0e520a248ecaff89626fcd02a8cc203b3605d1d1e20cded273b61c2c58cc4",
+      "source_sha256_normalized": "0cd0e520a248ecaff89626fcd02a8cc203b3605d1d1e20cded273b61c2c58cc4",
+      "source_lines": 23,
+      "headings": [
+        "2 Exercise 1: Prompt Engineering",
+        "3 Generating JSONs with Llama"
+      ],
+      "execution_count": null,
+      "outputs": [],
+      "has_error": false,
+      "output_substantive": false,
+      "exported_source": "study_guide/execution_artifacts/lab06-pre-run/lab06/text-06-prompt-engineering-rag_cell_0013_0cd0e520a248.py",
+      "exported_outputs": [],
+      "exported_figures": []
+    },
+    {
+      "key": "lab06/text-06-prompt-engineering-rag.ipynb::cell-0015",
+      "notebook": "lab06/text-06-prompt-engineering-rag.ipynb",
+      "notebook_sha256": "394e5ad554af5d8de16edcde815cd9682de8ea3ea24c450447271a63d72ff250",
+      "cell_index": 15,
+      "source_sha256": "774a2406687eaa5c5ddc2aee9a7b875750edee932fd840d8bfc63bd83914d245",
+      "source_sha256_normalized": "774a2406687eaa5c5ddc2aee9a7b875750edee932fd840d8bfc63bd83914d245",
+      "source_lines": 28,
+      "headings": [
+        "2 Exercise 1: Prompt Engineering",
+        "3 One-to-Many Shot Learning Prompting"
+      ],
+      "execution_count": null,
+      "outputs": [],
+      "has_error": false,
+      "output_substantive": false,
+      "exported_source": "study_guide/execution_artifacts/lab06-pre-run/lab06/text-06-prompt-engineering-rag_cell_0015_774a2406687e.py",
+      "exported_outputs": [],
+      "exported_figures": []
+    },
+    {
+      "key": "lab06/text-06-prompt-engineering-rag.ipynb::cell-0017",
+      "notebook": "lab06/text-06-prompt-engineering-rag.ipynb",
+      "notebook_sha256": "394e5ad554af5d8de16edcde815cd9682de8ea3ea24c450447271a63d72ff250",
+      "cell_index": 17,
+      "source_sha256": "b65c8832a34fe27c3ce9ef4e3c4e870c0fb40e97246f7b6f534b467fcfe7c0f4",
+      "source_sha256_normalized": "b65c8832a34fe27c3ce9ef4e3c4e870c0fb40e97246f7b6f534b467fcfe7c0f4",
+      "source_lines": 13,
+      "headings": [
+        "2 Exercise 2: RAG (Retrieval-Augmented-Generation)"
+      ],
+      "execution_count": 3,
+      "outputs": [
+        {
+          "index": 0,
+          "type": "stream",
+          "payload_sha256": "81bcc3faa957d2314f954f7c3cfb0ff24b9ac06056f79892c2577217632aeb29",
+          "text_sha256": "93bb44e72999b986989385a393c0ce65808b6d969b9dbe7841198aa2d554bcf1"
+        }
+      ],
+      "has_error": false,
+      "output_substantive": true,
+      "exported_source": "study_guide/execution_artifacts/lab06-pre-run/lab06/text-06-prompt-engineering-rag_cell_0017_b65c8832a34f.py",
+      "exported_outputs": [
+        {
+          "index": 0,
+          "payload_sha256": "81bcc3faa957d2314f954f7c3cfb0ff24b9ac06056f79892c2577217632aeb29",
+          "presentation_artifact": "study_guide/execution_artifacts/lab06-pre-run/lab06/text-06-prompt-engineering-rag_cell_0017_b65c8832a34f_output_0.txt",
+          "presentation_sha256": "589afddd5f29951a8ea85cabac1d78610bfc05c38b3b4b88d9e8be0ebd443bf9",
+          "raw_payload_artifacts": [
+            {
+              "path": "study_guide/execution_artifacts/lab06-pre-run/lab06/text-06-prompt-engineering-rag_cell_0017_b65c8832a34f_output_0.stream.txt",
+              "sha256": "93bb44e72999b986989385a393c0ce65808b6d969b9dbe7841198aa2d554bcf1"
+            }
+          ],
+          "figures": []
+        }
+      ],
+      "exported_output": "study_guide/execution_artifacts/lab06-pre-run/lab06/text-06-prompt-engineering-rag_cell_0017_b65c8832a34f_output_0.txt",
+      "exported_figures": []
+    },
+    {
+      "key": "lab06/text-06-prompt-engineering-rag.ipynb::cell-0019",
+      "notebook": "lab06/text-06-prompt-engineering-rag.ipynb",
+      "notebook_sha256": "394e5ad554af5d8de16edcde815cd9682de8ea3ea24c450447271a63d72ff250",
+      "cell_index": 19,
+      "source_sha256": "767e063fcaaf467358e825d40b8424fcb5c766cc79432a739b6b85491654e507",
+      "source_sha256_normalized": "767e063fcaaf467358e825d40b8424fcb5c766cc79432a739b6b85491654e507",
+      "source_lines": 44,
+      "headings": [
+        "2 Exercise 2: RAG (Retrieval-Augmented-Generation)",
+        "3 Creating an index of vectors to represent the documents"
+      ],
+      "execution_count": 4,
+      "outputs": [
+        {
+          "index": 0,
+          "type": "stream",
+          "payload_sha256": "e87ea14f3c9f9a30a5b74aa4401cccaef31b8b840cb7c4718c32aabfa072bfac",
+          "text_sha256": "8089fcff4d8514edbe8df0541b06b6f52eecf94bffd4e928cdc537a9922c04f4"
+        },
+        {
+          "index": 1,
+          "type": "stream",
+          "payload_sha256": "1df734ed9957baa314ef956faa84b392a6147f8727a35d6e52a79163ba16704f",
+          "text_sha256": "6e3e5c7520c63a27e5e0ca28586f7fd66895e732bb746cd75fb13aae4d47e4b8"
+        }
+      ],
+      "has_error": false,
+      "output_substantive": true,
+      "exported_source": "study_guide/execution_artifacts/lab06-pre-run/lab06/text-06-prompt-engineering-rag_cell_0019_767e063fcaaf.py",
+      "exported_outputs": [
+        {
+          "index": 0,
+          "payload_sha256": "e87ea14f3c9f9a30a5b74aa4401cccaef31b8b840cb7c4718c32aabfa072bfac",
+          "presentation_artifact": "study_guide/execution_artifacts/lab06-pre-run/lab06/text-06-prompt-engineering-rag_cell_0019_767e063fcaaf_output_0.txt",
+          "presentation_sha256": "dae22d38b8e5ff71e7f6cea5e820b0abd236de93ba27c3d0185fd0a2651ba1b3",
+          "raw_payload_artifacts": [
+            {
+              "path": "study_guide/execution_artifacts/lab06-pre-run/lab06/text-06-prompt-engineering-rag_cell_0019_767e063fcaaf_output_0.stream.txt",
+              "sha256": "8089fcff4d8514edbe8df0541b06b6f52eecf94bffd4e928cdc537a9922c04f4"
+            }
+          ],
+          "figures": []
+        },
+        {
+          "index": 1,
+          "payload_sha256": "1df734ed9957baa314ef956faa84b392a6147f8727a35d6e52a79163ba16704f",
+          "presentation_artifact": "study_guide/execution_artifacts/lab06-pre-run/lab06/text-06-prompt-engineering-rag_cell_0019_767e063fcaaf_output_1.txt",
+          "presentation_sha256": "6e3e5c7520c63a27e5e0ca28586f7fd66895e732bb746cd75fb13aae4d47e4b8",
+          "raw_payload_artifacts": [
+            {
+              "path": "study_guide/execution_artifacts/lab06-pre-run/lab06/text-06-prompt-engineering-rag_cell_0019_767e063fcaaf_output_1.stream.txt",
+              "sha256": "6e3e5c7520c63a27e5e0ca28586f7fd66895e732bb746cd75fb13aae4d47e4b8"
+            }
+          ],
+          "figures": []
+        }
+      ],
+      "exported_figures": []
+    },
+    {
+      "key": "lab06/text-06-prompt-engineering-rag.ipynb::cell-0021",
+      "notebook": "lab06/text-06-prompt-engineering-rag.ipynb",
+      "notebook_sha256": "394e5ad554af5d8de16edcde815cd9682de8ea3ea24c450447271a63d72ff250",
+      "cell_index": 21,
+      "source_sha256": "3a1a24381ac1026afbfc633537eec2500d22775e63d3cf25ef757af71bb3801b",
+      "source_sha256_normalized": "3a1a24381ac1026afbfc633537eec2500d22775e63d3cf25ef757af71bb3801b",
+      "source_lines": 28,
+      "headings": [
+        "2 Exercise 2: RAG (Retrieval-Augmented-Generation)",
+        "3 Search"
+      ],
+      "execution_count": 5,
+      "outputs": [
+        {
+          "index": 0,
+          "type": "stream",
+          "payload_sha256": "08313eb13d56e5e3c899537c9499638c2778774dd69a390a1836608d2d384eda",
+          "text_sha256": "9965fa6aeeed897a9f1688bb877d6ab01a9fbf6b9371f89e7d113113b89c30cc"
+        }
+      ],
+      "has_error": false,
+      "output_substantive": true,
+      "exported_source": "study_guide/execution_artifacts/lab06-pre-run/lab06/text-06-prompt-engineering-rag_cell_0021_3a1a24381ac1.py",
+      "exported_outputs": [
+        {
+          "index": 0,
+          "payload_sha256": "08313eb13d56e5e3c899537c9499638c2778774dd69a390a1836608d2d384eda",
+          "presentation_artifact": "study_guide/execution_artifacts/lab06-pre-run/lab06/text-06-prompt-engineering-rag_cell_0021_3a1a24381ac1_output_0.txt",
+          "presentation_sha256": "9965fa6aeeed897a9f1688bb877d6ab01a9fbf6b9371f89e7d113113b89c30cc",
+          "raw_payload_artifacts": [
+            {
+              "path": "study_guide/execution_artifacts/lab06-pre-run/lab06/text-06-prompt-engineering-rag_cell_0021_3a1a24381ac1_output_0.stream.txt",
+              "sha256": "9965fa6aeeed897a9f1688bb877d6ab01a9fbf6b9371f89e7d113113b89c30cc"
+            }
+          ],
+          "figures": []
+        }
+      ],
+      "exported_output": "study_guide/execution_artifacts/lab06-pre-run/lab06/text-06-prompt-engineering-rag_cell_0021_3a1a24381ac1_output_0.txt",
+      "exported_figures": []
+    },
+    {
+      "key": "lab06/text-06-prompt-engineering-rag.ipynb::cell-0023",
+      "notebook": "lab06/text-06-prompt-engineering-rag.ipynb",
+      "notebook_sha256": "394e5ad554af5d8de16edcde815cd9682de8ea3ea24c450447271a63d72ff250",
+      "cell_index": 23,
+      "source_sha256": "8db23af63980819f141f76b51c53d7b16a75a7e1fc61ef79e9c4ad79cef1b3cd",
+      "source_sha256_normalized": "8db23af63980819f141f76b51c53d7b16a75a7e1fc61ef79e9c4ad79cef1b3cd",
+      "source_lines": 34,
+      "headings": [
+        "2 Exercise 2: RAG (Retrieval-Augmented-Generation)",
+        "3 A function to perform Retrieval Augmented Generation"
+      ],
+      "execution_count": null,
+      "outputs": [],
+      "has_error": false,
+      "output_substantive": false,
+      "exported_source": "study_guide/execution_artifacts/lab06-pre-run/lab06/text-06-prompt-engineering-rag_cell_0023_8db23af63980.py",
+      "exported_outputs": [],
+      "exported_figures": []
+    }
+  ],
+  "input_errors": []
+}

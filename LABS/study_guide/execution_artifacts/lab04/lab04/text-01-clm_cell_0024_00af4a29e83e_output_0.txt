@@ -1,0 +1,5 @@
+                       Strategy  Useful tokens  Padded tokens Padding share Reduction vs fixed (%)
+             Fixed length 1,024         244388         779612        76.13%                  0.00%
+ Dynamic, seeded random batches         244388         183026        42.82%                 76.52%
+Dynamic, similar-length batches         244388           1802         0.73%                 99.77%
+Logical batches: 167 (last batch size 4)

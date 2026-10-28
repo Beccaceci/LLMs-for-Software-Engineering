@@ -1,0 +1,20 @@
+Expected answer: 26 + 760 = 786
+Model's answer: 26 + 760 = 786
+Question 1: Correct 
+
+Expected answer: 251 + 229 = 480
+Model's answer: 251 + 229 = 480
+Question 2: Correct 
+
+Expected answer: 755 + 105 = 860
+Model's answer: 755 + 105 = 860
+Question 3: Correct 
+
+Expected answer: 90 + 605 = 695
+Model's answer: 90 + 605 = 695
+Question 4: Correct 
+
+Expected answer: 33 + 31 = 64
+Model's answer: 33 + 31 = 64
+Question 5: Correct 
+

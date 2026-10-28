@@ -1,0 +1,26 @@
+{
+  "datasets": [
+    {
+      "dataset": "CIFAR10",
+      "archive_md5": "c58f30108f718f92721af3b95e74349a",
+      "expected_md5": "c58f30108f718f92721af3b95e74349a",
+      "sizes": {
+        "train": 50000,
+        "test": 10000
+      }
+    },
+    {
+      "dataset": "CIFAR100",
+      "archive_md5": "eb9058c3a382ffc7106e4002c42a8d85",
+      "expected_md5": "eb9058c3a382ffc7106e4002c42a8d85",
+      "sizes": {
+        "train": 50000,
+        "test": 10000
+      }
+    }
+  ],
+  "resnet18_weights": {
+    "path": "/Users/nicolabeccaceci/.cache/torch/hub/checkpoints/resnet18-f37072fd.pth",
+    "sha256": "f37072fd47e89c5e827621c5baffa7500819f7896bbacec160b1a16c560e07ec"
+  }
+}

@@ -1,0 +1,14 @@
+Step 1: Hall
+Step 2: Hallo
+
+
+Step 3: Hallo,
+Step 4: Hallo, wie
+
+
+Step 5: Hallo, wie sind
+Step 6: Hallo, wie sind Sie
+
+
+Step 7: Hallo, wie sind Sie?
+Step 8: Hallo, wie sind Sie?</s>

@@ -1,0 +1,33 @@
+\documentclass[../../labs.tex]{subfiles}
+\begin{document}
+\frontmatter
+\def\labSolutionTitle{Laboratory 01: Deep Learning Foundations with PyTorch}
+\def\labSolutionSubtitle{Complete notebook-aligned solution}
+\input{../../frontmatter/solution_titlepage}
+\tableofcontents
+\mainmatter
+\subfile{../../chapters/01_pytorch_foundations}
+
+\appendix
+\chapter{PyTorch execution model}
+\label{app:lab01_pytorch}
+
+The exercises use PyTorch through its Python interface, while tensor operations and automatic differentiation are implemented by the library's C++ ATen and autograd components. This appendix summarizes the runtime mechanisms needed to interpret the notebook; it does not claim that one particular internal representation applies unchanged across all devices and versions.
+
+\section{Tensor metadata and storage}
+
+A tensor combines a data type, device, sizes, strides, storage offset, and a reference to its underlying storage. For an index tuple $(i_0,\ldots,i_{n-1})$, the logical element is found at storage position
+\[
+  o + \sum_{k=0}^{n-1} i_k s_k,
+\]
+where $o$ is the storage offset and $s_k$ is the stride of dimension $k$. Views such as transposes can therefore change shape and strides while sharing the same allocation. A view need not be contiguous; operations that require a contiguous layout may need a copy, and \texttt{contiguous()} makes that copy when necessary. Device placement also belongs to the tensor: arithmetic generally requires compatible devices, which is why the model and minibatches are moved to the same selected device.
+
+\section{Reverse-mode automatic differentiation}
+
+When gradient tracking is enabled, differentiable operations record edges from their outputs to the functions that produced them. A tensor produced by such an operation exposes its history through \texttt{grad\_fn}; leaf parameters marked with \texttt{requires\_grad=True} receive accumulated gradients in \texttt{.grad}. Calling \texttt{backward()} starts reverse traversal from the scalar objective, combines contributions where paths meet, and stores the resulting derivatives at leaves. Gradients accumulate across backward calls, so training loops clear them with \texttt{optimizer.zero\_grad()} before processing the next update. This is the mechanism demonstrated directly in Exercise~3 and used implicitly by the regression and image-classification loops.
+
+\section{Device dispatch and training state}
+
+The dispatcher selects an implementation according to the operator and tensor properties, including device, layout, and dtype. The Python-level device check in the notebook chooses a supported execution target; it does not guarantee that every operation has identical performance or numerical behavior across CPU, CUDA, and other backends. During training, \texttt{model.train()} and \texttt{model.eval()} configure layers whose behavior depends on the phase, while \texttt{torch.no\_grad()} prevents evaluation operations from building a gradient graph. These controls affect execution state and memory use; they do not change the mathematical definition of the trained model.
+
+\end{document}

@@ -1,0 +1,6 @@
+Roles extracted by the model: ['Visitors', 'Local Guides', 'Platform Managers', 'Hut Workers']
+True Positives: 4
+False Positives: 0
+False Negatives: 2
+Precision: 1.0
+Recall: 0.6666666666666666

@@ -1,0 +1,2 @@
+Tokens: ['hello', ',', 'this', 'is', 'a', 'sentence', '!']
+Token IDs: [7592, 1010, 2023, 2003, 1037, 6251, 999]

@@ -1,0 +1,5 @@
+little (2210) - logit: 10.2418
+bite (6805) - logit: 9.8704
+burger (15890) - logit: 9.0154
+lot (2843) - logit: 8.9455
+sandwich (11642) - logit: 8.6518

@@ -1,0 +1,71 @@
+{
+  "started_utc": "2026-10-26T07:43:55.038594+00:00",
+  "python": "3.11.16",
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "cells": [
+    {
+      "cell_index": 3,
+      "execution_count": 1,
+      "source_sha256": "12f0ef518b3f463ea56020320838a3000a29594ec2a094e7f6046b33ac13a4c7",
+      "seconds": 70.11501754098572,
+      "kernel_rss_bytes": 242991104,
+      "status": "ok"
+    },
+    {
+      "cell_index": 5,
+      "execution_count": 2,
+      "source_sha256": "cc82b8f9ded0cd4f7bc0526dc836c09215e33d5d8cf1096bf0ed7f0a53af3e31",
+      "seconds": 24.329063625016715,
+      "kernel_rss_bytes": 610516992,
+      "status": "ok"
+    },
+    {
+      "cell_index": 8,
+      "execution_count": 3,
+      "source_sha256": "8d5de2b0c0b0b162b9d579df6e871b7f5659eb4183e40dad14351a7aab9b47eb",
+      "seconds": 58.380395958025474,
+      "kernel_rss_bytes": 95879168,
+      "status": "ok"
+    },
+    {
+      "cell_index": 9,
+      "execution_count": 4,
+      "source_sha256": "66b37288af236ea6e4f60c062a3346247038f2c23c303d6ea38bdc68fffac7d5",
+      "seconds": 7.847808791033458,
+      "kernel_rss_bytes": 525303808,
+      "status": "ok"
+    },
+    {
+      "cell_index": 12,
+      "execution_count": 5,
+      "source_sha256": "c83319cc39daa8013bef5a1ca4d749ace0665812fb7cf69ca2021c718199c368",
+      "seconds": 12.83407583303051,
+      "kernel_rss_bytes": 128630784,
+      "status": "ok"
+    },
+    {
+      "cell_index": 13,
+      "execution_count": 6,
+      "source_sha256": "6e025cf9cd30752579dee7d8dbc106df61636b0215b1e7cfdeab49aa91506f21",
+      "seconds": 3.3767965409788303,
+      "kernel_rss_bytes": 406388736,
+      "status": "ok"
+    },
+    {
+      "cell_index": 17,
+      "execution_count": 7,
+      "source_sha256": "d2b66b447836b89a4f728c429db1cd124ea274b28912e8f3114591b029987dc9",
+      "seconds": 0.018044374999590218,
+      "kernel_rss_bytes": 406716416,
+      "status": "ok"
+    },
+    {
+      "cell_index": 18,
+      "execution_count": 8,
+      "source_sha256": "89bf912338dcfd22b82e3d3cc392af33b8685de937fae1abdebac3661ebed124",
+      "seconds": 3.0871284999884665,
+      "kernel_rss_bytes": 231489536,
+      "status": "ok"
+    }
+  ]
+}

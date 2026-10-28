@@ -1,0 +1,18 @@
+................FF.                                                      [100%]
+=================================== FAILURES ===================================
+_____________________________ test_invalid[args6] ______________________________
+test_cases_03.py:6: in test_invalid
+    def test_invalid(args): assert computeMaxTime(*args) == 0
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AssertionError: assert nan == 0
+E    +  where nan = computeMaxTime(*(nan, 30, 'A'))
+_____________________________ test_invalid[args7] ______________________________
+test_cases_03.py:6: in test_invalid
+    def test_invalid(args): assert computeMaxTime(*args) == 0
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AssertionError: assert 105.0 == 0
+E    +  where 105.0 = computeMaxTime(*(100, True, 'A'))
+=========================== short test summary info ============================
+FAILED test_cases_03.py::test_invalid[args6] - AssertionError: assert nan == 0
+FAILED test_cases_03.py::test_invalid[args7] - AssertionError: assert 105.0 == 0
+2 failed, 17 passed in 0.03s

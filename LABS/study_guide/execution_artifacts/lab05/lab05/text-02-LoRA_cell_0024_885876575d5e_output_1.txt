@@ -1,0 +1,1 @@
+Accuracy on the validation set: 0.6580

@@ -1,0 +1,226 @@
+{
+  "test_function_01_gpt.py": {
+    "tests": 12,
+    "passed": 11,
+    "failed": 1,
+    "pass_rate": 0.9166666666666666,
+    "statement_coverage_percent": 96.0,
+    "killed_mutants": 2,
+    "survived_mutants": 3,
+    "mutation_score": 0.4,
+    "mutants": [
+      {
+        "mutant": 1,
+        "change": "reverse individual penalty comparison",
+        "killed": true,
+        "newly_failing_tests": [
+          "execution.suites.test_function_01_gpt::test_not_disqualified_due_to_valid_input"
+        ]
+      },
+      {
+        "mutant": 2,
+        "change": "include total penalty boundary",
+        "killed": false,
+        "newly_failing_tests": []
+      },
+      {
+        "mutant": 3,
+        "change": "include penalty-count boundary",
+        "killed": false,
+        "newly_failing_tests": []
+      },
+      {
+        "mutant": 4,
+        "change": "include time boundary",
+        "killed": false,
+        "newly_failing_tests": []
+      },
+      {
+        "mutant": 5,
+        "change": "always disqualify",
+        "killed": true,
+        "newly_failing_tests": [
+          "execution.suites.test_function_01_gpt::test_edge_case_no_time_exceeding",
+          "execution.suites.test_function_01_gpt::test_edge_case_penalties_empty",
+          "execution.suites.test_function_01_gpt::test_not_disqualified_due_to_valid_input"
+        ]
+      }
+    ]
+  },
+  "test_function_01_copilot.py": {
+    "tests": 3,
+    "passed": 3,
+    "failed": 0,
+    "pass_rate": 1.0,
+    "statement_coverage_percent": 100.0,
+    "killed_mutants": 5,
+    "survived_mutants": 0,
+    "mutation_score": 1.0,
+    "mutants": [
+      {
+        "mutant": 1,
+        "change": "reverse individual penalty comparison",
+        "killed": true,
+        "newly_failing_tests": [
+          "execution.suites.test_function_01_copilot::test_edge_cases",
+          "execution.suites.test_function_01_copilot::test_valid_inputs"
+        ]
+      },
+      {
+        "mutant": 2,
+        "change": "include total penalty boundary",
+        "killed": true,
+        "newly_failing_tests": [
+          "execution.suites.test_function_01_copilot::test_edge_cases"
+        ]
+      },
+      {
+        "mutant": 3,
+        "change": "include penalty-count boundary",
+        "killed": true,
+        "newly_failing_tests": [
+          "execution.suites.test_function_01_copilot::test_edge_cases"
+        ]
+      },
+      {
+        "mutant": 4,
+        "change": "include time boundary",
+        "killed": true,
+        "newly_failing_tests": [
+          "execution.suites.test_function_01_copilot::test_edge_cases"
+        ]
+      },
+      {
+        "mutant": 5,
+        "change": "always disqualify",
+        "killed": true,
+        "newly_failing_tests": [
+          "execution.suites.test_function_01_copilot::test_edge_cases",
+          "execution.suites.test_function_01_copilot::test_valid_inputs"
+        ]
+      }
+    ]
+  },
+  "test_function_01_qwen.py": {
+    "tests": 20,
+    "passed": 20,
+    "failed": 0,
+    "pass_rate": 1.0,
+    "statement_coverage_percent": 100.0,
+    "killed_mutants": 5,
+    "survived_mutants": 0,
+    "mutation_score": 1.0,
+    "mutants": [
+      {
+        "mutant": 1,
+        "change": "reverse individual penalty comparison",
+        "killed": true,
+        "newly_failing_tests": [
+          "execution.suites.test_function_01_qwen::test_edge_case_five_penalties_total_100"
+        ]
+      },
+      {
+        "mutant": 2,
+        "change": "include total penalty boundary",
+        "killed": true,
+        "newly_failing_tests": [
+          "execution.suites.test_function_01_qwen::test_edge_case_five_penalties_total_100"
+        ]
+      },
+      {
+        "mutant": 3,
+        "change": "include penalty-count boundary",
+        "killed": true,
+        "newly_failing_tests": [
+          "execution.suites.test_function_01_qwen::test_edge_case_five_penalties_total_100"
+        ]
+      },
+      {
+        "mutant": 4,
+        "change": "include time boundary",
+        "killed": true,
+        "newly_failing_tests": [
+          "execution.suites.test_function_01_qwen::test_edge_case_exactly_1_5_times_winner_time"
+        ]
+      },
+      {
+        "mutant": 5,
+        "change": "always disqualify",
+        "killed": true,
+        "newly_failing_tests": [
+          "execution.suites.test_function_01_qwen::test_edge_case_exactly_1_5_times_winner_time",
+          "execution.suites.test_function_01_qwen::test_edge_case_five_penalties_total_100",
+          "execution.suites.test_function_01_qwen::test_edge_case_zero_penalties",
+          "execution.suites.test_function_01_qwen::test_valid_input_not_disqualified"
+        ]
+      }
+    ]
+  },
+  "test_function_01_codex.py": {
+    "tests": 27,
+    "passed": 27,
+    "failed": 0,
+    "pass_rate": 1.0,
+    "statement_coverage_percent": 100.0,
+    "killed_mutants": 5,
+    "survived_mutants": 0,
+    "mutation_score": 1.0,
+    "mutants": [
+      {
+        "mutant": 1,
+        "change": "reverse individual penalty comparison",
+        "killed": true,
+        "newly_failing_tests": [
+          "execution.suites.test_function_01_codex::test_penalty_limits[penalties1-False]",
+          "execution.suites.test_function_01_codex::test_penalty_limits[penalties4-False]",
+          "execution.suites.test_function_01_codex::test_penalty_limits[penalties6-False]"
+        ]
+      },
+      {
+        "mutant": 2,
+        "change": "include total penalty boundary",
+        "killed": true,
+        "newly_failing_tests": [
+          "execution.suites.test_function_01_codex::test_penalty_limits[penalties2-False]",
+          "execution.suites.test_function_01_codex::test_penalty_limits[penalties4-False]"
+        ]
+      },
+      {
+        "mutant": 3,
+        "change": "include penalty-count boundary",
+        "killed": true,
+        "newly_failing_tests": [
+          "execution.suites.test_function_01_codex::test_penalty_limits[penalties6-False]"
+        ]
+      },
+      {
+        "mutant": 4,
+        "change": "include time boundary",
+        "killed": true,
+        "newly_failing_tests": [
+          "execution.suites.test_function_01_codex::test_time_limit_for_each_event[0-False-0]",
+          "execution.suites.test_function_01_codex::test_time_limit_for_each_event[0-False-1]",
+          "execution.suites.test_function_01_codex::test_time_limit_for_each_event[0-False-2]"
+        ]
+      },
+      {
+        "mutant": 5,
+        "change": "always disqualify",
+        "killed": true,
+        "newly_failing_tests": [
+          "execution.suites.test_function_01_codex::test_penalty_limits[penalties0-False]",
+          "execution.suites.test_function_01_codex::test_penalty_limits[penalties1-False]",
+          "execution.suites.test_function_01_codex::test_penalty_limits[penalties2-False]",
+          "execution.suites.test_function_01_codex::test_penalty_limits[penalties4-False]",
+          "execution.suites.test_function_01_codex::test_penalty_limits[penalties6-False]",
+          "execution.suites.test_function_01_codex::test_time_limit_for_each_event[-1-False-0]",
+          "execution.suites.test_function_01_codex::test_time_limit_for_each_event[-1-False-1]",
+          "execution.suites.test_function_01_codex::test_time_limit_for_each_event[-1-False-2]",
+          "execution.suites.test_function_01_codex::test_time_limit_for_each_event[0-False-0]",
+          "execution.suites.test_function_01_codex::test_time_limit_for_each_event[0-False-1]",
+          "execution.suites.test_function_01_codex::test_time_limit_for_each_event[0-False-2]"
+        ]
+      }
+    ]
+  }
+}

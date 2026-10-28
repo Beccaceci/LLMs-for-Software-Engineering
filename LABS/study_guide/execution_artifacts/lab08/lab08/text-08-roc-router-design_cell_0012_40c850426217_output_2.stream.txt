@@ -1,0 +1,34 @@
+Here are the actors and their user-goal use cases:
+
+**Visitors**
+
+1. Browse a comprehensive list of hiking trails.
+2. Filter hiking trails based on specific criteria (difficulty, length, starting point).
+3. View detailed descriptions of hiking trails.
+4. Create a user account to access personalized recommendations.
+5. Record fitness parameters to receive trail suggestions.
+6. Record progress during a hike by marking reference points.
+7. Share live location through a broadcasting URL.
+8. Plan group hikes, add group members, and confirm participation.
+9. Start, terminate, and track hikes with notifications for unfinished hikes or late group members.
+
+**Local Guides**
+
+1. Add detailed descriptions of hikes.
+2. Add parking facilities information.
+3. Link parking lots and huts to specific trails as starting or arrival points.
+4. Upload pictures of huts and connect these locations directly to hikes.
+
+**Platform Managers**
+
+1. Verify new hut worker registrations.
+2. Broadcast weather alerts for specific areas through push notifications.
+3. Maintain an organized and secure user system.
+4. Facilitate collaboration between local guides, hut workers, and visitors.
+
+**Hut Workers**
+
+1. Register and be verified to access the platform.
+2. Add or update information about assigned huts, including uploading pictures and describing facilities.
+3. Monitor and report on the condition of nearby trails.
+4. Provide situational updates for hikers, such as severe weather or physical obstructions.

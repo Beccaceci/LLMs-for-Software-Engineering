@@ -1,0 +1,14 @@
+Qwen2.5-Coder-1.5B-Instruct railway def compute_fee(basePrice, n_passengers, n_over18, n_under15):
+    if not (0 <= basePrice <= 100) or not (0 <= n_passengers <= 100) or not (0 <= n_over18 <= 100) or not (0 <= n_under15 <= 100):
+        raise ValueError("Invalid input values")
+    
+    if n_passengers > 5:
+        raise ValueError("Group size cannot be more than 5")
+    
+    if n_over18 + n_under15 != n_passengers:
+        raise ValueError("Counts must match the number of passengers")
+    
+    if n_under15 >= n_over18:
+        return basePrice * n_passengers
+    
+    return basePrice * n_over18 + (basePrice / 2) * n_under15

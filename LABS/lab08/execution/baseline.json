@@ -1,0 +1,106 @@
+{
+  "path": "LABS/lab08/text-08-roc-router-design.ipynb",
+  "sha256": "8668b97091123082ba71bd0f2ae3db64d8e97b13227c9f156e859e5108085545",
+  "cells": [
+    {
+      "index": 0,
+      "type": "markdown",
+      "source_sha256": "e79798d773e1e4953f36fd17b7c7e1c702f332feb4d045d2c66f2fe0c8c3bc62",
+      "execution_count": null,
+      "output_types": []
+    },
+    {
+      "index": 1,
+      "type": "code",
+      "source_sha256": "7b79a0d3d7e065d7c655d81dfe805fa52d75abed81c32e05f52c614c63b3531f",
+      "execution_count": null,
+      "output_types": []
+    },
+    {
+      "index": 2,
+      "type": "markdown",
+      "source_sha256": "bad6f5193768b22f0033315b350e7d54904ba714b8b72f07df219a420b36fada",
+      "execution_count": null,
+      "output_types": []
+    },
+    {
+      "index": 3,
+      "type": "code",
+      "source_sha256": "adead105a679de60516298ea83b8d301beaeb7e5da089570c3300120baf9f4d7",
+      "execution_count": 2,
+      "output_types": [
+        "stream"
+      ]
+    },
+    {
+      "index": 4,
+      "type": "markdown",
+      "source_sha256": "5313aca866cc04a3fdeb8506b0f9e25a22e30d933c841dd071f37ccb46f5bc6c",
+      "execution_count": null,
+      "output_types": []
+    },
+    {
+      "index": 5,
+      "type": "code",
+      "source_sha256": "be0932dbfcee29cf6b471f5e280a4593cd85c330f4f25b147ed51a348463205d",
+      "execution_count": null,
+      "output_types": []
+    },
+    {
+      "index": 6,
+      "type": "markdown",
+      "source_sha256": "f8802045428f9b6fbfd9fd37a934a3db9ec3794a208c1a3ed59d58f17db901c5",
+      "execution_count": null,
+      "output_types": []
+    },
+    {
+      "index": 7,
+      "type": "markdown",
+      "source_sha256": "13f386471ea3c471cb692259a42090f1242bdc38487ce7f4f3a74fa422956455",
+      "execution_count": null,
+      "output_types": []
+    },
+    {
+      "index": 8,
+      "type": "code",
+      "source_sha256": "8e83b50e20040f6c1112f9a788f36a24800abeef253191039cd2c1260037f7ba",
+      "execution_count": null,
+      "output_types": []
+    },
+    {
+      "index": 9,
+      "type": "markdown",
+      "source_sha256": "463dd09bb786db1106ba9dac7dc748e4e134dac61ed527a747551b603af33942",
+      "execution_count": null,
+      "output_types": []
+    },
+    {
+      "index": 10,
+      "type": "code",
+      "source_sha256": "beb2ed46108d191450deb21025859f57ae28ac937951b06a813ff118aa3fce43",
+      "execution_count": null,
+      "output_types": []
+    },
+    {
+      "index": 11,
+      "type": "markdown",
+      "source_sha256": "5f4bd6fb399e33d259ee8e86ce60d0bb0e6b31b7a803af7e47418d3511a29545",
+      "execution_count": null,
+      "output_types": []
+    },
+    {
+      "index": 12,
+      "type": "code",
+      "source_sha256": "fb096b84b4d8bfa556fd069404f4c13dc7002b9ff8c2e0736b456ad27e24feee",
+      "execution_count": null,
+      "output_types": []
+    },
+    {
+      "index": 13,
+      "type": "markdown",
+      "source_sha256": "ca82d71bf961e0465070ae1b1ddb8a87e06fdda397ede6c02e46a216293569e7",
+      "execution_count": null,
+      "output_types": []
+    }
+  ]
+}

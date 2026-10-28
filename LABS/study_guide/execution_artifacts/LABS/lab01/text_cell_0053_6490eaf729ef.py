@@ -1,0 +1,1 @@
+val_model(model, testloader)

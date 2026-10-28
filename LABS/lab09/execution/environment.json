@@ -1,0 +1,14 @@
+{
+  "python": "3.11.16",
+  "torch": "2.8.0",
+  "transformers": "4.46.3",
+  "huggingface_hub": "0.36.2",
+  "backend": "mps",
+  "kernel": "llms-lab09",
+  "kernel_python": "/Users/nicolabeccaceci/.venvs/llms-lab09/bin/python",
+  "models": [
+    "meta-llama/Llama-3.2-3B-Instruct",
+    "Qwen/Qwen2.5-Coder-1.5B-Instruct"
+  ],
+  "revision_pinning": "No explicit model revision is set in the notebook; revisions are not claimed as pinned."
+}

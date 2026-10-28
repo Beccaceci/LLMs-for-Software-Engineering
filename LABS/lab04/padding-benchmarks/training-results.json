@@ -1,0 +1,48 @@
+[
+  {
+    "variant": "fixed-padding",
+    "padding": "fixed",
+    "wall_seconds": 207.01193416694878,
+    "trainer_metrics": {
+      "train_runtime": 206.869,
+      "train_samples_per_second": 0.348,
+      "train_steps_per_second": 0.058,
+      "total_flos": 37626052608000.0,
+      "train_loss": 3.4151899019877114,
+      "epoch": 0.072
+    },
+    "global_step": 12,
+    "final_epoch": 0.072,
+    "device": "mps",
+    "seed": 42,
+    "train_examples": 1000,
+    "eval_examples": 500,
+    "max_steps": 12,
+    "evaluation": "disabled for matched short timing run",
+    "microbatch": 1,
+    "gradient_accumulation_steps": 6
+  },
+  {
+    "variant": "dynamic-padding",
+    "padding": "dynamic",
+    "wall_seconds": 467.3461262079654,
+    "trainer_metrics": {
+      "train_runtime": 467.2641,
+      "train_samples_per_second": 0.154,
+      "train_steps_per_second": 0.026,
+      "total_flos": 9128380032000.0,
+      "train_loss": 3.415445327758789,
+      "epoch": 0.072
+    },
+    "global_step": 12,
+    "final_epoch": 0.072,
+    "device": "mps",
+    "seed": 42,
+    "train_examples": 1000,
+    "eval_examples": 500,
+    "max_steps": 12,
+    "evaluation": "disabled for matched short timing run",
+    "microbatch": 1,
+    "gradient_accumulation_steps": 6
+  }
+]

@@ -1,0 +1,91 @@
+--- notebook output 0 ---
+/Users/nicolabeccaceci/.venvs/llms-lab09/lib/python3.11/site-packages/transformers/generation/configuration_utils.py:590: UserWarning: `do_sample` is set to `False`. However, `temperature` is set to `0.7` -- this flag is only used in sample-based generation modes. You should set `do_sample=True` or unset `temperature`.
+  warnings.warn(
+/Users/nicolabeccaceci/.venvs/llms-lab09/lib/python3.11/site-packages/transformers/generation/configuration_utils.py:595: UserWarning: `do_sample` is set to `False`. However, `top_p` is set to `0.8` -- this flag is only used in sample-based generation modes. You should set `do_sample=True` or unset `top_p`.
+  warnings.warn(
+/Users/nicolabeccaceci/.venvs/llms-lab09/lib/python3.11/site-packages/transformers/generation/configuration_utils.py:612: UserWarning: `do_sample` is set to `False`. However, `top_k` is set to `20` -- this flag is only used in sample-based generation modes. You should set `do_sample=True` or unset `top_k`.
+  warnings.warn(
+
+--- notebook output 1 ---
+def compute_average(grades):
+    if len(grades) != 6:
+        raise ValueError("Exactly six grades are required.")
+    
+    grades = [grade for grade in grades if isinstance(grade, (int, float)) and 18 <= grade <= 30 or grade == 33]
+    if len(grades) < 5:
+        raise ValueError("At least five grades are required after filtering.")
+    
+    min_val = min(grades)
+    max_val = max(grades)
+    grades.remove(min_val)
+    grades.remove(max_val)
+    
+    return sum(grades) / len(grades)
+
+--- notebook output 2 ---
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+
+--- notebook output 3 ---
+Codex_grades {'Passed': 14, 'Failed': 0, 'Errors': 0, 'Skipped': 0, 'FunctionalCorrectness': 1.0, 'pytest_exit_code': 0, 'SourceSHA256': '42d51761595f164133f1f4ef76c696cfab648dae72a55d2c2d8b3121030b8462'}
+
+--- notebook output 4 ---
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+
+--- notebook output 5 ---
+Llama-3.2-3B-Instruct_grades {'Passed': 9, 'Failed': 5, 'Errors': 0, 'Skipped': 0, 'FunctionalCorrectness': 0.6428571428571429, 'pytest_exit_code': 1, 'SourceSHA256': '71df77699c59cf835031a0116601738837086882f18d4b502d6fab131bffe79a'}
+
+--- notebook output 6 ---
+Qwen2.5-Coder-1.5B-Instruct_grades {'Passed': 8, 'Failed': 6, 'Errors': 0, 'Skipped': 0, 'FunctionalCorrectness': 0.5714285714285714, 'pytest_exit_code': 1, 'SourceSHA256': '41c70d817e176461bff36f9832cc21ab5a592899a3461532fd320a4f32ac2ce4'}
+{
+  "Codex": {
+    "CC": 9,
+    "MI": 58.00073622123373,
+    "LOC": 14,
+    "Comments": 0,
+    "Passed": 14,
+    "Failed": 0,
+    "Errors": 0,
+    "Skipped": 0,
+    "FunctionalCorrectness": 1.0,
+    "pytest_exit_code": 0,
+    "SourceSHA256": "42d51761595f164133f1f4ef76c696cfab648dae72a55d2c2d8b3121030b8462"
+  },
+  "Llama-3.2-3B-Instruct": {
+    "CC": 7,
+    "MI": 89.72051787423352,
+    "LOC": 38,
+    "Comments": 6,
+    "Passed": 9,
+    "Failed": 5,
+    "Errors": 0,
+    "Skipped": 0,
+    "FunctionalCorrectness": 0.6428571428571429,
+    "pytest_exit_code": 1,
+    "SourceSHA256": "71df77699c59cf835031a0116601738837086882f18d4b502d6fab131bffe79a"
+  },
+  "Qwen2.5-Coder-1.5B-Instruct": {
+    "CC": 7,
+    "MI": 62.30659087147264,
+    "LOC": 14,
+    "Comments": 0,
+    "Passed": 8,
+    "Failed": 6,
+    "Errors": 0,
+    "Skipped": 0,
+    "FunctionalCorrectness": 0.5714285714285714,
+    "pytest_exit_code": 1,
+    "SourceSHA256": "41c70d817e176461bff36f9832cc21ab5a592899a3461532fd320a4f32ac2ce4"
+  }
+}
+
+--- notebook output 7 ---
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)

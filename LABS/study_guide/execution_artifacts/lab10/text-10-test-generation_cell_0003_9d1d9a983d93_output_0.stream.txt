@@ -1,0 +1,6 @@
+[1m======================================= test session starts ========================================[0m
+platform darwin -- Python 3.11.16, pytest-9.1.1, pluggy-1.7.0 -- /private/tmp/llms-lab10-venv/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/nicolabeccaceci/Desktop/LLMs/LABS/lab10
+plugins: cov-7.1.0, platformdirs-4.13.5
+[1mcollecting ... [0m

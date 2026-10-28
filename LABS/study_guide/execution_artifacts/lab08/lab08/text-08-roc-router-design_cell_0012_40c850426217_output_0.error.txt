@@ -1,0 +1,1 @@
+ValueError: Router produced an unsupported decision: '**Hiking Platform Use Cases**\n\n### User Management\n\n1. **Register New'

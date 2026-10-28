@@ -1,0 +1,2 @@
+len(attention): 12
+attention shape torch.Size([1, 12, 11, 11])

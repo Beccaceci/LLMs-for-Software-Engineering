@@ -1,0 +1,1425 @@
+                                      Politecnico di Torino
+                              Master of Science in Computer Engineering
+                         Department of Control and Computer Engineering (DAUIN)
+
+
+
+
+                        Large Language Models
+                       for Software Engineering
+              Laboratory 05: Quantization and Low-Rank Adaptation
+                              Complete notebook-aligned solution
+
+
+
+
+Course Instructor                                                                       Prepared by
+Prof. Flavio Giobergia                                                            Nicola Beccaceci
+
+Laboratory Assistant                                                                 Academic Year
+Claudio Savelli                                                                         2026/2027
+
+
+
+
+                                    Politecnico di Torino   |   Torino, Italy
+Contents                                                                                                              1
+
+
+
+Contents
+
+1   Quantization                                                                                                     2
+    1.1 Absmax quantization and accumulation . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .       2
+    1.2 Min-max quantization and the zero-point correction . . . . . . . . . . . . . . . . . . . . . . . . . .       4
+    1.3 Dynamic quantization on a decoder-only model . . . . . . . . . . . . . . . . . . . . . . . . . . . .         6
+
+2   LoRA                                                                                                             11
+    2.1 Build and train the manual adapter . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .   11
+    2.2 Apply the same encoder adapters with PEFT . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .        15
+
+A Diagnostic output and earlier authentication attempt                                                               19
+
+B Execution and reproducibility notes                                                                                19
+                                                                                                                                 2
+
+
+
+     1 Quantization: from low-bit arithmetic to Llama inference
+     This exercise first makes low-bit arithmetic visible on a small matrix and vector, where symmetric and asymmetric
+     quantization can be compared directly. It then applies post-training quantization to Llama 3.2 1B, measuring
+     serialized size and a fixed CPU generation workload across float32, PyTorch int8, and BitsAndBytes int4. The
+     toy example isolates rounding, zero points, and accumulation overflow; the model experiment shows how these
+     ideas behave in a real decoder-only network.
+
+                                                         Absmax scale
+        Float matrix and vector                                                                  Wider accumulation
+                                                         and int8 codes
+
+
+          Llama size and gen-                            Corrected de-                               Min-max scale
+          eration comparison                           quantized product                             and zero point
+
+                                   Figure 1: The exercise pipeline, from input to checked result.
+
+
+
+     1.1 Absmax quantization and accumulation
+     We start with a fixed seed and two small tensors: a 3 by 5 weight matrix and a length-five input vector. Setting
+     one coordinate in each to zero makes it possible to observe how the two quantizers treat zero.
+ 1   import torch
+ 2
+ 3   torch.random.manual_seed(0)
+ 4
+ 5   n_rows = 3
+ 6   n_cols = 5
+ 7
+ 8   # TODO: Create two random tensors, W (of shape n_rows, n_cols) and x (of shape n_cols)
+ 9   W = torch.randn(n_rows, n_cols)
+10   x = torch.randn(n_cols)
+11
+12   W[0,0] = 0
+13   x[0] = 0
+
+
+         These tensors are the common reference for the unquantized product and both quantization schemes. Their
+     small dimensions keep the integer arithmetic inspectable.
+     Before changing precision, this product records the reference output of the original matrix and vector. Every
+     later reconstruction is compared with this value.
+ 1   out = W @ x
+ 2   print(out)
+
+
+
+ 1   tensor([0.4829, 1.3345, 0.2121])
+
+
+     The floating-point result is the numerical target for the quantized calculations that follow.
+     This helper implements symmetric absmax quantization. Its scale maps the largest magnitude to 127, rounding
+     maps values to integer levels, and clamping keeps them in the symmetric range from -127 to 127. The zero-range
+     guard makes an all-zero tensor safe to quantize.
+ 1   def absmax_quantize(W):
+ 2       # NOTE: we assume that we always map to 8-bit integers
+ 3
+ 4       # TODO: find the scale factor that maps the maximum absolute value in W to the maximum value of int8
+ 5       max_value = W.abs().max()
+ 6       scale = torch.where(max_value > 0, max_value / 127, torch.ones_like(max_value)) # how "long" the step between any two
+          int8 values is
+ 7
+ 8       # TODO: quantize W using the scale factor (hint: remember to round to the nearest integer and convert to int8)
+ 9       W_q = torch.round(W / scale).clamp(-127, 127).to(torch.int8)
+10       return W_q, scale
+
+
+        The function returns both integer codes and the scale needed to recover approximate floating-point values.
+     Quantization is useful only if the integer representation can be interpreted again. This inverse helper converts
+     the codes to float and multiplies by their saved scale.
+     1.1    Absmax quantization and accumulation                                                                       3
+
+
+
+
+ 1   def absmax_dequantize(W_q, scale):
+ 2       # TODO: dequantize W_q using the scale factor
+ 3       dequantized_W = W_q.to(torch.float32) * scale
+ 4       return dequantized_W
+
+
+        The original scale is required downstream; without it the integer codes do not retain the magnitude of the
+     source tensor.
+     We now apply the same symmetric scheme independently to the matrix and vector. Independent scales use
+     each operand’s available integer range effectively.
+ 1   W_q, scale_W = absmax_quantize(W)
+ 2   x_q, scale_x = absmax_quantize(x)
+
+
+           The resulting integer tensors and separate scales feed the reconstruction checks and integer dot product.
+     This comparison examines the matrix codes, the original weights, and the dequantized approximation. The
+     mean absolute difference condenses coordinate-wise rounding error into one diagnostic.
+ 1   print(W_q)
+ 2   print(W)
+ 3
+ 4   #TODO: dequantize W_q and check how close it is to the original W
+ 5   W_deq = absmax_dequantize(W_q, scale_W)
+ 6   print(W_deq)
+ 7   W_diff = (W - W_deq).abs().mean()
+ 8   print(W_diff)
+
+
+
+ 1   tensor([[   0, -17, -127,    33, -63],
+ 2           [ -82,   24,   49, -42, -24],
+ 3           [ -35,   11, -50,    64, -62]], dtype=torch.int8)
+ 4   tensor([[ 0.0000, -0.2934, -2.1788, 0.5684, -1.0845],
+ 5           [-1.3986, 0.4033, 0.8380, -0.7193, -0.4033],
+ 6           [-0.5966, 0.1820, -0.8567, 1.1006, -1.0712]])
+ 7   tensor([[ 0.0000, -0.2916, -2.1788, 0.5661, -1.0808],
+ 8           [-1.4068, 0.4117, 0.8406, -0.7205, -0.4117],
+ 9           [-0.6005, 0.1887, -0.8578, 1.0980, -1.0637]])
+10   tensor(0.0039)
+
+
+     The reconstructed matrix stays close to the original and preserves the deliberately zero entry. The small nonzero
+     mean error is quantization loss, not a change to the original tensor.
+     The same round trip is checked for the input vector, using its own scale. This separates weight error from
+     activation error.
+ 1   print(x_q)
+ 2   print(x)
+ 3
+ 4   # TODO: dequantize x_q and check how close it is to the original x
+ 5   x_deq = absmax_dequantize(x_q, scale_x)
+ 6   print(x_deq)
+ 7   x_diff = (x - x_deq).abs().mean()
+ 8   print(x_diff)
+
+
+
+ 1   tensor([   0, -48,    31,   -75, -127], dtype=torch.int8)
+ 2   tensor([ 0.0000, -0.5663,   0.3731, -0.8920, -1.5091])
+ 3   tensor([ 0.0000, -0.5704,   0.3684, -0.8912, -1.5091])
+ 4   tensor(0.0019)
+
+
+     The vector reconstruction also preserves zero; its mean absolute error is reported independently from the
+     matrix’s.
+     This is the tempting low-precision computation: multiply the quantized matrix and vector while they are still
+     int8. It exposes a hardware arithmetic issue separate from the rounding errors measured above.
+ 1   # TODO: perform the matrix multiplication using the quantized values
+ 2   product = W_q @ x_q
+ 3   print(product)
+
+
+
+ 1   tensor([101, -91, -28], dtype=torch.int8)
+
+
+     The displayed result has wrapped values because the dot products exceed the int8 range. Quantized operands
+     therefore need a wider accumulator even when their storage uses eight bits.
+     Inspecting the first matrix row and the vector lets us verify one dot product by hand and compare it with the
+     wrapped result.
+     1.2    Min-max quantization and the zero-point correction                                                              4
+
+
+
+
+ 1   W_q[0], x_q
+
+
+
+ 1   (tensor([     0,   -17, -127,    33, -63], dtype=torch.int8),
+ 2    tensor([     0,   -48,   31,   -75, -127], dtype=torch.int8))
+
+
+     The integer operands are individually representable in int8; their products’ sum is not. This isolates accumulation
+     overflow as the cause.
+     The corrected calculation promotes both operands to int16 before multiplication and accumulation. This is wide
+     enough for these short illustrative rows and prevents int8 wraparound.
+ 1   # TODO: perform the matrix multiplication using the quantized values converted to int16
+ 2   out_q = W_q.to(torch.int16) @ x_q.to(torch.int16)
+ 3   print(out_q)
+
+
+
+ 1   tensor([2405, 6565,     996], dtype=torch.int16)
+
+
+     The larger integer values are the proper dot products in quantized-code space. Production kernels generally
+     accumulate low-bit products into a wider type as well.
+     The integer dot products are converted back to the original output scale by multiplying the matrix and vector
+     scales. This follows from independently scaled operands: each product carries both factors.
+ 1   # TODO: dequantize the result and check how close it is to the original result
+ 2   out_deq = out_q.to(torch.float32) * scale_W * scale_x
+ 3
+ 4   print(out_deq)
+ 5   print(out)
+
+
+
+ 1   tensor([0.4903, 1.3383, 0.2030])
+ 2   tensor([0.4829, 1.3345, 0.2121])
+
+
+     The reconstructed output is close to the original floating-point product; the remaining difference is the
+     accumulated effect of quantizing both operands.
+     A final scalar error summarizes the effect of absmax quantization on the matrix-vector result, rather than on
+     either input alone.
+ 1   #TODO: check the difference between the original and the dequantized result
+ 2   out_diff = (out - out_deq).abs().mean()
+ 3   print("Mean absolute output error:", out_diff.item())
+
+
+
+ 1   Mean absolute output error: 0.006753509398549795
+
+
+     The measured mean absolute output error is about 0.00675 for this seeded example. It is an observed result for
+     these tensors, not a general error bound.
+
+     1.2 Min-max quantization and the zero-point correction
+     Symmetric absmax mapping dedicates its range around zero, so it cannot use the extra negative int8 endpoint.
+     Min-max mapping instead maps observed extrema to -128  P and 127. WithP zero points zW and zx , the recovered
+     product must expand (qW − zW )(qx − zx ): subtract zx qW and zW          qx , then add KzW zx , where K is the
+     inner dimension. Only after this correction do we divide by both scales.
+     The second helper uses an asymmetric min-max mapping. It stretches the observed range to the full int8 interval,
+     stores a zero point, and reverses both operations during dequantization. The constant-range guard avoids
+     division by zero.
+ 1   def minmax_quantize(W):
+ 2       # the following notations come from:
+ 3       # (1) scaling W to [0,1] ==> W’ = (W - min(W)) / (max(W) - min(W)),
+ 4       # (2) scaling W’ to [-128, 127] ==> W_q = W’ * 255 - 128
+ 5       # by combining the two, we get that:
+ 6       # W_q = W * scale + offset
+ 7       # we will call the offset "zero_point", as it represent the value that maps to 0
+ 8
+ 9         # TODO: find the scale factor that maps the minimum and maximum values in W to -128 and 127
+10         delta = W.max() - W.min() # the range of values in W
+11         scale = torch.where(delta > 0, 255 / delta, torch.ones_like(delta))
+12         zero_point = -128 - W.min() * scale # the value that maps to 0
+13
+14         # TODO: quantize W using the scale factor (hint: remember to round to the nearest integer and convert to int8)
+15         W_q = torch.round(W * scale + zero_point).clamp(-128, 127).to(torch.int8)
+     1.2    Min-max quantization and the zero-point correction                                                      5
+
+
+
+16
+17         return W_q, scale, zero_point
+18
+19   def minmax_dequantize(W_q, scale, zero_point):
+20       # TODO: dequantize W_q using the scale factor and zero_point
+21       dequantized_W = (W_q.to(torch.float32) - zero_point) / scale
+22       return dequantized_W
+
+
+        Unlike absmax, this mapping can use all 256 codes and need not map real zero to integer zero. The returned
+     scale and zero point are both required to interpret the codes.
+     We quantize the same matrix and vector with independent min-max ranges. Reusing the same examples makes
+     the later error comparison meaningful.
+ 1   W_q, scale_W, zero_point_W = minmax_quantize(W)
+ 2   x_q, scale_x, zero_point_x = minmax_quantize(x)
+
+
+        Each operand now carries its own scale and zero point; these are needed for both reconstruction and the
+     corrected dot product.
+     This check dequantizes the matrix, measures its mean absolute error, and prints the zero point so we can see
+     how real zero is encoded.
+ 1   print(W_q)
+ 2   print(W)
+ 3
+ 4   #TODO: dequantize W_q and check how close it is to the original W
+ 5   W_deq = minmax_dequantize(W_q, scale_W, zero_point_W)
+ 6   print(W_deq)
+ 7   W_diff = (W - W_deq).abs().mean()
+ 8   print(W_diff)
+ 9   print("zero point", zero_point_W)
+
+
+
+ 1   tensor([[ 41,    19, -128,   86, -43],
+ 2           [ -67,   73, 107, -15,     10],
+ 3           [ -5,    56, -25, 127, -42]], dtype=torch.int8)
+ 4   tensor([[ 0.0000, -0.2934, -2.1788, 0.5684, -1.0845],
+ 5           [-1.3986, 0.4033, 0.8380, -0.7193, -0.4033],
+ 6           [-0.5966, 0.1820, -0.8567, 1.1006, -1.0712]])
+ 7   tensor([[-0.0054, -0.2883, -2.1788, 0.5733, -1.0857],
+ 8           [-1.3943, 0.4061, 0.8434, -0.7256, -0.4041],
+ 9           [-0.5970, 0.1875, -0.8542, 1.1006, -1.0728]])
+10   tensor(0.0031)
+11   zero point tensor(41.4189)
+
+
+     The full int8 range is used and the matrix error is small. The nonzero zero point shows that a real zero is
+     represented by an offset code rather than by integer zero.
+     As in the symmetric case, the min-max integer dot product uses int16 accumulation. The result is kept in code
+     space until the zero-point offsets are removed.
+ 1   #TODO: perform the matrix multiplication using the quantized values converted to int16
+ 2   out_q = W_q.to(torch.int16) @ x_q.to(torch.int16)
+
+
+        This cell prepares the raw dot products; interpreting them as real values requires the correction terms in the
+     next computation.
+     Expanding the two affine quantization equations gives the corrected product. The row-wise matrix-code sums,
+     vector-code sum, and shared inner dimension account for the cross terms introduced by both zero points.
+ 1   # Expand (W_q - zero_point_W) @ (x_q - zero_point_x).
+ 2   # Use the quantized operand sums, rather than the original floats: rounding
+ 3   # means the latter no longer give the same dequantized product.
+ 4   out_deq = (
+ 5       out_q.to(torch.float32)
+ 6       - zero_point_x * W_q.to(torch.float32).sum(dim=1)
+ 7       - zero_point_W * x_q.to(torch.float32).sum()
+ 8       + W.shape[1] * zero_point_W * zero_point_x
+ 9   ) / (scale_W * scale_x)
+
+
+        The resulting expression removes the offsets before dividing by the product of scales. This is why asymmetric
+     quantization cannot simply multiply the raw int8 result by two scales.
+     We print the corrected min-max result beside the original output and compute their mean absolute difference.
+     This closes the small numerical comparison.
+ 1   print(out_deq)
+ 2   print(out)
+ 3   print((out_deq - out).abs().mean())
+     1.3    Dynamic quantization on a decoder-only model                                                                         6
+
+
+
+
+ 1   tensor([0.4784, 1.3450, 0.2179])
+ 2   tensor([0.4829, 1.3345, 0.2121])
+ 3   tensor(0.0069)
+
+
+     The result remains close to the floating-point reference. Although this particular error is small, asymmetric
+     mapping trades exact zero representation for tighter use of the available code range.
+
+     1.3 Dynamic quantization on a decoder-only model
+     The small arithmetic example uses toy values and cannot show storage or generation behavior at model scale.
+     The next sequence compares a float32 baseline with two post-training representations using the same 20 prompts,
+     greedy decoding, and 30 new tokens. All timed variants use CPU, because the PyTorch dynamic int8 path and
+     the installed BitsAndBytes CPU backend are being compared on a common device.
+     The Llama experiment uses a CPU baseline because PyTorch’s dynamic int8 Linear quantization is a CPU path.
+     The same CPU device and QNNPACK engine are used for the baseline and quantized timings to keep the
+     comparison aligned.
+ 1   import torch
+ 2   import os
+ 3   import time
+ 4   from transformers import AutoTokenizer, AutoModelForCausalLM
+ 5
+ 6   torch.set_num_threads(4)
+ 7   # PyTorch dynamic quantization is a CPU backend. Keep the FP32 baseline
+ 8   # on CPU as well so its timing is comparable to the int8 result.
+ 9   device = torch.device("cpu")
+10   if "qnnpack" in torch.backends.quantized.supported_engines:
+11       torch.backends.quantized.engine = "qnnpack"
+12   print("Quantization engine:", torch.backends.quantized.engine)
+
+
+           The complete progress or warning stream is reproduced in Appendix A.
+ 1   Quantization engine: qnnpack
+
+
+     QNNPACK is the selected quantized operator backend. The widget warning is only a notebook display
+     dependency and is preserved in the diagnostics appendix.
+     The gated Llama checkpoint is accessed through the existing local Hugging Face credential store. The code
+     checks access without printing or embedding a token, then clears the temporary variable.
+ 1   from huggingface_hub import login, get_token
+ 2
+ 3   # Use local Hugging Face authentication; never save a token in this notebook.
+ 4   token = get_token()
+ 5   if token is None:
+ 6       raise RuntimeError("Llama 3.2 requires an approved Hugging Face account. Run ‘hf auth login‘ locally or set HF_TOKEN,
+          then rerun.")
+ 7   login(token=token, add_to_git_credential=False)
+ 8   del token
+ 9   print("Hugging Face authentication configured.")
+
+
+
+ 1   Hugging Face authentication configured.
+
+
+     Authentication succeeds in the finalized run, allowing the exact gated checkpoint to load in the next step. An
+     earlier failed attempt is retained as historical diagnostics only.
+     This cell loads the public gated Llama 3.2 1B base model in float32 on CPU and loads a left-padding tokenizer.
+     Setting EOS as the pad token lets differently sized prompts share a batch.
+ 1   model_id = "meta-llama/Llama-3.2-1B"
+ 2   #TODO: load the model and tokenizer
+ 3   model = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype=torch.float32, low_cpu_mem_usage=True).to(device).eval()
+ 4   tokenizer = AutoTokenizer.from_pretrained(model_id, padding_side="left")
+ 5
+ 6   tokenizer.pad_token = tokenizer.eos_token
+
+
+        The model and tokenizer become the common baseline for parameter-size measurement, generation, and the
+     two quantized alternatives.
+     Rather than infer memory from a parameter count, this helper serializes the state dictionary and measures its
+     file size. It establishes the storage baseline before quantization.
+     1.3   Dynamic quantization on a decoder-only model                                                                             7
+
+
+
+
+ 1   def get_model_size(model):
+ 2       """Get the size of the model in MB"""
+ 3       torch.save(model.state_dict(), "temp.pth")
+ 4       size = os.path.getsize("temp.pth") / 1e6 # size in "MB" (technically, it should be 1024**2, but we approximate to 1e6
+          to get an easier conversion #params <=> MB)
+ 5       os.remove("temp.pth")
+ 6       return size
+ 7
+ 8   print(f"Model size before quantization {(get_model_size(model)):.2f} MB")
+
+
+ 1   Model size before quantization 4943.31 MB
+
+
+     The value reports serialized model-state size in decimal megabytes; it is not peak runtime memory, which also
+     includes activations and framework overhead.
+     Twenty copies of one short prompt are tokenized together, then the unquantized model greedily generates 30
+     new tokens. The batch provides a stable workload for the later CPU timing comparison.
+ 1   text = "The secret of life is"
+ 2   # Notice we use a batch of 20 sentences -- we will get better results
+ 3   # on quantized models when processing a batch of inputs
+ 4   text = [text]*20
+ 5
+ 6   #TODO: encode the text using the tokenizer
+ 7   inputs = tokenizer(text, return_tensors="pt", padding=True).to(device)
+ 8
+ 9   tic = time.time()
+10
+11   with torch.no_grad():
+12       #TODO: generate the output from the model
+13       baseline_output = model.generate(**inputs, max_new_tokens=30, do_sample=False, pad_token_id=tokenizer.eos_token_id)
+14
+15   elapsed_time = time.time() - tic
+16
+17   #TODO: decode the output
+18   baseline_decoded = tokenizer.batch_decode(baseline_output, skip_special_tokens=True)
+19
+20   print("Baseline model output:", baseline_decoded)
+21   print("\nTime taken for baseline model:", elapsed_time)
+
+
+ 1   /Users/nicolabeccaceci/.venvs/llms-lab05/lib/python3.11/site-packages/transformers/generation/configuration_utils.py:590:
+          UserWarning: ‘do_sample‘ is set to ‘False‘. However, ‘temperature‘ is set to ‘0.6‘ -- this flag is only used in sample-
+          based generation modes. You should set ‘do_sample=True‘ or unset ‘temperature‘.
+ 2     warnings.warn(
+ 3   /Users/nicolabeccaceci/.venvs/llms-lab05/lib/python3.11/site-packages/transformers/generation/configuration_utils.py:595:
+          UserWarning: ‘do_sample‘ is set to ‘False‘. However, ‘top_p‘ is set to ‘0.9‘ -- this flag is only used in sample-based
+          generation modes. You should set ‘do_sample=True‘ or unset ‘top_p‘.
+ 4     warnings.warn(
+
+
+ 1   Baseline model output: [’The secret of life is to be happy, and to be happy you must be yourself. - Ralph Waldo Emerson\nThe
+          secret of life is to be happy, and to’, ’The secret of life is to be happy, and to be happy you must be yourself. - Ralph
+           Waldo Emerson\nThe secret of life is to be happy, and to’, ’The secret of life is to be happy, and to be happy you must
+          be yourself. - Ralph Waldo Emerson\nThe secret of life is to be happy, and to’, ’The secret of life is to be happy, and
+          to be happy you must be yourself. - Ralph Waldo Emerson\nThe secret of life is to be happy, and to’, ’The secret of life
+          is to be happy, and to be happy you must be yourself. - Ralph Waldo Emerson\nThe secret of life is to be happy, and to’, ’
+          The secret of life is to be happy, and to be happy you must be yourself. - Ralph Waldo Emerson\nThe secret of life is to
+          be happy, and to’, ’The secret of life is to be happy, and to be happy you must be yourself. - Ralph Waldo Emerson\nThe
+          secret of life is to be happy, and to’, ’The secret of life is to be happy, and to be happy you must be yourself. - Ralph
+           Waldo Emerson\nThe secret of life is to be happy, and to’, ’The secret of life is to be happy, and to be happy you must
+          be yourself. - Ralph Waldo Emerson\nThe secret of life is to be happy, and to’, ’The secret of life is to be happy, and
+          to be happy you must be yourself. - Ralph Waldo Emerson\nThe secret of life is to be happy, and to’, ’The secret of life
+          is to be happy, and to be happy you must be yourself. - Ralph Waldo Emerson\nThe secret of life is to be happy, and to’, ’
+          The secret of life is to be happy, and to be happy you must be yourself. - Ralph Waldo Emerson\nThe secret of life is to
+          be happy, and to’, ’The secret of life is to be happy, and to be happy you must be yourself. - Ralph Waldo Emerson\nThe
+          secret of life is to be happy, and to’, ’The secret of life is to be happy, and to be happy you must be yourself. - Ralph
+           Waldo Emerson\nThe secret of life is to be happy, and to’, ’The secret of life is to be happy, and to be happy you must
+          be yourself. - Ralph Waldo Emerson\nThe secret of life is to be happy, and to’, ’The secret of life is to be happy, and
+          to be happy you must be yourself. - Ralph Waldo Emerson\nThe secret of life is to be happy, and to’, ’The secret of life
+          is to be happy, and to be happy you must be yourself. - Ralph Waldo Emerson\nThe secret of life is to be happy, and to’, ’
+          The secret of life is to be happy, and to be happy you must be yourself. - Ralph Waldo Emerson\nThe secret of life is to
+          be happy, and to’, ’The secret of life is to be happy, and to be happy you must be yourself. - Ralph Waldo Emerson\nThe
+          secret of life is to be happy, and to’, ’The secret of life is to be happy, and to be happy you must be yourself. - Ralph
+           Waldo Emerson\nThe secret of life is to be happy, and to’]
+ 2
+ 3   Time taken for baseline model: 8.564711809158325
+
+
+     The decoded batch preserves each prompt followed by its continuation. The elapsed time is specific to this
+     hardware, batch, and software stack.
+     PyTorch replaces Linear layers with dynamically quantized int8 versions while leaving other modules, including
+     embeddings, in their existing representation. The serialized state size is measured again.
+     1.3   Dynamic quantization on a decoder-only model                                                                           8
+
+
+
+
+ 1   quantized_model = torch.quantization.quantize_dynamic(
+ 2       model, {torch.nn.Linear}, dtype=torch.qint8
+ 3   ).to(’cpu’)
+ 4
+ 5   # Model size after quantization
+ 6   print(f"Model size after quantization {(get_model_size(quantized_model)):.2f} MB")
+
+
+ 1   /var/folders/s1/c1_g_ntd5nb_f0t11858vs640000gn/T/ipykernel_15547/1416564361.py:1: DeprecationWarning: torch.ao.quantization is
+          deprecated and will be removed in 2.10.
+ 2   For migrations of users:
+ 3   1. Eager mode quantization (torch.ao.quantization.quantize, torch.ao.quantization.quantize_dynamic), please migrate to use
+          torchao eager mode quantize_ API instead
+ 4   2. FX graph mode quantization (torch.ao.quantization.quantize_fx.prepare_fx,torch.ao.quantization.quantize_fx.convert_fx,
+          please migrate to use torchao pt2e quantization API instead (prepare_pt2e, convert_pt2e)
+ 5   3. pt2e quantization has been migrated to torchao (https://github.com/pytorch/ao/tree/main/torchao/quantization/pt2e)
+ 6   see https://github.com/pytorch/ao/issues/2259 for more details
+ 7     quantized_model = torch.quantization.quantize_dynamic(
+
+
+ 1   Model size after quantization 2288.87 MB
+
+
+     The size change reflects only modules supported by this transformation and its metadata. It should not be
+     mistaken for every parameter becoming one byte.
+     Displaying the module tree makes the transformation concrete: it shows which Linear layers are now dynamically
+     quantized and which layers retain their original types.
+ 1   quantized_model
+
+
+ 1   LlamaForCausalLM(
+ 2     (model): LlamaModel(
+ 3       (embed_tokens): Embedding(128256, 2048)
+ 4       (layers): ModuleList(
+ 5          (0-15): 16 x LlamaDecoderLayer(
+ 6            (self_attn): LlamaSdpaAttention(
+ 7              (q_proj): DynamicQuantizedLinear(in_features=2048, out_features=2048, dtype=torch.qint8, qscheme=torch.
+           per_tensor_affine)
+ 8              (k_proj): DynamicQuantizedLinear(in_features=2048, out_features=512, dtype=torch.qint8, qscheme=torch.
+           per_tensor_affine)
+ 9              (v_proj): DynamicQuantizedLinear(in_features=2048, out_features=512, dtype=torch.qint8, qscheme=torch.
+           per_tensor_affine)
+10              (o_proj): DynamicQuantizedLinear(in_features=2048, out_features=2048, dtype=torch.qint8, qscheme=torch.
+           per_tensor_affine)
+11              (rotary_emb): LlamaRotaryEmbedding()
+12            )
+13            (mlp): LlamaMLP(
+14              (gate_proj): DynamicQuantizedLinear(in_features=2048, out_features=8192, dtype=torch.qint8, qscheme=torch.
+           per_tensor_affine)
+15              (up_proj): DynamicQuantizedLinear(in_features=2048, out_features=8192, dtype=torch.qint8, qscheme=torch.
+           per_tensor_affine)
+16              (down_proj): DynamicQuantizedLinear(in_features=8192, out_features=2048, dtype=torch.qint8, qscheme=torch.
+           per_tensor_affine)
+17              (act_fn): SiLU()
+18            )
+19            (input_layernorm): LlamaRMSNorm((2048,), eps=1e-05)
+20            (post_attention_layernorm): LlamaRMSNorm((2048,), eps=1e-05)
+21          )
+22       )
+23       (norm): LlamaRMSNorm((2048,), eps=1e-05)
+24       (rotary_emb): LlamaRotaryEmbedding()
+25     )
+26     (lm_head): DynamicQuantizedLinear(in_features=2048, out_features=128256, dtype=torch.qint8, qscheme=torch.per_tensor_affine)
+27   )
+
+
+     The printed structure is architectural evidence for the selective conversion performed in the previous cell.
+     The same 20 prompts are generated with the int8 model using greedy decoding and the same 30-token budget.
+     Comparing strings and elapsed time with the baseline isolates the observed effect of this configuration.
+ 1   tic = time.time()
+ 2
+ 3   with torch.no_grad():
+ 4       #TODO: generate the output from the quantized model
+ 5       output = quantized_model.generate(**inputs, max_new_tokens=30, do_sample=False, pad_token_id=tokenizer.eos_token_id)
+ 6
+ 7   elapsed_time = time.time() - tic
+ 8
+ 9   #TODO: decode the output
+10   output_decoded = tokenizer.batch_decode(output, skip_special_tokens=True)
+11
+12   print("Quantized model output:", output_decoded)
+13   print("\nTime taken for quantized model:", elapsed_time)
+     1.3   Dynamic quantization on a decoder-only model                                                                           9
+
+
+
+
+ 1   /Users/nicolabeccaceci/.venvs/llms-lab05/lib/python3.11/site-packages/transformers/generation/configuration_utils.py:590:
+          UserWarning: ‘do_sample‘ is set to ‘False‘. However, ‘temperature‘ is set to ‘0.6‘ -- this flag is only used in sample-
+          based generation modes. You should set ‘do_sample=True‘ or unset ‘temperature‘.
+ 2     warnings.warn(
+ 3   /Users/nicolabeccaceci/.venvs/llms-lab05/lib/python3.11/site-packages/transformers/generation/configuration_utils.py:595:
+          UserWarning: ‘do_sample‘ is set to ‘False‘. However, ‘top_p‘ is set to ‘0.9‘ -- this flag is only used in sample-based
+          generation modes. You should set ‘do_sample=True‘ or unset ‘top_p‘.
+ 4     warnings.warn(
+ 5   [W1026 17:58:49.303102000 qlinear_dynamic.cpp:251] Warning: Currently, qnnpack incorrectly ignores reduce_range when it is set
+          to true; this may change in a future release. (function operator())
+
+
+ 1   Quantized model output: [’The secret of life is the most important thing in the world. It is the most important thing in the
+          world. It is the most important thing in the world. It is’, ’The secret of life is the most important thing in the world.
+           It is the most important thing in the world. It is the most important thing in the world. It is’, ’The secret of life is
+           the most important thing in the world. It is the most important thing in the world. It is the most important thing in
+          the world. It is’, ’The secret of life is the most important thing in the world. It is the most important thing in the
+          world. It is the most important thing in the world. It is’, ’The secret of life is the most important thing in the world.
+           It is the most important thing in the world. It is the most important thing in the world. It is’, ’The secret of life is
+           the most important thing in the world. It is the most important thing in the world. It is the most important thing in
+          the world. It is’, ’The secret of life is the most important thing in the world. It is the most important thing in the
+          world. It is the most important thing in the world. It is’, ’The secret of life is the most important thing in the world.
+           It is the most important thing in the world. It is the most important thing in the world. It is’, ’The secret of life is
+           the most important thing in the world. It is the most important thing in the world. It is the most important thing in
+          the world. It is’, ’The secret of life is the most important thing in the world. It is the most important thing in the
+          world. It is the most important thing in the world. It is’, ’The secret of life is the most important thing in the world.
+           It is the most important thing in the world. It is the most important thing in the world. It is’, ’The secret of life is
+           the most important thing in the world. It is the most important thing in the world. It is the most important thing in
+          the world. It is’, ’The secret of life is the most important thing in the world. It is the most important thing in the
+          world. It is the most important thing in the world. It is’, ’The secret of life is the most important thing in the world.
+           It is the most important thing in the world. It is the most important thing in the world. It is’, ’The secret of life is
+           the most important thing in the world. It is the most important thing in the world. It is the most important thing in
+          the world. It is’, ’The secret of life is the most important thing in the world. It is the most important thing in the
+          world. It is the most important thing in the world. It is’, ’The secret of life is the most important thing in the world.
+           It is the most important thing in the world. It is the most important thing in the world. It is’, ’The secret of life is
+           the most important thing in the world. It is the most important thing in the world. It is the most important thing in
+          the world. It is’, ’The secret of life is the most important thing in the world. It is the most important thing in the
+          world. It is the most important thing in the world. It is’, ’The secret of life is the most important thing in the world.
+           It is the most important thing in the world. It is the most important thing in the world. It is’]
+ 2
+ 3   Time taken for quantized model: 11.583800077438354
+
+
+     The full decoded output and runtime are preserved. Any speed or text difference is specific to the tested backend
+     and does not establish a general performance or quality guarantee.
+     After deleting the float32 and int8 models, this cell loads a fresh 4-bit BitsAndBytes model on CPU. Explicit
+     cleanup avoids holding all large variants together; the same prompt batch is moved to the new model’s device.
+ 1   from transformers import BitsAndBytesConfig
+ 2   import gc
+ 3
+ 4   # Release both previous models before loading the next one on this 16 GB Mac.
+ 5   del model, quantized_model
+ 6   gc.collect()
+ 7
+ 8   # BitsAndBytes 0.50.2 supports the CPU backend on macOS ARM64. Keep all
+ 9   # three timed experiments on CPU here so their timings are comparable.
+10   quantization_config = BitsAndBytesConfig(
+11       load_in_4bit=True,
+12       bnb_4bit_compute_dtype=torch.float32,
+13   )
+14   quantized_model = AutoModelForCausalLM.from_pretrained(
+15       model_id, quantization_config=quantization_config,
+16       torch_dtype=torch.float32, device_map="cpu", low_cpu_mem_usage=True,
+17   ).eval()
+18   inputs = inputs.to(quantized_model.device)
+19   print("4-bit backend: BitsAndBytes (CPU)")
+20   print(f"Model size after quantization: {get_model_size(quantized_model):.2f} MB")
+
+
+
+ 1   4-bit backend: BitsAndBytes (CPU)
+
+
+ 1   Model size after quantization: 1598.46 MB
+
+
+     The output confirms the CPU int4 backend and measures the serialized quantized state. The configuration
+     stores 4-bit weights with float32 computation; weight storage precision and arithmetic precision are distinct.
+     The final generation repeats the same greedy prompt batch and token budget with the int4 model, completing
+     the baseline/int8/int4 comparison.
+ 1   tic = time.time()
+ 2
+     1.3   Dynamic quantization on a decoder-only model                                                                          10
+
+
+
+ 3   with torch.no_grad():
+ 4       #TODO: generate the output from the quantized model
+ 5       output = quantized_model.generate(**inputs, max_new_tokens=30, do_sample=False, pad_token_id=tokenizer.eos_token_id)
+ 6
+ 7   elapsed_time = time.time() - tic
+ 8
+ 9   #TODO: decode the output
+10   output_decoded = tokenizer.batch_decode(output, skip_special_tokens=True)
+11
+12   print("\nquantized model output:", output_decoded)
+13   print("\nTime taken for quantized model:", elapsed_time)
+
+
+
+ 1
+ 2   quantized model output: [’The secret of life is to live it to the fullest.\nThe secret of life is to live it to the fullest.\
+          nThe secret of life is to live it to the fullest’, ’The secret of life is to live it to the fullest.\nThe secret of life
+          is to live it to the fullest.\nThe secret of life is to live it to the fullest’, ’The secret of life is to live it to the
+           fullest.\nThe secret of life is to live it to the fullest.\nThe secret of life is to live it to the fullest’, ’The
+          secret of life is to live it to the fullest.\nThe secret of life is to live it to the fullest.\nThe secret of life is to
+          live it to the fullest’, ’The secret of life is to live it to the fullest.\nThe secret of life is to live it to the
+          fullest.\nThe secret of life is to live it to the fullest’, ’The secret of life is to live it to the fullest.\nThe secret
+           of life is to live it to the fullest.\nThe secret of life is to live it to the fullest’, ’The secret of life is to live
+          it to the fullest.\nThe secret of life is to live it to the fullest.\nThe secret of life is to live it to the fullest’, ’
+          The secret of life is to live it to the fullest.\nThe secret of life is to live it to the fullest.\nThe secret of life is
+           to live it to the fullest’, ’The secret of life is to live it to the fullest.\nThe secret of life is to live it to the
+          fullest.\nThe secret of life is to live it to the fullest’, ’The secret of life is to live it to the fullest.\nThe secret
+           of life is to live it to the fullest.\nThe secret of life is to live it to the fullest’, ’The secret of life is to live
+          it to the fullest.\nThe secret of life is to live it to the fullest.\nThe secret of life is to live it to the fullest’, ’
+          The secret of life is to live it to the fullest.\nThe secret of life is to live it to the fullest.\nThe secret of life is
+           to live it to the fullest’, ’The secret of life is to live it to the fullest.\nThe secret of life is to live it to the
+          fullest.\nThe secret of life is to live it to the fullest’, ’The secret of life is to live it to the fullest.\nThe secret
+           of life is to live it to the fullest.\nThe secret of life is to live it to the fullest’, ’The secret of life is to live
+          it to the fullest.\nThe secret of life is to live it to the fullest.\nThe secret of life is to live it to the fullest’, ’
+          The secret of life is to live it to the fullest.\nThe secret of life is to live it to the fullest.\nThe secret of life is
+           to live it to the fullest’, ’The secret of life is to live it to the fullest.\nThe secret of life is to live it to the
+          fullest.\nThe secret of life is to live it to the fullest’, ’The secret of life is to live it to the fullest.\nThe secret
+           of life is to live it to the fullest.\nThe secret of life is to live it to the fullest’, ’The secret of life is to live
+          it to the fullest.\nThe secret of life is to live it to the fullest.\nThe secret of life is to live it to the fullest’, ’
+          The secret of life is to live it to the fullest.\nThe secret of life is to live it to the fullest.\nThe secret of life is
+           to live it to the fullest’]
+ 3
+ 4   Time taken for quantized model: 16.536229133605957
+
+
+     The generated strings and elapsed time are evidence for this run only. Quantization level alone does not predict
+     latency or generation quality independently of the backend and workload.
+                                                                                                                           11
+
+
+
+     2 Low-Rank Adaptation: manual adapters and PEFT
+     The second exercise adapts BERT for binary IMDB sentiment classification without updating all of its weights.
+     The manual implementation adds rank-eight paths to the six Linear transformations in each encoder block,
+     freezes the base model, and trains the adapters on a seeded 2,000-review subset. A second run uses Hugging
+     Face PEFT with the same selected transformations and Trainer configuration. We compare parameter counts
+     and held-out accuracy while keeping visible a key difference: PEFT also trains the newly initialized classification
+     head, whereas the manual path freezes it.
+
+                                                                                                    Freeze base and
+            Pretrained BERT                       Six target linears per layer
+                                                                                                   train low-rank A/B
+
+
+             PEFT wrapper
+                                                    One-epoch evaluation                           Seeded IMDB split
+            and comparison
+
+                                Figure 2: The exercise pipeline, from input to checked result.
+
+
+
+     2.1 Build and train the manual adapter
+     The LoRA exercise begins with PyTorch and BERT imports, a fixed seed, and an MPS availability check. This
+     provides deterministic initialization and records the accelerator environment for the later training comparison.
+ 1   import torch
+ 2   import torch.nn as nn
+ 3   from transformers import BertTokenizer, BertForSequenceClassification, set_seed
+ 4
+ 5   set_seed(42)
+ 6   torch.set_num_threads(4)
+ 7   print("MPS available:", torch.backends.mps.is_available())
+
+
+        The complete progress or warning stream is reproduced in Appendix A.
+ 1   MPS available: True
+
+
+     MPS is available on this host. The notebook’s Trainer selects the device during training; the availability message
+     alone does not prove that a particular run used it.
+     This small reporting helper totals trainable and total parameters and expresses the trainable fraction as a
+     percentage. We use it before and after adapter insertion to quantify the parameter savings.
+ 1   # From https://github.com/huggingface/peft/issues/41#issuecomment-1404611868
+ 2   def print_trainable_parameters(model):
+ 3       """
+ 4       Prints the number of trainable parameters in the model.
+ 5       """
+ 6       trainable_params = 0
+ 7       all_param = 0
+ 8       for _, param in model.named_parameters():
+ 9            all_param += param.numel()
+10            if param.requires_grad:
+11                trainable_params += param.numel()
+12       print(
+13            f"trainable params: {trainable_params} || all params: {all_param} || trainable%: {100 * trainable_params /
+           all_param:.2f}"
+14       )
+
+
+        The function produces no printed result until called on a model; it is reused for both the manual and PEFT
+     implementations.
+     We load the uncased BERT encoder with a two-class sequence-classification head and its matching tokenizer.
+     The pretrained encoder supplies language features; the classification head is newly initialized for sentiment
+     labels.
+ 1   model_name = "bert-base-uncased"
+ 2   model = BertForSequenceClassification.from_pretrained(model_name, num_labels=2)
+ 3   tokenizer = BertTokenizer.from_pretrained(model_name)
+     2.1    Build and train the manual adapter                                                                                   12
+
+
+
+
+ 1   Some weights of BertForSequenceClassification were not initialized from the model checkpoint at bert-base-uncased and are newly
+           initialized: [’classifier.bias’, ’classifier.weight’]
+ 2   You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+
+
+     Transformers warns that the classifier weights are random and must be trained for the task. The head’s
+     trainability later becomes an important difference between the manual and PEFT runs.
+     Before modifying BERT, the helper establishes the full fine-tuning baseline: every parameter in the encoder and
+     classifier is trainable.
+ 1   print_trainable_parameters(model)
+
+
+
+ 1   trainable params: 109483778 || all params: 109483778 || trainable%: 100.00
+
+
+     All 109,483,778 parameters are initially trainable. This count is compared with the much smaller adapter-only
+     parameter set.
+     The manual adapter wraps a linear layer with its original operation plus a rank-eight update (xA)B. The
+     standard initialization uses Kaiming-uniform A and zero B, so the adapter initially contributes exactly zero
+     while its parameters can learn.
+ 1   class LoRA(nn.Module):
+ 2       def __init__(self, original_layer, rank=8):
+ 3           super(LoRA, self).__init__()
+ 4           self.original_layer = original_layer
+ 5           self.rank = rank
+ 6           self.in_features = original_layer.in_features
+ 7           self.out_features = original_layer.out_features
+ 8
+ 9            # Match the standard LoRA initialization: A uses Kaiming uniform, B starts at zero.
+10            # Transposing A for initialization gives Kaiming’s fan-in the input dimension.
+11            self.A = nn.Parameter(torch.empty(self.in_features, rank))
+12            nn.init.kaiming_uniform_(self.A.T, a=5 ** 0.5)
+13            self.B = nn.Parameter(torch.zeros(rank, self.out_features))
+14
+15         def forward(self, x):
+16             # The output is the original layer output plus the low-rank adaptation
+17
+18            # LoRA output
+19            lora_output = (x @ self.A) @ self.B
+20
+21            # layer output, which combines the original output with the LoRA one
+22            return self.original_layer(x) + lora_output
+
+
+        This class preserves the base projection and adds a low-rank trainable path. Its parameter dimensions are
+     input-by-rank and rank-by-output, so the added count is proportional to rank rather than input times output.
+     Each BERT encoder block has six linear projections selected here: query, key, value, attention output, and the two
+     feed-forward transformations. Replacing them applies the same adapter construction throughout the encoder.
+ 1   for layer in model.bert.encoder.layer:
+ 2       layer.attention.self.query = LoRA(layer.attention.self.query)
+ 3       layer.attention.self.key = LoRA(layer.attention.self.key)
+ 4       layer.attention.self.value = LoRA(layer.attention.self.value)
+ 5       layer.attention.output.dense = LoRA(layer.attention.output.dense)
+ 6       layer.intermediate.dense = LoRA(layer.intermediate.dense)
+ 7       layer.output.dense = LoRA(layer.output.dense)
+
+
+       The model now contains a base projection plus a low-rank path at each selected site. Layer normalization,
+     embeddings, and the task classifier are not replaced by this loop.
+     To make the experiment parameter-efficient, all model parameters are frozen first. The loop then enables
+     gradients only for each manually inserted A and B matrix.
+ 1   # Freeze all parameters except the LoRA parameters
+ 2
+ 3   # Freeze all parameters
+ 4   for param in model.parameters():
+ 5       param.requires_grad = False
+ 6
+ 7   # Unfreeze only LoRA parameters
+ 8   for layer in model.modules():
+ 9       if isinstance(layer, LoRA):
+10           layer.A.requires_grad = True
+11           layer.B.requires_grad = True
+     2.1   Build and train the manual adapter                                                                                    13
+
+
+
+         This policy trains the adapters while leaving the pretrained encoder and the randomly initialized classifier
+     frozen. That frozen classifier is a limitation when comparing accuracy with PEFT, which also trains its task head.
+     The parameter helper now checks whether freezing and replacement produced the expected trainable count.
+     The assertion guards the architecture calculation against a missed or duplicated projection.
+ 1   print_trainable_parameters(model)
+ 2   assert sum(p.numel() for p in model.parameters() if p.requires_grad) == 1_327_104
+
+
+
+ 1   trainable params: 1327104 || all params: 110810882 || trainable%: 1.20
+
+
+     The six adapter sites across twelve layers contain 1,327,104 trainable parameters, about 1.20
+     The IMDB dataset is shuffled with seed 42 and reduced to 2,000 training and 1,000 test examples. This small,
+     disjoint sample keeps the demonstration manageable while preserving a reproducible comparison set.
+ 1   from datasets import load_dataset
+ 2
+ 3   # Load a sentiment analysis dataset
+ 4   dataset = load_dataset(’imdb’)
+ 5   train_dataset = dataset[’train’].shuffle(seed=42).select(range(2000))
+ 6   test_dataset = dataset[’test’].shuffle(seed=42).select(range(1000))
+
+
+
+ 1   Using the latest cached version of the dataset since imdb couldn’t be found on the Hugging Face Hub (offline mode is enabled).
+
+
+ 1   Found the latest cached dataset configuration ’plain_text’ at /Users/nicolabeccaceci/.cache/huggingface/datasets/imdb/
+          plain_text/0.0.0/e6281661ce1c48d982bc483cf8a173c1bbeb5d31 (last modified on Mon Oct 26 09:43:53 2026).
+
+
+     The cached dataset is used in offline mode. The same selected rows feed both adapter implementations.
+     This metric callback converts the Trainer’s logits to class predictions and computes accuracy against the reference
+     labels. It is reused for initial evaluation, periodic validation, and final comparison.
+ 1   from sklearn.metrics import accuracy_score
+ 2
+ 3   # Function to compute accuracy
+ 4   def compute_metrics(pred):
+ 5       labels = pred.label_ids
+ 6       preds = pred.predictions.argmax(-1)
+ 7       accuracy = accuracy_score(labels, preds)
+ 8       return {"accuracy": accuracy}
+
+
+        The callback returns a single accuracy metric for each evaluation event, keeping the comparison focused on
+     held-out classification accuracy.
+     The tokenizer converts the review text into padded, truncated BERT inputs. Mapping both splits in batches
+     prepares model-ready data once for both training approaches.
+ 1   # Tokenize the dataset
+ 2   def tokenize_function(sample):
+ 3       return tokenizer(sample[’text’], padding="max_length", truncation=True)
+ 4
+ 5   train_dataset = train_dataset.map(tokenize_function, batched=True)
+ 6   test_dataset = test_dataset.map(tokenize_function, batched=True)
+
+
+        The tokenized datasets contain aligned input IDs, attention masks, and labels; later Trainers can reuse them
+     without retokenizing.
+     The Trainer configuration keeps an effective batch of 32 using microbatches of four and eight accumulation steps.
+     It specifies one epoch, the shared learning rate and weight decay, evaluation and logging every ten updates, and
+     disables external reporting.
+ 1   from transformers import Trainer, TrainingArguments
+ 2
+ 3   batch_size = 32
+ 4   num_train_epochs = 1
+ 5
+ 6   learning_rate = 2e-4
+ 7   weight_decay = 0.01
+ 8
+ 9   # Define training arguments
+10   training_args = TrainingArguments(
+11       output_dir=’./results’,
+12       eval_strategy="steps",
+13       eval_steps=10,
+14       learning_rate=learning_rate,
+15       # Accumulate smaller microbatches to retain effective batch size 32.
+     2.1    Build and train the manual adapter                                                                           14
+
+
+
+16         per_device_train_batch_size=4,
+17         gradient_accumulation_steps=batch_size // 4,
+18         per_device_eval_batch_size=8,
+19         num_train_epochs=num_train_epochs,
+20         weight_decay=weight_decay,
+21         logging_dir=’./logs’, # Directory for storing logs
+22         logging_steps=10, # Log every 10 steps
+23         report_to="none",
+24         seed=42,
+25         dataloader_pin_memory=torch.cuda.is_available(),
+26   )
+27
+28   # Initialize the Trainer object
+29   trainer = Trainer(
+30       model=model,
+31       args=training_args,
+32       train_dataset=train_dataset,
+33       eval_dataset=test_dataset,
+34       compute_metrics=compute_metrics
+35   )
+
+
+        The same arguments and metric callback are reused for both implementations. This cell creates the training
+     controller but does not yet evaluate or update the model.
+     Before training, we measure the manual adapter model on the held-out split. This establishes the starting
+     accuracy of the frozen random classifier plus untrained adapters.
+ 1   # Evaluate the model
+ 2   results = trainer.evaluate()
+ 3   print(f"Accuracy on the validation set: {results[’eval_accuracy’]:.4f}")
+
+
+           The complete progress or warning stream is reproduced in Appendix A.
+ 1   Accuracy on the validation set: 0.5070
+
+
+     Initial accuracy is 0.5070, close to chance for two balanced classes. The progress trace is retained in the diagnostics
+     appendix.
+     The manual adapters are trained for one epoch on the seeded 2,000-review subset, with held-out evaluation at
+     regular update intervals. The complete validation table shows how accuracy and loss change during adaptation.
+
+ 1   results = trainer.train()
+
+
+
+ 1   Progress: 62/62
+ 2   [62/62 13:22, Epoch 0/1]
+ 3   Step
+ 4   Training Loss
+ 5   Validation Loss
+ 6   Model Preparation Time
+ 7   Accuracy
+ 8   10
+ 9   0.698200
+10   0.686084
+11   0.002800
+12   0.582000
+13   20
+14   0.694700
+15   0.681265
+16   0.002800
+17   0.620000
+18   30
+19   0.683300
+20   0.675302
+21   0.002800
+22   0.643000
+23   40
+24   0.686100
+25   0.671291
+26   0.002800
+27   0.661000
+28   50
+29   0.671200
+30   0.667917
+31   0.002800
+32   0.654000
+33   60
+34   0.670200
+35   0.666133
+36   0.002800
+37   0.657000
+     2.2    Apply the same encoder adapters with PEFT                                                                            15
+
+
+
+     The 62-update run reports the per-checkpoint losses and accuracies in full. Its training time is about 810 seconds
+     on this host; the assigned classifier remains frozen, so interpret this result as the notebook’s adapter-only
+     implementation rather than a fully matched classifier fine-tune.
+     After the manual adapter epoch, the same held-out set is evaluated again to quantify its endpoint under the
+     shared metric.
+ 1   # Evaluate the model
+ 2   results = trainer.evaluate()
+ 3   print(f"Accuracy on the validation set: {results[’eval_accuracy’]:.4f}")
+
+
+           The complete progress or warning stream is reproduced in Appendix A.
+ 1   Accuracy on the validation set: 0.6580
+
+
+     Accuracy rises from 0.5070 to 0.6580. This is an observed result on 1,000 selected reviews and the fixed random
+     classifier, not a general benchmark.
+
+     2.2 Apply the same encoder adapters with PEFT
+     The PEFT path starts from a freshly loaded BERT checkpoint after the manual model is released. Its target-module
+     list is derived from the same six encoder linears per layer. The library also keeps the sequence-classification
+     head trainable; this adds 1,538 parameters and means the final accuracy comparison is informative but not
+     perfectly controlled.
+     Before testing PEFT, the notebook releases the manual Trainer and model, clears cached MPS allocations, resets
+     the seed, and reloads a fresh BERT classifier. This prevents learned weights from leaking into the second
+     approach.
+ 1   # Release the manually adapted model/trainer before loading a fresh baseline.
+ 2   import gc
+ 3   globals().pop("trainer", None)
+ 4   globals().pop("model", None)
+ 5   gc.collect()
+ 6   if torch.backends.mps.is_available():
+ 7       torch.mps.empty_cache()
+ 8
+ 9   set_seed(42)
+10   model_name = "bert-base-uncased"
+11   model = BertForSequenceClassification.from_pretrained(model_name)
+12   tokenizer = BertTokenizer.from_pretrained(model_name)
+
+
+
+ 1   Some weights of BertForSequenceClassification were not initialized from the model checkpoint at bert-base-uncased and are newly
+           initialized: [’classifier.bias’, ’classifier.weight’]
+ 2   You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+
+
+     The warning again identifies the newly initialized classification head. Reloading it under the same seed makes
+     the PEFT branch start from a reproducible baseline.
+     PEFT’s LoRA configuration uses rank eight, alpha 32, dropout 0.1, and targets the same six encoder Linear
+     projections per layer. Its sequence-classification wrapper also keeps the task head trainable.
+ 1   from peft import LoraConfig, get_peft_model, PeftModelForSequenceClassification
+ 2
+ 3   config = LoraConfig(
+ 4       r=8,
+ 5       lora_alpha=32,
+ 6       lora_dropout=0.1,
+ 7       bias="none",
+ 8       # Select the same six linear transformations in each encoder block.
+ 9       target_modules=[
+10           name for name, module in model.named_modules()
+11           if name.startswith("bert.encoder.layer.") and isinstance(module, nn.Linear)
+12       ],
+13   )
+14
+15   peft_model = PeftModelForSequenceClassification(model, peft_config=config)
+
+
+         The PEFT model now contains low-rank modules at the selected sites. Its trainable count will include the
+     classification head as well as the adapters.
+     This type inspection confirms that get_peft_model returned the sequence-classification PEFT wrapper expected
+     for the task.
+ 1   type(peft_model)
+     2.2   Apply the same encoder adapters with PEFT                                                               16
+
+
+
+
+ 1   peft.peft_model.PeftModelForSequenceClassification
+
+
+     The Python type is ‘PeftModelForSequenceClassification‘, so the task-specific classifier is preserved by the
+     wrapper.
+     Printing the first encoder block verifies where PEFT inserted its A and B projections and shows that the original
+     linear layers remain as the adapter base.
+ 1   peft_model.bert.encoder.layer[0]
+
+
+
+ 1   BertLayer(
+ 2     (attention): BertAttention(
+ 3       (self): BertSdpaSelfAttention(
+ 4         (query): lora.Linear(
+ 5           (base_layer): Linear(in_features=768, out_features=768, bias=True)
+ 6           (lora_dropout): ModuleDict(
+ 7             (default): Dropout(p=0.1, inplace=False)
+ 8           )
+ 9           (lora_A): ModuleDict(
+10             (default): Linear(in_features=768, out_features=8, bias=False)
+11           )
+12           (lora_B): ModuleDict(
+13             (default): Linear(in_features=8, out_features=768, bias=False)
+14           )
+15           (lora_embedding_A): ParameterDict()
+16           (lora_embedding_B): ParameterDict()
+17           (lora_magnitude_vector): ModuleDict()
+18         )
+19         (key): lora.Linear(
+20           (base_layer): Linear(in_features=768, out_features=768, bias=True)
+21           (lora_dropout): ModuleDict(
+22             (default): Dropout(p=0.1, inplace=False)
+23           )
+24           (lora_A): ModuleDict(
+25             (default): Linear(in_features=768, out_features=8, bias=False)
+26           )
+27           (lora_B): ModuleDict(
+28             (default): Linear(in_features=8, out_features=768, bias=False)
+29           )
+30           (lora_embedding_A): ParameterDict()
+31           (lora_embedding_B): ParameterDict()
+32           (lora_magnitude_vector): ModuleDict()
+33         )
+34         (value): lora.Linear(
+35           (base_layer): Linear(in_features=768, out_features=768, bias=True)
+36           (lora_dropout): ModuleDict(
+37             (default): Dropout(p=0.1, inplace=False)
+38           )
+39           (lora_A): ModuleDict(
+40             (default): Linear(in_features=768, out_features=8, bias=False)
+41           )
+42           (lora_B): ModuleDict(
+43             (default): Linear(in_features=8, out_features=768, bias=False)
+44           )
+45           (lora_embedding_A): ParameterDict()
+46           (lora_embedding_B): ParameterDict()
+47           (lora_magnitude_vector): ModuleDict()
+48         )
+49         (dropout): Dropout(p=0.1, inplace=False)
+50       )
+51       (output): BertSelfOutput(
+52         (dense): lora.Linear(
+53           (base_layer): Linear(in_features=768, out_features=768, bias=True)
+54           (lora_dropout): ModuleDict(
+55             (default): Dropout(p=0.1, inplace=False)
+56           )
+57           (lora_A): ModuleDict(
+58             (default): Linear(in_features=768, out_features=8, bias=False)
+59           )
+60           (lora_B): ModuleDict(
+61             (default): Linear(in_features=8, out_features=768, bias=False)
+62           )
+63           (lora_embedding_A): ParameterDict()
+64           (lora_embedding_B): ParameterDict()
+65           (lora_magnitude_vector): ModuleDict()
+66         )
+67         (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)
+68         (dropout): Dropout(p=0.1, inplace=False)
+69       )
+70     )
+71     (intermediate): BertIntermediate(
+72       (dense): lora.Linear(
+73         (base_layer): Linear(in_features=768, out_features=3072, bias=True)
+74         (lora_dropout): ModuleDict(
+      2.2    Apply the same encoder adapters with PEFT                                                             17
+
+
+
+ 75             (default): Dropout(p=0.1, inplace=False)
+ 76           )
+ 77           (lora_A): ModuleDict(
+ 78             (default): Linear(in_features=768, out_features=8, bias=False)
+ 79           )
+ 80           (lora_B): ModuleDict(
+ 81             (default): Linear(in_features=8, out_features=3072, bias=False)
+ 82           )
+ 83           (lora_embedding_A): ParameterDict()
+ 84           (lora_embedding_B): ParameterDict()
+ 85           (lora_magnitude_vector): ModuleDict()
+ 86         )
+ 87         (intermediate_act_fn): GELUActivation()
+ 88       )
+ 89       (output): BertOutput(
+ 90         (dense): lora.Linear(
+ 91           (base_layer): Linear(in_features=3072, out_features=768, bias=True)
+ 92           (lora_dropout): ModuleDict(
+ 93             (default): Dropout(p=0.1, inplace=False)
+ 94           )
+ 95           (lora_A): ModuleDict(
+ 96             (default): Linear(in_features=3072, out_features=8, bias=False)
+ 97           )
+ 98           (lora_B): ModuleDict(
+ 99             (default): Linear(in_features=8, out_features=768, bias=False)
+100           )
+101           (lora_embedding_A): ParameterDict()
+102           (lora_embedding_B): ParameterDict()
+103           (lora_magnitude_vector): ModuleDict()
+104         )
+105         (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)
+106         (dropout): Dropout(p=0.1, inplace=False)
+107       )
+108   )
+
+
+      The module tree displays adapters on the attention and feed-forward linears. This is the library-managed
+      counterpart to the manual replacements above.
+      The PEFT helper calculates trainable parameters after wrapping. Comparing the result with the manual count
+      reveals whether the task head is included.
+  1   peft_model.print_trainable_parameters()
+
+
+
+  1   trainable params: 1,328,642 || all params: 110,812,420 || trainable%: 1.1990
+
+
+      PEFT trains 1,328,642 parameters, including 1,538 classifier weights and biases, versus 1,327,104 manual adapter
+      parameters. The accuracy comparison therefore is not perfectly controlled.
+      A second Trainer is constructed with the same tokenized splits, metric callback, and training arguments. Only
+      the model object changes to the PEFT-wrapped classifier.
+  1   from transformers import Trainer, TrainingArguments
+  2
+  3   # Initialize the Trainer object
+  4   trainer = Trainer(
+  5       model=peft_model,
+  6       args=training_args, # we will recycle the same training arguments as before!
+  7       train_dataset=train_dataset, # also datasets,
+  8       eval_dataset=test_dataset,
+  9       compute_metrics=compute_metrics # and compute_metrics
+ 10   )
+
+
+         The comparison is ready to run with the same one-epoch schedule and effective batch size as the manual
+      path.
+      PEFT adapters are trained for one epoch using the shared Trainer configuration. The saved table records
+      validation loss and accuracy at each logged checkpoint.
+  1   trainer.train()
+
+
+
+  1   Progress: 62/62
+  2   [62/62 13:26, Epoch 0/1]
+  3   Step
+  4   Training Loss
+  5   Validation Loss
+  6   Accuracy
+  7   10
+  8   0.694100
+  9   0.673932
+ 10   0.641000
+     2.2    Apply the same encoder adapters with PEFT                                                                            18
+
+
+
+11   20
+12   0.673600
+13   0.642261
+14   0.686000
+15   30
+16   0.619900
+17   0.574219
+18   0.714000
+19   40
+20   0.574400
+21   0.481102
+22   0.781000
+23   50
+24   0.461800
+25   0.449831
+26   0.789000
+27   60
+28   0.445800
+29   0.416675
+30   0.817000
+
+
+ 1   TrainOutput(global_step=62, training_loss=0.5760850579507889, metrics={’train_runtime’: 814.3872, ’train_samples_per_second’:
+          2.456, ’train_steps_per_second’: 0.076, ’total_flos’: 530110204870656.0, ’train_loss’: 0.5760850579507889, ’epoch’:
+          0.992})
+
+
+     The 62-update run reports training loss 0.5761 and runtime 814.4 seconds; the full step table is preserved. The
+     task head is trainable here, unlike in the manual branch, so the accuracy difference combines implementation
+     and head-training effects.
+     The final cell evaluates the trained PEFT classifier once more on the held-out reviews so its endpoint can be read
+     alongside the manual result.
+ 1   # Evaluate the model
+ 2   results = trainer.evaluate()
+ 3   print(f"Accuracy on the validation set: {results[’eval_accuracy’]:.4f}")
+
+
+           The complete progress or warning stream is reproduced in Appendix A.
+ 1   Accuracy on the validation set: 0.8170
+
+
+     Final accuracy is 0.8170 on this selected test subset. The difference from the manual 0.6580 result is suggestive
+     for this run, but the two branches differ in classifier trainability and PEFT dropout.
+                                                                                                                                19
+
+
+
+    A Diagnostic output and earlier authentication attempt
+    The complete warnings and progress-only streams omitted from the computational narrative are retained here.
+    They remain tied to their source outputs by the coverage manifest and raw payload hashes.
+
+    Diagnostic stream from text-01-quantization.ipynb, cell 39.
+1   /Users/nicolabeccaceci/.venvs/llms-lab05/lib/python3.11/site-packages/tqdm/auto.py:21: TqdmWarning: IProgress not found. Please
+          update jupyter and ipywidgets. See https://ipywidgets.readthedocs.io/en/stable/user_install.html
+2     from .autonotebook import tqdm as notebook_tqdm
+
+
+
+
+    Diagnostic stream from text-02-LoRA.ipynb, cell 3.
+1   /Users/nicolabeccaceci/.venvs/llms-lab05/lib/python3.11/site-packages/tqdm/auto.py:21: TqdmWarning: IProgress not found. Please
+          update jupyter and ipywidgets. See https://ipywidgets.readthedocs.io/en/stable/user_install.html
+2     from .autonotebook import tqdm as notebook_tqdm
+
+
+
+
+    Diagnostic stream from text-02-LoRA.ipynb, cell 22.
+1   Progress: 250/125
+2   [125/125 03:28]
+
+
+
+
+    Diagnostic stream from text-02-LoRA.ipynb, cell 24.
+1   Progress: 125/125
+2   [125/125 01:09]
+
+
+
+
+    Diagnostic stream from text-02-LoRA.ipynb, cell 38.
+1   Progress: 125/125
+2   [125/125 01:06]
+
+
+
+
+    Earlier authentication failure. The first saved attempt stopped at the notebook’s local Hugging Face authen-
+    tication check. The later execution used the account’s existing credential store and successfully loaded the
+    approved checkpoint. No credential value is included here.
+1
+2   RuntimeError: Llama 3.2 requires an approved Hugging Face account. Run hf auth login locally or set HF_TOKEN, then rerun.
+
+
+
+
+    B Execution and reproducibility notes
+    No Lab05 lecture recording was available among the supplied course files. The only additional Whisper item
+    inspected was a computer-vision lecture on object detection and segmentation, so it was excluded as unrelated.
+    The professor’s promised Laboratory 05 recording can be incorporated later. Explanations and numerical claims
+    here follow the notebook source and its recorded executions rather than inferred lecture content.
+       The quantization arithmetic uses seeded toy tensors. The Llama comparison uses checkpoint revisions and
+    exact package versions recorded in lab05/execution/environment.json; CPU timing depends on the host,
+    thread scheduling, backend, and model-cache state. Serialized state size is not peak inference memory. The
+    LoRA runs use a seeded 2,000/1,000 IMDB subset, microbatch four, eight-step accumulation, and one epoch.
+    Manual training took about 810 seconds and PEFT about 814 seconds on this host. The manual path freezes the
+    new classification head, while PEFT trains it, so the 0.658 versus 0.817 accuracy results are not an isolated causal
+    comparison of the adapter implementations.
+

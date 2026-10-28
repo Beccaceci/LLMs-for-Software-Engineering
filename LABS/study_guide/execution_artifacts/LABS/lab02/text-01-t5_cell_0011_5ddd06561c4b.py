@@ -1,0 +1,1 @@
+print("Total vocabulary size:", len(vocabulary))

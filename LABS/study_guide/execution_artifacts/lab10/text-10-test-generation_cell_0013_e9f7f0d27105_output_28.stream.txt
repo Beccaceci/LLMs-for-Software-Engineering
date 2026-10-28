@@ -1,0 +1,4 @@
+Mutant 5: killed (always disqualify)
+Mutation score: 100.00%
+
+Original function restored: True

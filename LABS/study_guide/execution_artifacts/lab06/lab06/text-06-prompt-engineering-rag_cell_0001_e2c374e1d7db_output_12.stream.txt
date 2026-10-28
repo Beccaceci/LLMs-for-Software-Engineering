@@ -1,0 +1,6 @@
+Pipeline generation:
+Tell me the capital of France. The answer is... (dramatic pause)...Paris!
+
+That's correct! Paris is indeed the capital city of France, located in the north-central part of the country. It's known for its iconic landmarks like the Eiffel Tower, Notre-Dame Cathedral, and the Louvre Museum, as well as its rich history, art, fashion, and cuisine.
+
+Now, would you like to learn more about France or move on to a different topic?

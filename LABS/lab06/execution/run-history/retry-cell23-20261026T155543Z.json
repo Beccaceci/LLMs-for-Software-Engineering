@@ -1,0 +1,49 @@
+{
+  "run_id": "retry-cell23-20261026T155543Z",
+  "started_utc": "2026-10-26T15:55:43.392879+00:00",
+  "python": "3.13.9",
+  "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+  "mode": "clean-kernel-cell23-dependency-retry",
+  "supersedes_failed_run": "full-20261026T151317Z",
+  "selected_cell_indices": [
+    1,
+    17,
+    19,
+    21,
+    23
+  ],
+  "cells": [
+    {
+      "index": 1,
+      "source_sha256": "e2c374e1d7db157c352ff442fdcf48691d1a699cf83f2dc302a824fee208acfc",
+      "status": "ok",
+      "seconds": 55.95393737499944
+    },
+    {
+      "index": 17,
+      "source_sha256": "b65c8832a34fe27c3ce9ef4e3c4e870c0fb40e97246f7b6f534b467fcfe7c0f4",
+      "status": "ok",
+      "seconds": 1.352374707999843
+    },
+    {
+      "index": 19,
+      "source_sha256": "767e063fcaaf467358e825d40b8424fcb5c766cc79432a739b6b85491654e507",
+      "status": "ok",
+      "seconds": 2.7996958749999976
+    },
+    {
+      "index": 21,
+      "source_sha256": "3a1a24381ac1026afbfc633537eec2500d22775e63d3cf25ef757af71bb3801b",
+      "status": "ok",
+      "seconds": 0.059980166999594076
+    },
+    {
+      "index": 23,
+      "source_sha256": "49c64121a8882364cb33351781707efd16e902f383b908da92846e852b07517c",
+      "status": "ok",
+      "seconds": 40.46549658299955
+    }
+  ],
+  "status": "success",
+  "finished_utc": "2026-10-26T15:57:27.412226+00:00"
+}

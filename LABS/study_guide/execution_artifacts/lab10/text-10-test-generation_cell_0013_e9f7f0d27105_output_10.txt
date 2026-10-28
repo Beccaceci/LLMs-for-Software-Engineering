@@ -1,0 +1,1 @@
+Mutant 1: killed (reverse individual penalty comparison)

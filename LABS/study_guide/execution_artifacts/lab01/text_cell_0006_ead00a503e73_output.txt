@@ -1,0 +1,2 @@
+Time for matrix multiplication (float64): 0.7051s
+Time for matrix multiplication (float32): 0.1997s

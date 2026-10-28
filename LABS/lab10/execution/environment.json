@@ -1,0 +1,6 @@
+{
+  "python": "3.11.16",
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "backend": "CPU",
+  "model_inference": "None; supplied examples plus fresh Codex-authored suite"
+}

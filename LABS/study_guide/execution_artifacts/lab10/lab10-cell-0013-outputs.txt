@@ -1,0 +1,104 @@
+--- notebook output 0 ---
+
+Doing: test_function_01_gpt.py
+
+--- notebook output 1 ---
+Number of tests: 12
+Pass Rate: 91.67% (1 failed)
+Failing reference tests: ['execution.suites.test_function_01_gpt::test_disqualified_due_to_exceeding_time_limit']
+
+--- notebook output 2 ---
+Coverage: 96.0%
+
+--- notebook output 3 ---
+Mutant 1: killed (reverse individual penalty comparison)
+
+--- notebook output 4 ---
+Mutant 2: survived (include total penalty boundary)
+
+--- notebook output 5 ---
+Mutant 3: survived (include penalty-count boundary)
+
+--- notebook output 6 ---
+Mutant 4: survived (include time boundary)
+
+--- notebook output 7 ---
+Mutant 5: killed (always disqualify)
+Mutation score: 40.00%
+
+Doing: test_function_01_copilot.py
+
+--- notebook output 8 ---
+Number of tests: 3
+Pass Rate: 100.00% (0 failed)
+
+--- notebook output 9 ---
+Coverage: 100.0%
+
+--- notebook output 10 ---
+Mutant 1: killed (reverse individual penalty comparison)
+
+--- notebook output 11 ---
+Mutant 2: killed (include total penalty boundary)
+
+--- notebook output 12 ---
+Mutant 3: killed (include penalty-count boundary)
+
+--- notebook output 13 ---
+Mutant 4: killed (include time boundary)
+
+--- notebook output 14 ---
+Mutant 5: killed (always disqualify)
+Mutation score: 100.00%
+
+Doing: test_function_01_qwen.py
+
+--- notebook output 15 ---
+Number of tests: 20
+Pass Rate: 100.00% (0 failed)
+
+--- notebook output 16 ---
+Coverage: 100.0%
+
+--- notebook output 17 ---
+Mutant 1: killed (reverse individual penalty comparison)
+
+--- notebook output 18 ---
+Mutant 2: killed (include total penalty boundary)
+
+--- notebook output 19 ---
+Mutant 3: killed (include penalty-count boundary)
+
+--- notebook output 20 ---
+Mutant 4: killed (include time boundary)
+
+--- notebook output 21 ---
+Mutant 5: killed (always disqualify)
+Mutation score: 100.00%
+
+Doing: test_function_01_codex.py
+
+--- notebook output 22 ---
+Number of tests: 27
+Pass Rate: 100.00% (0 failed)
+
+--- notebook output 23 ---
+Coverage: 100.0%
+
+--- notebook output 24 ---
+Mutant 1: killed (reverse individual penalty comparison)
+
+--- notebook output 25 ---
+Mutant 2: killed (include total penalty boundary)
+
+--- notebook output 26 ---
+Mutant 3: killed (include penalty-count boundary)
+
+--- notebook output 27 ---
+Mutant 4: killed (include time boundary)
+
+--- notebook output 28 ---
+Mutant 5: killed (always disqualify)
+Mutation score: 100.00%
+
+Original function restored: True

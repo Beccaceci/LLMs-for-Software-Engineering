@@ -1,0 +1,35 @@
+{
+  "status": "executing: released clean MPS slot, dedicated Python 3.11.16 run",
+  "successful_cells": [
+    6
+  ],
+  "error_cells": [
+    0
+  ],
+  "dependency_blocked_cells": [
+    2,
+    4,
+    7,
+    9,
+    11
+  ],
+  "code_cells": 7,
+  "notebook_sha256": "55e5ffb13a76be62f20f7bb503f6e31ddabba36cca34961414c12f7704ffff5b",
+  "all_code_compiles": true,
+  "model_id": "meta-llama/Llama-3.2-3B-Instruct",
+  "synthetic_helper_checks": 8,
+  "pre_run_notebook_sha256": "55e5ffb13a76be62f20f7bb503f6e31ddabba36cca34961414c12f7704ffff5b",
+  "active_notebook_sha256_before_full_execution": "55e5ffb13a76be62f20f7bb503f6e31ddabba36cca34961414c12f7704ffff5b",
+  "effective_generation_settings": {
+    "num_beams": 1,
+    "do_sample": false,
+    "repetition_penalty": 2.0,
+    "no_repeat_ngram_size": 3,
+    "cell_9_max_new_tokens": 512,
+    "cell_11_max_new_tokens": 256,
+    "context_truncation": "none"
+  },
+  "runtime": "/Users/nicolabeccaceci/.venvs/llms-lab07",
+  "python": "3.11.16",
+  "model_revision": "0cb88a4f764b7a12671c53f0838cd831a0843b95"
+}

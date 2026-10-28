@@ -1,0 +1,6 @@
+('./gpt2-medical-finetuned/tokenizer_config.json',
+ './gpt2-medical-finetuned/special_tokens_map.json',
+ './gpt2-medical-finetuned/vocab.json',
+ './gpt2-medical-finetuned/merges.txt',
+ './gpt2-medical-finetuned/added_tokens.json',
+ './gpt2-medical-finetuned/tokenizer.json')

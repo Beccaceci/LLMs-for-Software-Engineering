@@ -1,0 +1,143 @@
+paper0.pdf: 48,274 extracted characters
+XIWU: A BASIS FLEXIBLE AND LEARNABLE LLM FOR HIGH
+ENERGY PHYSICS
+Zhengde Zhang1, Yiyu Zhang1, Haodong Yao1, Jianwen Luo2, Rui Zhao1, Bo Huang1, Jiameng Zhao3,1,
+Yipu Liao1, Ke Li1, Lina Zhao1, Jun Cao1, Fazhi Qi1,∗, and Changzheng Yuan1,†
+1Institute of High Energy Physics, Chinese Academy of Sciences, Beijing 100049, China
+2School of Physical Sciences, University of Chinese Academy of Sciences, Beijing 100049, China
+3School of Computer and Artificial Intelligence, ZhengZhou University, Henan 450 
+
+paper1.pdf: 32,266 extracted characters
+1
+Towards Greener LLMs: Bringing Energy-Efficiency
+to the Forefront of LLM Inference
+Jovan Stojkovic, Esha Choukse†, Chaojie Zhang†, Inigo Goiri†, Josep Torrellas
+University of Illinois at Urbana-Champaign
+†Microsoft Azure Research - Systems
+Abstract—With the ubiquitous use of modern large language
+models (LLMs) across industries, the inference serving for these
+models is ever expanding. Given the high compute and memory
+requirements of modern LLMs, more and more top-of-the-
+line GPUs are being  
+
+paper2.pdf: 43,311 extracted characters
+Offline Energy-Optimal LLM Serving: Workload-Based Energy
+Models for LLM Inference on Heterogeneous Systems
+Grant Wilkins
+gfw27@cam.ac.uk
+University of Cambridge
+Cambridge, UK
+Srinivasan Keshav
+sk818@cam.ac.uk
+University of Cambridge
+Cambridge, UK
+Richard Mortier
+rmm1002@cam.ac.uk
+University of Cambridge
+Cambridge, UK
+ABSTRACT
+The rapid adoption of large language models (LLMs) has led to
+significant advances in natural language processing and text gener-
+ation. However, the energy consumed throu 
+
+paper3.pdf: 43,119 extracted characters
+Posted on 12 Aug 2024 — CC-BY-NC-SA 4 — https://doi.org/10.36227/techrxiv.172348951.12175366/v1 — e-Prints posted on TechRxiv are preliminary reports that are not peer reviewed. They should not b...
+Optimizing LLM Inference Clusters for Enhanced Performance and
+Energy Eﬃciency
+Soka Hisaharo1, Yuki Nishimura1, and Aoi Takahashi1
+1Aﬃliation not available
+August 12, 2024
+Abstract
+The growing demand for eﬃcient and scalable AI solutions has driven research into optimizing the performance and energy
+ 
+
+paper4.pdf: 72,034 extracted characters
+Applied Energy 367 (2024) 123431
+Available online 16 May 2024
+0306-2619/© 2024 Elsevier Ltd. All rights are reserved, including those for text and data mining, AI training, and similar technologies.
+EPlus-LLM: A large language model-based computing platform for 
+automated building energy modeling 
+Gang Jiang a, Zhihao Ma a, Liang Zhang b, Jianli Chen a,* 
+a The University of Utah, United States 
+b The University of Arizona, United States   
+H I G H L I G H T S 
+• This study represents the pionee 
+
+paper5.pdf: 77,213 extracted characters
+DynamoLLM: Designing LLM Inference Clusters
+for Performance and Energy Efficiency
+Jovan Stojkovic, Chaojie Zhang†, ´I˜nigo Goiri†, Josep Torrellas, Esha Choukse†
+University of Illinois at Urbana-Champaign
+†Microsoft Azure Research - Systems
+Abstract—The rapid evolution and widespread adoption of
+generative large language models (LLMs) have made them a
+pivotal workload in various applications. Today, LLM inference
+clusters receive a large number of queries with strict Service
+Level Objectives (SL 
+
+paper6.pdf: 25,554 extracted characters
+Large Language Model (LLM)-enabled In-context
+Learning for Wireless Network Optimization: A
+Case Study of Power Control
+Hao Zhou, Chengming Hu, Dun Yuan, Ye Yuan, Di Wu,
+Xue Liu, Fellow, IEEE, and Charlie Zhang, Fellow, IEEE.
+Abstract—Large language model (LLM) has recently been
+considered a promising technique for many fields. This work
+explores LLM-based wireless network optimization via in-context
+learning. To showcase the potential of LLM technologies, we
+consider the base station (BS) power 
+
+paper7.pdf: 47,001 extracted characters
+Hybrid Heterogeneous Clusters Can Lower the Energy
+Consumption of LLM Inference Workloads
+Grant Wilkins
+gfw27@cam.ac.uk
+University of Cambridge
+Cambridge, UK
+Srinivasan Keshav
+sk818@cam.ac.uk
+University of Cambridge
+Cambridge, UK
+Richard Mortier
+rmm1002@cam.ac.uk
+University of Cambridge
+Cambridge, UK
+ABSTRACT
+Both the training and use of Large Language Models (LLMs) require
+large amounts of energy. Their increasing popularity, therefore,
+raises critical concerns regarding the energy efficiency a 
+
+paper8.pdf: 27,372 extracted characters
+Can Private LLM Agents Synthesize Household Energy
+Consumption Data?
+Mahathir Almashor∗
+mahathir.almashor@csiro.au
+CSIRO Energy
+Sydney, Australia
+Yusuke Miyashita∗
+yusuke.miyashita@csiro.au
+CSIRO Energy
+Melbourne, Australia
+Sam West∗
+sam.west@csiro.au
+CSIRO Energy
+Newcastle, Australia
+Thi Van Dai Dong∗
+thivandai.dong@csiro.au
+CSIRO Energy
+Wollonggong, Australia
+ABSTRACT
+Reproducible science requires easy access to data, especially with
+the rise of data-driven and increasingly complex models used 
+
+paper9.pdf: 36,517 extracted characters
+Democratizing Energy Management with LLM-Assisted Optimization
+Autoformalism
+Ming Jin, Bilgehan Sel, Fnu Hardeep, Wotao Yin
+Abstract— This paper introduces a method for personaliz-
+ing energy optimization using large language models (LLMs)
+combined with an optimization solver. This approach, termed
+human-guided optimization autoformalism, translates natural
+language speciﬁcations into optimization problems, enabling
+LLMs to handle various user-speciﬁc energy-related tasks. It
+allows for nuanced

@@ -1,0 +1,38 @@
+\documentclass[10pt,a4paper,oneside]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{newpxtext}
+\usepackage[scaled=0.88]{sourcecodepro}
+\usepackage{microtype}
+\usepackage[a4paper,top=19mm,bottom=19mm,left=20mm,right=20mm,headheight=16pt,footskip=10mm]{geometry}
+\usepackage[dvipsnames,table]{xcolor}
+\usepackage{amssymb,graphicx,booktabs,tabularx,array,enumitem,listings,tikz,titlesec,fancyhdr,hyperref}
+\usetikzlibrary{arrows.meta,positioning}
+\definecolor{politoNavy}{RGB}{0,45,98}
+\definecolor{steelBlue}{RGB}{35,100,160}
+\definecolor{skyBlue}{RGB}{230,240,250}
+\definecolor{bodyGray}{RGB}{80,85,90}
+\definecolor{codeBg}{RGB}{248,249,251}
+\definecolor{codeFrame}{RGB}{220,225,230}
+\hypersetup{colorlinks=true,linkcolor=politoNavy,urlcolor=steelBlue,pdftitle={Laboratory 08 complete solution},pdfauthor={Politecnico di Torino}}
+\newcommand{\labSolutionTitle}{Laboratory 08: ROC Analysis and LLM Routing}
+\newcommand{\labSolutionSubtitle}{Complete notebook-aligned solution}
+\titleformat{\section}{\normalfont\sffamily\Large\bfseries\color{politoNavy}}{\thesection}{0.8em}{}
+\titleformat{\subsection}{\normalfont\sffamily\large\bfseries\color{steelBlue}}{\thesubsection}{0.8em}{}
+\pagestyle{fancy}\fancyhf{}
+\fancyhead[L]{\small\sffamily\color{bodyGray}\nouppercase{\rightmark}}
+\fancyhead[R]{\small\sffamily\bfseries\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\fancypagestyle{plain}{\fancyhf{}\fancyfoot[C]{\small\sffamily\thepage}\renewcommand{\headrulewidth}{0pt}}
+\lstdefinestyle{studycode}{language=Python,basicstyle=\fontsize{7.4}{8.8}\ttfamily,keywordstyle=\bfseries\color{politoNavy},commentstyle=\itshape\color{bodyGray},stringstyle=\color{ForestGreen},numbers=left,numberstyle=\tiny\color{bodyGray},numbersep=6pt,tabsize=4,showstringspaces=false,breaklines=true,breakatwhitespace=false,columns=fullflexible,keepspaces=true,frame=single,rulecolor=\color{codeFrame},backgroundcolor=\color{codeBg},literate={█}{{\ensuremath{\blacksquare}}}1 {’}{{'}}1}
+\lstdefinestyle{terminalOutput}{basicstyle=\fontsize{7.2}{8.5}\ttfamily,breaklines=true,breakatwhitespace=false,columns=fullflexible,keepspaces=true,showstringspaces=false,frame=single,rulecolor=\color{codeFrame},backgroundcolor=\color{codeBg},literate={█}{{\ensuremath{\blacksquare}}}1 {’}{{'}}1}
+\lstset{style=studycode}
+\setlist{nosep,leftmargin=1.5em}
+\begin{document}
+\pagenumbering{roman}
+\input{../../frontmatter/solution_titlepage}
+\tableofcontents
+\clearpage
+\pagenumbering{arabic}
+\input{../../chapters/08_roc_router_design.tex}
+\end{document}

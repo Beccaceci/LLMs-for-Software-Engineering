@@ -1,0 +1,19 @@
+
+Question: How does DynamoLLM improve energy efficiency while meeting latency service-level objectives?
+Retrieved sources: ['paper9.pdf', 'paper2.pdf', 'paper0.pdf']
+With RAG:
+ The provided sources mention "Human-Guidance Optimisation AutoFormalis" [paper8 is missing but it seems that this was supposed be mentioned here], however there isn't any information about 'DynamoLLL' or its improvements.
+
+However one relevant piece mentions how optimizing certain parameters can lead towards better performance - specifically looking at reducing power consumption during computations by utilizing techniques such those described within papers related Deep Learning Model optimisations:
+
+*   Paper #40 discusses ways Large Scale Distributed Data
+Without RAG:
+ I couldn't find specific information on how "Dynamo LLMS" (likely referring to Dynamo LLM) improves both 'energy' and meets the specified requirements.
+
+However I can tell that there is something called dynaml or dynamic lllm which uses less power than traditional models by dynamically allocating resources during inference time based upon demand for those tasks in order meet certain performance metrics such as low-latency response times.
+
+
+
+If this isn’t what was asked then could more context be
+Compare the observed answers for source citations, supported detail, and unsupported assertions.
+Context shortened from 33191 to 1024 tokens for local memory.

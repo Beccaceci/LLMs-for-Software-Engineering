@@ -1,0 +1,23 @@
+[
+  {
+    "Strategy":"Fixed length 1,024",
+    "Useful tokens":244388,
+    "Padded tokens":779612,
+    "Padding share":76.133984375,
+    "Reduction vs fixed (%)":0.0
+  },
+  {
+    "Strategy":"Dynamic, seeded random batches",
+    "Useful tokens":244388,
+    "Padded tokens":183026,
+    "Padding share":42.8217138418,
+    "Reduction vs fixed (%)":76.5234501265
+  },
+  {
+    "Strategy":"Dynamic, similar-length batches",
+    "Useful tokens":244388,
+    "Padded tokens":1802,
+    "Padding share":0.7319549941,
+    "Reduction vs fixed (%)":99.7688593813
+  }
+]

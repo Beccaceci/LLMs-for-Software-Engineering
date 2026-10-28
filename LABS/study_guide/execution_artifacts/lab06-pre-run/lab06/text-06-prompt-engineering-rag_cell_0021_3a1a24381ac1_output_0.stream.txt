@@ -1,0 +1,23 @@
+Query vector shape: torch.Size([1, 768])
+Top three documents: [('paper9.pdf', 0.8042144775390625), ('paper2.pdf', 0.7916010618209839), ('paper0.pdf', 0.7646573781967163)]
+Retrieved full-text characters: 128145
+[paper9.pdf]
+Democratizing Energy Management with LLM-Assisted Optimization
+Autoformalism
+Ming Jin, Bilgehan Sel, Fnu Hardeep, Wotao Yin
+Abstract— This paper introduces a method for personaliz-
+ing energy optimization using large language models (LLMs)
+combined with an optimization solver. This approach, termed
+human-guided optimization autoformalism, translates natural
+language speciﬁcations into optimization problems, enabling
+LLMs to handle various user-speciﬁc energy-related tasks. It
+allows for nuanced understanding and nonlinear reasoning
+tailored to individual preferences. The research covers common
+energy sector tasks like electric vehicle charging, HVAC control,
+and long-term planning for renewable energy installations. This
+novel strategy represents a signiﬁcant advancement in context-
+based optimization using LLMs, facilitating sustainable energy
+practices customized to individual needs.
+I. INTRODUCTION
+Despite computational advances, the complex challenges
+of meeting energy

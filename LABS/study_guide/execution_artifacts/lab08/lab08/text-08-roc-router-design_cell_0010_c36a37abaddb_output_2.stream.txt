@@ -1,0 +1,5 @@
+Raw router response: **Hiking Platform Use Cases**
+
+### User Management
+
+1. **Register New

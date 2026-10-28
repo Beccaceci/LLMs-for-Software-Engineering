@@ -1,0 +1,27 @@
+LlamaForCausalLM(
+  (model): LlamaModel(
+    (embed_tokens): Embedding(128256, 2048)
+    (layers): ModuleList(
+      (0-15): 16 x LlamaDecoderLayer(
+        (self_attn): LlamaSdpaAttention(
+          (q_proj): DynamicQuantizedLinear(in_features=2048, out_features=2048, dtype=torch.qint8, qscheme=torch.per_tensor_affine)
+          (k_proj): DynamicQuantizedLinear(in_features=2048, out_features=512, dtype=torch.qint8, qscheme=torch.per_tensor_affine)
+          (v_proj): DynamicQuantizedLinear(in_features=2048, out_features=512, dtype=torch.qint8, qscheme=torch.per_tensor_affine)
+          (o_proj): DynamicQuantizedLinear(in_features=2048, out_features=2048, dtype=torch.qint8, qscheme=torch.per_tensor_affine)
+          (rotary_emb): LlamaRotaryEmbedding()
+        )
+        (mlp): LlamaMLP(
+          (gate_proj): DynamicQuantizedLinear(in_features=2048, out_features=8192, dtype=torch.qint8, qscheme=torch.per_tensor_affine)
+          (up_proj): DynamicQuantizedLinear(in_features=2048, out_features=8192, dtype=torch.qint8, qscheme=torch.per_tensor_affine)
+          (down_proj): DynamicQuantizedLinear(in_features=8192, out_features=2048, dtype=torch.qint8, qscheme=torch.per_tensor_affine)
+          (act_fn): SiLU()
+        )
+        (input_layernorm): LlamaRMSNorm((2048,), eps=1e-05)
+        (post_attention_layernorm): LlamaRMSNorm((2048,), eps=1e-05)
+      )
+    )
+    (norm): LlamaRMSNorm((2048,), eps=1e-05)
+    (rotary_emb): LlamaRotaryEmbedding()
+  )
+  (lm_head): DynamicQuantizedLinear(in_features=2048, out_features=128256, dtype=torch.qint8, qscheme=torch.per_tensor_affine)
+)

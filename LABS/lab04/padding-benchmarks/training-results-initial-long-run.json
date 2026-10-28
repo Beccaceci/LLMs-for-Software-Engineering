@@ -1,0 +1,23 @@
+[
+  {
+    "variant": "fixed-padding",
+    "padding": "fixed",
+    "wall_seconds": 3011.493533208035,
+    "trainer_metrics": {
+      "train_runtime": 3011.0453,
+      "train_samples_per_second": 0.332,
+      "train_steps_per_second": 0.055,
+      "total_flos": 520493727744000.0,
+      "train_loss": 3.3559414966996894,
+      "epoch": 0.996
+    },
+    "global_step": 166,
+    "final_epoch": 0.996,
+    "device": "mps",
+    "seed": 42,
+    "train_examples": 1000,
+    "eval_examples": 500,
+    "microbatch": 1,
+    "gradient_accumulation_steps": 6
+  }
+]

@@ -1,0 +1,1 @@
+Mutant 2: killed (include total penalty boundary)

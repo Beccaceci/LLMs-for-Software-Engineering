@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="6" skipped="0" tests="14" time="0.034" timestamp="2026-10-26T17:52:47.846813+01:00" hostname="Nicolas-MacBook-Pro.local"><testcase classname="test_cases_01" name="test_valid_grades" time="0.000" /><testcase classname="test_cases_01" name="test_valid_grades_with_30laude" time="0.000" /><testcase classname="test_cases_01" name="test_lowest_and_highest_valid_grades" time="0.000" /><testcase classname="test_cases_01" name="test_all_30laude" time="0.000" /><testcase classname="test_cases_01" name="test_more_than_six_grades" time="0.000" /><testcase classname="test_cases_01" name="test_less_than_six_grades" time="0.000" /><testcase classname="test_cases_01" name="test_invalid_grade_too_low" time="0.000"><failure message="Failed: DID NOT RAISE ValueError">test_cases_01.py:41: in test_invalid_grade_too_low
+    with pytest.raises(ValueError):
+E   Failed: DID NOT RAISE ValueError</failure></testcase><testcase classname="test_cases_01" name="test_invalid_grade_too_high" time="0.000"><failure message="Failed: DID NOT RAISE ValueError">test_cases_01.py:46: in test_invalid_grade_too_high
+    with pytest.raises(ValueError):
+E   Failed: DID NOT RAISE ValueError</failure></testcase><testcase classname="test_cases_01" name="test_all_grades_are_the_same" time="0.000" /><testcase classname="test_cases_01" name="test_all_grades_except_highest_and_lowest" time="0.000" /><testcase classname="test_cases_01" name="test_non_numeric_input_string" time="0.000"><failure message="Failed: DID NOT RAISE TypeError">test_cases_01.py:63: in test_non_numeric_input_string
+    with pytest.raises(TypeError):
+E   Failed: DID NOT RAISE TypeError</failure></testcase><testcase classname="test_cases_01" name="test_non_numeric_input_none" time="0.000"><failure message="Failed: DID NOT RAISE TypeError">test_cases_01.py:68: in test_non_numeric_input_none
+    with pytest.raises(TypeError):
+E   Failed: DID NOT RAISE TypeError</failure></testcase><testcase classname="test_cases_01" name="test_non_numeric_input_boolean" time="0.000"><failure message="Failed: DID NOT RAISE ValueError">test_cases_01.py:73: in test_non_numeric_input_boolean
+    with pytest.raises(ValueError):
+E   Failed: DID NOT RAISE ValueError</failure></testcase><testcase classname="test_cases_01" name="test_non_numeric_input_mixed" time="0.000"><failure message="Failed: DID NOT RAISE TypeError">test_cases_01.py:78: in test_non_numeric_input_mixed
+    with pytest.raises(TypeError):
+E   Failed: DID NOT RAISE TypeError</failure></testcase></testsuite></testsuites>

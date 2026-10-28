@@ -1,0 +1,42 @@
+{
+  "reason": "Lab06 attention failed on MPS with a 2.25 GiB allocation after 16.75 GiB MPS allocation plus 2.29 GiB other allocations. To reduce inference memory and make six-role extraction practical, this lab uses one decoding beam and releases generated tensors after each query. Full requirements text remains intact; generated function and purpose outputs are capped at task-appropriate lengths. A failed clean run showed that numbered role prefixes were not being normalized and that the model can emit a NONE sentinel followed by prose. The response parser now accepts only an initial contiguous list and skips non-list responses. Sampling is enabled at temperature 0.15 to reduce deterministic continuation drift; full requirements remain untruncated.",
+  "generation_settings": {
+    "num_beams": 1,
+    "do_sample": true,
+    "temperature": 0.15,
+    "top_p": 0.9,
+    "cell_4_max_new_tokens": 96,
+    "cell_9_max_new_tokens": 128,
+    "cell_11_max_new_tokens": 128,
+    "context_truncation": "none",
+    "eos_token_id": [
+      "<|eot_id|>",
+      "<|end_of_text|>"
+    ],
+    "response_parser": "initial contiguous numbered/bulleted list only; NONE or prose is rejected"
+  },
+  "changed_cells": [
+    {
+      "cell_index": 0,
+      "old_source_sha256": "ac54503d61c571c434826ed24f184e927f8e80b258b58256776442e307343e2c",
+      "effective_source_sha256": "213b654a9f0b64956cf303aff7f066ea19d6a398a3fc71647427250bf33fc9b4"
+    },
+    {
+      "cell_index": 9,
+      "old_source_sha256": "b5bd548b2ee1e73faa672a6a9562058ca0a6dd631d5850fe2cff431443068707",
+      "effective_source_sha256": "c43dbf8489fd87e9cfce515380a7d931c0f8b913807224bdd8d679850a60da6d"
+    },
+    {
+      "cell_index": 11,
+      "old_source_sha256": "fbaf5b4566cbc157dfbe6e7edd7fd05198b03767adbeb0422246a01b2b0430cd",
+      "effective_source_sha256": "a754d0883d50736835b7c835331bc554600cb7a28fc4207c30f46e40af693a33"
+    }
+  ],
+  "updated_cells": {
+    "0": "ff72705d448129199faede751830b17add7ee35634a1b529debe8205658f146c",
+    "4": "b11ebf08ba13a699332444406302e478d2420ef31c808a819090ac4e8668b83f",
+    "6": "4aa3588c78580c37180c2ae11f3104e64c4f14bf82c16b2b01f4047d58d8553c",
+    "9": "ff9552db17b0693deeb4bac390c32031c36a4a26cc7e5cbde43cf8617cdd487d",
+    "11": "5e5466de46af074a357fa29c81e6b66506322daa27db854d43871031e8cb95ed"
+  }
+}

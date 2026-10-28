@@ -1,0 +1,26 @@
+[
+  {
+    "file": "test_function_01_gpt.py",
+    "origin": "supplied repository example",
+    "source_sha256": "eec3ce1420390ec36e905624eda04a0df4dc36be7833463544a8ac78bd8afbd1",
+    "removed_top_level_pytest_main_calls": 0
+  },
+  {
+    "file": "test_function_01_copilot.py",
+    "origin": "supplied repository example",
+    "source_sha256": "25ceb6ed5af4c01a155db5aa40a0bf3ea3eaa18de047ede5955f59afd55dcdae",
+    "removed_top_level_pytest_main_calls": 1
+  },
+  {
+    "file": "test_function_01_qwen.py",
+    "origin": "supplied repository example",
+    "source_sha256": "b4365b685c2d004b5a278a5591f7aa977f1653f31f09dbd1e85538859ddc6db8",
+    "removed_top_level_pytest_main_calls": 0
+  },
+  {
+    "file": "test_function_01_codex.py",
+    "origin": "fresh Codex generation",
+    "source_sha256": "5eb617137ec50151a057080672518c2eb39c8229f8793e398cf418fbced1bd5d",
+    "removed_top_level_pytest_main_calls": 0
+  }
+]

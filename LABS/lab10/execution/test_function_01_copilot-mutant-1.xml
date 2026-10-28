@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="2" skipped="0" tests="3" time="0.048" timestamp="2026-10-25T23:08:00.244637+01:00" hostname="Nicolas-MacBook-Pro.local"><testcase classname="execution.suites.test_function_01_copilot" name="test_valid_inputs" time="0.001"><failure message="assert True == False&#10; +  where True = your_function_name([100, 200, 300], [90, 180, 270], 3, [10, 20, 30])">execution/suites/test_function_01_copilot.py:11: in test_valid_inputs
+    assert your_function_name([100, 200, 300], [90, 180, 270], 3, [10, 20, 30]) == False
+E   assert True == False
+E    +  where True = your_function_name([100, 200, 300], [90, 180, 270], 3, [10, 20, 30])</failure></testcase><testcase classname="execution.suites.test_function_01_copilot" name="test_invalid_inputs" time="0.001" /><testcase classname="execution.suites.test_function_01_copilot" name="test_edge_cases" time="0.000"><failure message="assert True == False&#10; +  where True = your_function_name([100, 200, 300], [90, 180, 270], 5, [20, 20, 20, 20, 20])">execution/suites/test_function_01_copilot.py:65: in test_edge_cases
+    assert your_function_name([100, 200, 300], [90, 180, 270], 5, [20, 20, 20, 20, 20]) == False
+E   assert True == False
+E    +  where True = your_function_name([100, 200, 300], [90, 180, 270], 5, [20, 20, 20, 20, 20])</failure></testcase></testsuite></testsuites>

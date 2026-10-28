@@ -1,0 +1,16 @@
+--- notebook output 0 ---
+Mutant 1: killed (reverse individual penalty comparison)
+
+--- notebook output 1 ---
+Mutant 2: killed (include total penalty boundary)
+
+--- notebook output 2 ---
+Mutant 3: killed (include penalty-count boundary)
+
+--- notebook output 3 ---
+Mutant 4: killed (include time boundary)
+
+--- notebook output 4 ---
+Mutant 5: killed (always disqualify)
+Killed: 5; survived: 0
+Mutation score: 100.00%

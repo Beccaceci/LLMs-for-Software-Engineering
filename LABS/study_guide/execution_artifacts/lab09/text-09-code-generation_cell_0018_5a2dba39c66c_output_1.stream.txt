@@ -1,0 +1,14 @@
+def compute_average(grades):
+    if len(grades) != 6:
+        raise ValueError("Exactly six grades are required.")
+    
+    grades = [grade for grade in grades if isinstance(grade, (int, float)) and 18 <= grade <= 30 or grade == 33]
+    if len(grades) < 5:
+        raise ValueError("At least five grades are required after filtering.")
+    
+    min_val = min(grades)
+    max_val = max(grades)
+    grades.remove(min_val)
+    grades.remove(max_val)
+    
+    return sum(grades) / len(grades)

@@ -1,0 +1,1 @@
+Abstract vectors [documents, hidden size]: torch.Size([10, 768])

@@ -1,0 +1,52 @@
+FFFFF........                                                            [100%]
+=================================== FAILURES ===================================
+______________________________ test_fee[args0-10] ______________________________
+test_cases_02.py:4: in test_fee
+    def test_fee(args,expected): assert computeFee(*args) == pytest.approx(expected)
+                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   assert 70 == 10 ± 1.0e-05
+E     
+E     comparison failed
+E     Obtained: 70
+E     Expected: 10 ± 1.0e-05
+______________________________ test_fee[args1-10] ______________________________
+test_cases_02.py:4: in test_fee
+    def test_fee(args,expected): assert computeFee(*args) == pytest.approx(expected)
+                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   assert 160 == 10 ± 1.0e-05
+E     
+E     comparison failed
+E     Obtained: 160
+E     Expected: 10 ± 1.0e-05
+______________________________ test_fee[args2-50] ______________________________
+test_cases_02.py:4: in test_fee
+    def test_fee(args,expected): assert computeFee(*args) == pytest.approx(expected)
+                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   assert 200 == 50 ± 5.0e-05
+E     
+E     comparison failed
+E     Obtained: 200
+E     Expected: 50 ± 5.0e-05
+______________________________ test_fee[args3-10] ______________________________
+test_cases_02.py:4: in test_fee
+    def test_fee(args,expected): assert computeFee(*args) == pytest.approx(expected)
+                                        ^^^^^^^^^^^^^^^^^
+function_02.py:30: in computeFee
+    raise ValueError("Invalid group size")
+E   ValueError: Invalid group size
+______________________________ test_fee[args4-20] ______________________________
+test_cases_02.py:4: in test_fee
+    def test_fee(args,expected): assert computeFee(*args) == pytest.approx(expected)
+                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   assert 60 == 20 ± 2.0e-05
+E     
+E     comparison failed
+E     Obtained: 60
+E     Expected: 20 ± 2.0e-05
+=========================== short test summary info ============================
+FAILED test_cases_02.py::test_fee[args0-10] - assert 70 == 10 ± 1.0e-05
+FAILED test_cases_02.py::test_fee[args1-10] - assert 160 == 10 ± 1.0e-05
+FAILED test_cases_02.py::test_fee[args2-50] - assert 200 == 50 ± 5.0e-05
+FAILED test_cases_02.py::test_fee[args3-10] - ValueError: Invalid group size
+FAILED test_cases_02.py::test_fee[args4-20] - assert 60 == 20 ± 2.0e-05
+5 failed, 8 passed in 0.03s

@@ -1,0 +1,617 @@
+\documentclass[../labs.tex]{subfiles}
+egin{document}
+
+\section[LLM test generation]{Exercise: evaluating test suites generated with LLMs}
+
+\label{sec:lab10-test-generation}
+
+This exercise starts with correct code and evaluates whether test suites detect violations of its rules. A hand-written baseline leads to pass-rate and statement-coverage measures, then to mutation testing and a comparison of saved generated suites.
+
+\begin{figure}[htbp]\centering\begin{tikzpicture}[>=Stealth,stage/.style={draw=steelBlue,fill=skyBlue,rounded corners,align=center,text width=3cm,minimum height=.9cm,font=\small\sffamily}]\node[stage](a){Reference function\\and requirements};\node[stage,right=8mm of a](b){Manual and\\saved test suites};\node[stage,right=8mm of b](c){Pass rate and\\statement coverage};\node[stage,right=8mm of c](d){Single-change\\mutations};\draw[->,thick,steelBlue](a)--(b);\draw[->,thick,steelBlue](b)--(c);\draw[->,thick,steelBlue](c)--(d);\end{tikzpicture}\caption{Each suite is compared with a fixed reference and controlled defects.}\end{figure}
+
+\medskip\noindent Pass rate asks whether examples agree with the reference; coverage asks which statements ran; mutation testing asks whether tests reject selected faulty variants. Together they provide distinct evidence about a suite's quality.
+
+\medskip\noindent We start from the known reference implementation of \texttt{racer\_disqualified}. Its contract combines strict thresholds for event times and penalties with type and shape validation. The source is embedded as a string so later cells can restore it after each mutation. This gives the experiment a stable oracle: tests are judged against the stated rules rather than against a candidate test author's assumptions.
+
+% coverage-cell: LABS/lab10/text-10-test-generation.ipynb cell=1 source_sha256=fb6dd31a2378400de74691b2e78fd45fa8634fec9d61ef5eb9bd2f6fa683a4aa
+
+\begin{lstlisting}[style=studycode]
+#the same code is saved in the python script function_01.py
+
+original_function="""def racer_disqualified(times, winner_times, n_penalties, penalties):
+    \"""
+    Determines if a racer is disqualified based on their times, penalties, and winner times.
+
+    Parameters:
+        times (list of int): List of the racer's times for three events.
+        winner_times (list of int): List of winner times for the same three events.
+        n_penalties (int): Number of penalties the racer incurred.
+        penalties (list of int): List of penalty values.
+
+    Returns:
+        bool: True if the racer is disqualified, False otherwise.
+
+    Raises:
+        ValueError: If inputs do not meet the required types or constraints.
+    \"""
+    # Input validation
+    if not (isinstance(times, list) and len(times) == 3 and all(isinstance(t, int) for t in times)):
+        raise ValueError("times must be a list of three integers.")
+
+    if not (isinstance(winner_times, list) and len(winner_times) == 3 and all(isinstance(wt, int) for wt in winner_times)):
+        raise ValueError("winner_times must be a list of three integers.")
+
+    if not isinstance(n_penalties, int):
+        raise ValueError("n_penalties must be an integer.")
+
+    if not (isinstance(penalties, list) and all(isinstance(p, int) for p in penalties)):
+        raise ValueError("penalties must be a list of integers.")
+
+    if n_penalties != len(penalties):
+        raise ValueError("n_penalties must match the length of the penalties list.")
+
+    disqualified = False
+    tot_penalties = 0
+
+    # Calculate total penalties and check for any excessive penalty
+    for penalty in penalties:
+        tot_penalties += penalty
+        if penalty > 100:
+            disqualified = True
+
+    # Check for disqualification based on total penalties or number of penalties
+    if tot_penalties > 100 or n_penalties > 5:
+        disqualified = True
+
+    # Check if any time exceeds 1.5 times the corresponding winner time
+    for i in range(3):
+        max_time = winner_times[i] * 1.5
+        if times[i] > max_time:
+            disqualified = True
+
+    return disqualified"""
+
+
+file_path = "./function_01.py"
+
+with open(file_path, 'w') as file:
+    file.write(original_function + "\n")
+
+
+
+def racer_disqualified(times, winner_times, n_penalties, penalties):
+    """
+    Determines if a racer is disqualified based on their times, penalties, and winner times.
+
+    Parameters:
+        times (list of int): List of the racer's times for three events.
+        winner_times (list of int): List of winner times for the same three events.
+        n_penalties (int): Number of penalties the racer incurred.
+        penalties (list of int): List of penalty values.
+
+    Returns:
+        bool: True if the racer is disqualified, False otherwise.
+
+    Raises:
+        ValueError: If inputs do not meet the required types or constraints.
+    """
+    # Input validation
+    if not (isinstance(times, list) and len(times) == 3 and all(isinstance(t, int) for t in times)):
+        raise ValueError("times must be a list of three integers.")
+
+    if not (isinstance(winner_times, list) and len(winner_times) == 3 and all(isinstance(wt, int) for wt in winner_times)):
+        raise ValueError("winner_times must be a list of three integers.")
+
+    if not isinstance(n_penalties, int):
+        raise ValueError("n_penalties must be an integer.")
+
+    if not (isinstance(penalties, list) and all(isinstance(p, int) for p in penalties)):
+        raise ValueError("penalties must be a list of integers.")
+
+    if n_penalties != len(penalties):
+        raise ValueError("n_penalties must match the length of the penalties list.")
+
+    disqualified = False
+    tot_penalties = 0
+
+    # Calculate total penalties and check for any excessive penalty
+    for penalty in penalties:
+        tot_penalties += penalty
+        if penalty > 100:
+            disqualified = True
+
+    # Check for disqualification based on total penalties or number of penalties
+    if tot_penalties > 100 or n_penalties > 5:
+        disqualified = True
+
+    # Check if any time exceeds 1.5 times the corresponding winner time
+    for i in range(3):
+        max_time = winner_times[i] * 1.5
+        if times[i] > max_time:
+            disqualified = True
+
+    return disqualified
+\end{lstlisting}
+
+This setup creates the reference source used by the isolated test runner and mutation generator. It prints no output; subsequent cells write it into a temporary test environment.
+
+\medskip\noindent The first suite is designed around the function's decision boundaries: values below, equal to, and above each limit, plus malformed argument shapes and types. The test runner launches pytest in an isolated directory and parses JUnit XML, so outcomes remain structured even as the code file changes.
+
+% coverage-cell: LABS/lab10/text-10-test-generation.ipynb cell=3 source_sha256=9d1d9a983d9312345b1b30605da6e38ae77f8ce3eb9d8efb05a5ad942cf8b9ae
+
+\begin{lstlisting}[style=studycode]
+import sys
+from pathlib import Path
+import pytest
+import ipytest
+
+# Use the laboratory folder as the notebook working directory.
+LAB_DIR = Path.cwd()
+assert (LAB_DIR / "function_01.py").is_file(), "Run this notebook from LABS/lab10"
+sys.path.insert(0, str(LAB_DIR.parent))
+
+# The manual baseline tests exercise each rule and its strict boundary.
+manual_test_source = 'import pytest\nfrom lab10.function_01 import racer_disqualified\n\n@pytest.mark.parametrize("times, penalties, expected", [\n    ([100, 100, 100], [], False),\n    ([150, 150, 150], [], False),\n    ([151, 100, 100], [], True),\n    ([100, 151, 100], [], True),\n    ([100, 100, 151], [], True),\n    ([100, 100, 100], [100], False),\n    ([100, 100, 100], [101], True),\n    ([100, 100, 100], [50, 50], False),\n    ([100, 100, 100], [50, 51], True),\n    ([100, 100, 100], [10] * 5, False),\n    ([100, 100, 100], [10] * 6, True),\n])\ndef test_disqualification_rules(times, penalties, expected):\n    assert racer_disqualified(times, [100, 100, 100], len(penalties), penalties) is expected\n\n@pytest.mark.parametrize("args", [\n    ("100,100,100", [100, 100, 100], 0, []),\n    ([100, 100], [100, 100, 100], 0, []),\n    ([100, 100, 1.5], [100, 100, 100], 0, []),\n    ([100, 100, 100], "100,100,100", 0, []),\n    ([100, 100, 100], [100, 100], 0, []),\n    ([100, 100, 100], [100, 100, "100"], 0, []),\n    ([100, 100, 100], [100, 100, 100], "0", []),\n    ([100, 100, 100], [100, 100, 100], 0, ""),\n    ([100, 100, 100], [100, 100, 100], 1, [1.5]),\n    ([100, 100, 100], [100, 100, 100], 2, [10]),\n])\ndef test_invalid_inputs(args):\n    with pytest.raises(ValueError):\n        racer_disqualified(*args)\n'
+(LAB_DIR / "test_function_01_manual.py").write_text(manual_test_source)
+exec(compile(manual_test_source, "test_function_01_manual.py", "exec"), globals())
+ipytest.autoconfig(raise_on_error=True)
+
+def run_tests():
+    return ipytest.run("-vv")
+
+run_tests()
+\end{lstlisting}
+
+\label{out:lab10-cell-0003}
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=3 output=0 source_sha256=9d1d9a983d9312345b1b30605da6e38ae77f8ce3eb9d8efb05a5ad942cf8b9ae payload_sha256=d4058c4deb7149544698e78493fca99b8d5ba6aedbb11eeb304477591c14bc2a artifact=study_guide/execution_artifacts/lab10/lab10-cell-0003-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=3 output=1 source_sha256=9d1d9a983d9312345b1b30605da6e38ae77f8ce3eb9d8efb05a5ad942cf8b9ae payload_sha256=ad240968f22fe8259aab6d3ed80e1ef6bd27a93aecfd84216c2d1d4da20b37cb artifact=study_guide/execution_artifacts/lab10/lab10-cell-0003-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=3 output=2 source_sha256=9d1d9a983d9312345b1b30605da6e38ae77f8ce3eb9d8efb05a5ad942cf8b9ae payload_sha256=e4d6df358b0c0bc86ded3fce233055f5672c965d9d4543c9c4d9c3557e9a5b30 artifact=study_guide/execution_artifacts/lab10/lab10-cell-0003-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=3 output=3 source_sha256=9d1d9a983d9312345b1b30605da6e38ae77f8ce3eb9d8efb05a5ad942cf8b9ae payload_sha256=49d81eefdeb3f88d71740f80d4a68c1f485323fc24aceddd89e80e6b10b76242 artifact=study_guide/execution_artifacts/lab10/lab10-cell-0003-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=3 output=4 source_sha256=9d1d9a983d9312345b1b30605da6e38ae77f8ce3eb9d8efb05a5ad942cf8b9ae payload_sha256=dba1feb9e51e6fa41e4a5464a63163fe4776b53538cb7569f47753208405ded2 artifact=study_guide/execution_artifacts/lab10/lab10-cell-0003-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=3 output=5 source_sha256=9d1d9a983d9312345b1b30605da6e38ae77f8ce3eb9d8efb05a5ad942cf8b9ae payload_sha256=58f25781d4c255ed45a894a70cb507fc0b01c0c05d7eae86a6e5d7bfda137ad7 artifact=study_guide/execution_artifacts/lab10/lab10-cell-0003-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=3 output=6 source_sha256=9d1d9a983d9312345b1b30605da6e38ae77f8ce3eb9d8efb05a5ad942cf8b9ae payload_sha256=eeec0b4588b9291735a7143895c94cf5968622bcd097231f97ad9e1ac77b2251 artifact=study_guide/execution_artifacts/lab10/lab10-cell-0003-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=3 output=7 source_sha256=9d1d9a983d9312345b1b30605da6e38ae77f8ce3eb9d8efb05a5ad942cf8b9ae payload_sha256=1c715334efd1b2645a1850bb3a43ae03c61da20a22a5745385125a447e5b32a9 artifact=study_guide/execution_artifacts/lab10/lab10-cell-0003-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=3 output=8 source_sha256=9d1d9a983d9312345b1b30605da6e38ae77f8ce3eb9d8efb05a5ad942cf8b9ae payload_sha256=d9df1071573e5fe2c15be8d35ae8ff97135c3aa2c4fedf176e8a8641f482684a artifact=study_guide/execution_artifacts/lab10/lab10-cell-0003-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=3 output=9 source_sha256=9d1d9a983d9312345b1b30605da6e38ae77f8ce3eb9d8efb05a5ad942cf8b9ae payload_sha256=3d10e17e46ce6b590eef73430f685af5dbdbd3dc1270250a8a5f3aeed7d183c7 artifact=study_guide/execution_artifacts/lab10/lab10-cell-0003-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=3 output=10 source_sha256=9d1d9a983d9312345b1b30605da6e38ae77f8ce3eb9d8efb05a5ad942cf8b9ae payload_sha256=c5993b6885b873a1618749efc1e33c570a4d724c528bc584511163b66e77578d artifact=study_guide/execution_artifacts/lab10/lab10-cell-0003-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=3 output=11 source_sha256=9d1d9a983d9312345b1b30605da6e38ae77f8ce3eb9d8efb05a5ad942cf8b9ae payload_sha256=ba7c529d668991d0abb59983947de390cb2ca2b75f800b19a80e353d2db0767d artifact=study_guide/execution_artifacts/lab10/lab10-cell-0003-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=3 output=12 source_sha256=9d1d9a983d9312345b1b30605da6e38ae77f8ce3eb9d8efb05a5ad942cf8b9ae payload_sha256=f9073f8b418fa1273bcaa2bee4af54153c14d049b24d31eef42de0034fba6706 artifact=study_guide/execution_artifacts/lab10/lab10-cell-0003-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=3 output=13 source_sha256=9d1d9a983d9312345b1b30605da6e38ae77f8ce3eb9d8efb05a5ad942cf8b9ae payload_sha256=e2657019dddabb69359be512623c9f90f2b6d4a7fe9025c7ceea16ac09c0662e artifact=study_guide/execution_artifacts/lab10/lab10-cell-0003-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=3 output=14 source_sha256=9d1d9a983d9312345b1b30605da6e38ae77f8ce3eb9d8efb05a5ad942cf8b9ae payload_sha256=11f046d340505fe2767e48fd59729731e991027d5038aa4e3a26b8685e687b7c artifact=study_guide/execution_artifacts/lab10/lab10-cell-0003-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=3 output=15 source_sha256=9d1d9a983d9312345b1b30605da6e38ae77f8ce3eb9d8efb05a5ad942cf8b9ae payload_sha256=8e700264a215476096ce000feaf523725e705b4e92b48d42bfa49546fe6b1601 artifact=study_guide/execution_artifacts/lab10/lab10-cell-0003-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=3 output=16 source_sha256=9d1d9a983d9312345b1b30605da6e38ae77f8ce3eb9d8efb05a5ad942cf8b9ae payload_sha256=e095623cea95abaef94261cea8f1b84661c5a52515373e9e298d0ad23e0225ec artifact=study_guide/execution_artifacts/lab10/lab10-cell-0003-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=3 output=17 source_sha256=9d1d9a983d9312345b1b30605da6e38ae77f8ce3eb9d8efb05a5ad942cf8b9ae payload_sha256=33965065ed7db684f559081f9fa35d6e29a61b78dd2541065e589eae6e4fb13c artifact=study_guide/execution_artifacts/lab10/lab10-cell-0003-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=3 output=18 source_sha256=9d1d9a983d9312345b1b30605da6e38ae77f8ce3eb9d8efb05a5ad942cf8b9ae payload_sha256=f8477b28e5eb4cafbe6d99aabf4a2e667558c55267aa7686861111055a89dd6b artifact=study_guide/execution_artifacts/lab10/lab10-cell-0003-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=3 output=19 source_sha256=9d1d9a983d9312345b1b30605da6e38ae77f8ce3eb9d8efb05a5ad942cf8b9ae payload_sha256=857d08bfe903760415aaa86d23e67810c63d3901deb320003762296d532700bc artifact=study_guide/execution_artifacts/lab10/lab10-cell-0003-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=3 output=20 source_sha256=9d1d9a983d9312345b1b30605da6e38ae77f8ce3eb9d8efb05a5ad942cf8b9ae payload_sha256=8d635b61be5634c900b6bc3000dc6deeafc8494a5260acbe90728f1f8ec5f87d artifact=study_guide/execution_artifacts/lab10/lab10-cell-0003-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=3 output=21 source_sha256=9d1d9a983d9312345b1b30605da6e38ae77f8ce3eb9d8efb05a5ad942cf8b9ae payload_sha256=5fd372c5a49ccd3cc1951b4ae6d1b0479b7ca421d4736736627ada8b58960bb1 artifact=study_guide/execution_artifacts/lab10/lab10-cell-0003-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=3 output=22 source_sha256=9d1d9a983d9312345b1b30605da6e38ae77f8ce3eb9d8efb05a5ad942cf8b9ae payload_sha256=e47cff064b2306ba7c202ba46161947b90e24ac7f30494c8542f466b1ede3d94 artifact=study_guide/execution_artifacts/lab10/lab10-cell-0003-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=3 output=23 source_sha256=9d1d9a983d9312345b1b30605da6e38ae77f8ce3eb9d8efb05a5ad942cf8b9ae payload_sha256=995ef65acabf949b6632fa4ab4984c712a7b62a15e4679d00530b6169ab2fb78 artifact=study_guide/execution_artifacts/lab10/lab10-cell-0003-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=3 output=24 source_sha256=9d1d9a983d9312345b1b30605da6e38ae77f8ce3eb9d8efb05a5ad942cf8b9ae payload_sha256=9c0a39cbd711949cac2cfd49d39585a270f694a32ad3e060993cede19a11a72a artifact=study_guide/execution_artifacts/lab10/lab10-cell-0003-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=3 output=25 source_sha256=9d1d9a983d9312345b1b30605da6e38ae77f8ce3eb9d8efb05a5ad942cf8b9ae payload_sha256=48ef354be7f1370461a646a90b4afc1b8ef97cf85c48a107706ac42899326c6e artifact=study_guide/execution_artifacts/lab10/lab10-cell-0003-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=3 output=26 source_sha256=9d1d9a983d9312345b1b30605da6e38ae77f8ce3eb9d8efb05a5ad942cf8b9ae payload_sha256=b68059a6e58b14cdbcfe481596c225962e43179f5e1523430b31b8603c711cdc artifact=study_guide/execution_artifacts/lab10/lab10-cell-0003-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=3 output=27 source_sha256=9d1d9a983d9312345b1b30605da6e38ae77f8ce3eb9d8efb05a5ad942cf8b9ae payload_sha256=d245b880aae8c1215eed6261a85b9922de19abbe51817e17c8133c67e39c5885 artifact=study_guide/execution_artifacts/lab10/lab10-cell-0003-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=3 output=28 source_sha256=9d1d9a983d9312345b1b30605da6e38ae77f8ce3eb9d8efb05a5ad942cf8b9ae payload_sha256=5da413acc795fbb847646bd74dbbafb8edca5478b49600131ecbbe40b2c8f005 artifact=study_guide/execution_artifacts/lab10/lab10-cell-0003-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=3 output=29 source_sha256=9d1d9a983d9312345b1b30605da6e38ae77f8ce3eb9d8efb05a5ad942cf8b9ae payload_sha256=8a7a06aab4b66596e25dc4b82c39a6c799beca149d2fe1aa25bf3401909e6662 artifact=study_guide/execution_artifacts/lab10/lab10-cell-0003-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=3 output=30 source_sha256=9d1d9a983d9312345b1b30605da6e38ae77f8ce3eb9d8efb05a5ad942cf8b9ae payload_sha256=da62d0b44b32624c5f9c5138105f1ff94110594003eb84467b6722ca8666a00a artifact=study_guide/execution_artifacts/lab10/lab10-cell-0003-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=3 output=31 source_sha256=9d1d9a983d9312345b1b30605da6e38ae77f8ce3eb9d8efb05a5ad942cf8b9ae payload_sha256=09ca88326fb8ceebe3ba9fb1db3c4d8093c2ceaf6380cd7f3479e43735dcc71e artifact=study_guide/execution_artifacts/lab10/lab10-cell-0003-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=3 output=32 source_sha256=9d1d9a983d9312345b1b30605da6e38ae77f8ce3eb9d8efb05a5ad942cf8b9ae payload_sha256=c3be27a36b56dd092956c36f81bf83acd3846dcaf50706f2561eeb4f02e1e7cb artifact=study_guide/execution_artifacts/lab10/lab10-cell-0003-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=3 output=33 source_sha256=9d1d9a983d9312345b1b30605da6e38ae77f8ce3eb9d8efb05a5ad942cf8b9ae payload_sha256=130aa73acf1587171b0cc9b6545aa42ce2ff2358cf5aa21d2ff7f4728bfc9655 artifact=study_guide/execution_artifacts/lab10/lab10-cell-0003-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=3 output=34 source_sha256=9d1d9a983d9312345b1b30605da6e38ae77f8ce3eb9d8efb05a5ad942cf8b9ae payload_sha256=1cc7195c93b9d4a9e38df0dfcc6a008c439fafcfb2ae97787354e2c45a05f44e artifact=study_guide/execution_artifacts/lab10/lab10-cell-0003-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=3 output=35 source_sha256=9d1d9a983d9312345b1b30605da6e38ae77f8ce3eb9d8efb05a5ad942cf8b9ae payload_sha256=410cb38c204475f6493daf6670ff572ecbb995c96d393cd0784124db0dcb10e6 artifact=study_guide/execution_artifacts/lab10/lab10-cell-0003-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=3 output=36 source_sha256=9d1d9a983d9312345b1b30605da6e38ae77f8ce3eb9d8efb05a5ad942cf8b9ae payload_sha256=6bb450ceac6fa36aaf3abeb4921daa5c6dc34e9c2d32ae7be772bf65f0b6969d artifact=study_guide/execution_artifacts/lab10/lab10-cell-0003-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=3 output=37 source_sha256=9d1d9a983d9312345b1b30605da6e38ae77f8ce3eb9d8efb05a5ad942cf8b9ae payload_sha256=7fb7c49e4aa505b3dd3b20c2e57bc15314c888f406c74ee2dba25c5eb192496d artifact=study_guide/execution_artifacts/lab10/lab10-cell-0003-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=3 output=38 source_sha256=9d1d9a983d9312345b1b30605da6e38ae77f8ce3eb9d8efb05a5ad942cf8b9ae payload_sha256=8f11a30909fc961c89d175a5e35191ebddcdbd9ad124b7ba90109f0a4d890853 artifact=study_guide/execution_artifacts/lab10/lab10-cell-0003-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=3 output=39 source_sha256=9d1d9a983d9312345b1b30605da6e38ae77f8ce3eb9d8efb05a5ad942cf8b9ae payload_sha256=eca8ad2f0c74e6b2c1040198d432ac1ca1728429af66e78ec3234a4edf0aab4d artifact=study_guide/execution_artifacts/lab10/lab10-cell-0003-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=3 output=40 source_sha256=9d1d9a983d9312345b1b30605da6e38ae77f8ce3eb9d8efb05a5ad942cf8b9ae payload_sha256=43a1cd496e8a4d3c0e0fce3c64485ff02fa67db3553522d4872ee9473ef6bd52 artifact=study_guide/execution_artifacts/lab10/lab10-cell-0003-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=3 output=41 source_sha256=9d1d9a983d9312345b1b30605da6e38ae77f8ce3eb9d8efb05a5ad942cf8b9ae payload_sha256=f4e18f41013c1090c26ee62e1baa1bdfd8264e8578a6b75e4d1fa6928e28cb4b artifact=study_guide/execution_artifacts/lab10/lab10-cell-0003-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=3 output=42 source_sha256=9d1d9a983d9312345b1b30605da6e38ae77f8ce3eb9d8efb05a5ad942cf8b9ae payload_sha256=124289a986415f71900766c478844b96b730d02473feb535c3b6b2d7e29a4002 artifact=study_guide/execution_artifacts/lab10/lab10-cell-0003-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=3 output=43 source_sha256=9d1d9a983d9312345b1b30605da6e38ae77f8ce3eb9d8efb05a5ad942cf8b9ae payload_sha256=a5acff330973a012afdffe6022aab60aed9cfd5a52e435ba4b600b07d87b5db1 artifact=study_guide/execution_artifacts/lab10/lab10-cell-0003-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=3 output=44 source_sha256=9d1d9a983d9312345b1b30605da6e38ae77f8ce3eb9d8efb05a5ad942cf8b9ae payload_sha256=62796edff09501a4fd65bf22b170657d7e064c3dd5c0dddd2d89ede1e6adde9a artifact=study_guide/execution_artifacts/lab10/lab10-cell-0003-outputs.txt
+
+\lstinputlisting[style=terminalOutput]{../../execution_artifacts/lab10/lab10-cell-0003-outputs.txt}
+
+All 21 manually authored tests pass on the reference. This establishes a consistent baseline, but passing tests alone do not show whether every important statement or behavior is covered.
+
+\medskip\noindent Pass rate is computed from JUnit results: it measures whether examples agree with known-correct code. This is the reverse direction from functional correctness, where candidate code is checked against trusted tests. Structured outcomes also identify which test failed instead of relying on pytest's display text.
+
+% coverage-cell: LABS/lab10/text-10-test-generation.ipynb cell=5 source_sha256=47d2e4717bcf001ccbcaf38a2717bff6d37eae3cd9044e077f35bb888bc1cfad
+
+\begin{lstlisting}[style=studycode]
+import os
+import re
+import subprocess
+import sys
+import xml.etree.ElementTree as ET
+from pathlib import Path
+
+ARTIFACTS = LAB_DIR / "execution"
+ARTIFACTS.mkdir(exist_ok=True)
+RUN_ENV = dict(os.environ)
+RUN_ENV["PYTHONPATH"] = str(LAB_DIR.parent) + os.pathsep + RUN_ENV.get("PYTHONPATH", "")
+RUN_ENV["PYTHONDONTWRITEBYTECODE"] = "1"
+
+
+def run_command(arguments, tag):
+    result = subprocess.run(
+        [sys.executable, "-B", *arguments], cwd=LAB_DIR, env=RUN_ENV,
+        capture_output=True, text=True, timeout=120,
+    )
+    (ARTIFACTS / f"{tag}.log").write_text(result.stdout + result.stderr)
+    return result
+
+
+def parse_test_results(xml_path):
+    root = ET.parse(xml_path).getroot()
+    cases = root.findall(".//testcase")
+    if not cases:
+        raise RuntimeError(f"No tests collected; see {xml_path}")
+    outcomes = {}
+    for case in cases:
+        key = case.get("classname", "") + "::" + case.get("name", "")
+        outcomes[key] = (
+            "error" if case.find("error") is not None else
+            "failed" if case.find("failure") is not None else
+            "skipped" if case.find("skipped") is not None else "passed"
+        )
+    counts = {state: sum(value == state for value in outcomes.values())
+              for state in ("passed", "failed", "error", "skipped")}
+    counts["total"] = len(cases)
+    counts["pass_rate"] = counts["passed"] / counts["total"]
+    counts["outcomes"] = outcomes
+    return counts
+
+
+def run_suite(test_file, tag):
+    xml_path = ARTIFACTS / f"{tag}.xml"
+    result = run_command([
+        "-m", "pytest", str(test_file), "-q", "--tb=short", "--disable-warnings",
+        f"--junitxml={xml_path}",
+    ], tag)
+    if result.returncode not in (0, 1):
+        raise RuntimeError(f"pytest infrastructure error: {tag}; see its log")
+    counts = parse_test_results(xml_path)
+    if counts["error"]:
+        raise RuntimeError(f"Collection/setup error in {tag}; see its log")
+    return result, counts
+
+
+result, manual_baseline = run_suite("test_function_01_manual.py", "manual-baseline")
+errors, failures, passes = (manual_baseline[key] for key in ("error", "failed", "passed"))
+print(f"# Passed: {passes}")
+print(f"# Failed: {failures}")
+print(f"# Errors: {errors}")
+pass_rate = manual_baseline["pass_rate"]
+print(f"Pass Rate: {pass_rate:.2%}")
+assert pass_rate == 1.0
+\end{lstlisting}
+
+\label{out:lab10-cell-0005}
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=5 output=0 source_sha256=47d2e4717bcf001ccbcaf38a2717bff6d37eae3cd9044e077f35bb888bc1cfad payload_sha256=8813e11b5b195aec2b6b6830f4f8ffd00a2428a52250cddfaa174a6bed46b9fd artifact=study_guide/execution_artifacts/lab10/lab10-cell-0005-outputs.txt
+
+\lstinputlisting[style=terminalOutput]{../../execution_artifacts/lab10/lab10-cell-0005-outputs.txt}
+
+The manual suite reports 21 passed, zero failed or errored, and a 100% pass rate. This validates the examples against the reference but does not establish sensitivity to defects.
+
+\medskip\noindent The next measurement runs the suite under statement coverage. The helper reads the coverage report for \texttt{function\_01.py}, separating executed statements from unrelated test-runner code. Coverage can show that a line ran, but not whether both outcomes of a condition were checked.
+
+% coverage-cell: LABS/lab10/text-10-test-generation.ipynb cell=7 source_sha256=f010d8056cf9fc54e956d16b804a7fdc4b926f6d58293ef597b0118ba6ba1418
+
+\begin{lstlisting}[style=studycode]
+def measure_coverage(test_file, tag):
+    data_file = ARTIFACTS / f".coverage-{tag}"
+    xml_path = ARTIFACTS / f"{tag}-coverage-tests.xml"
+    result = run_command([
+        "-m", "coverage", "run", f"--data-file={data_file}",
+        "--source=lab10.function_01", "-m", "pytest", str(test_file),
+        "-q", "--tb=short", f"--junitxml={xml_path}",
+    ], f"{tag}-coverage-run")
+    if result.returncode not in (0, 1):
+        raise RuntimeError(f"Coverage test execution failed: {tag}")
+    result2 = run_command([
+        "-m", "coverage", "report", f"--data-file={data_file}",
+        "--include=*/lab10/function_01.py", "-m",
+    ], f"{tag}-coverage-report")
+    if result2.returncode != 0:
+        raise RuntimeError(result2.stdout + result2.stderr)
+    line = next(line for line in result2.stdout.splitlines() if "function_01.py" in line)
+    coverage = float(re.search(r"(\d+(?:\.\d+)?)%", line).group(1))
+    return result, result2, coverage
+
+
+result, result2, coverage = measure_coverage("test_function_01_manual.py", "manual")
+print(result2.stdout)
+print(f"Coverage: {coverage}%")
+\end{lstlisting}
+
+\label{out:lab10-cell-0007}
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=7 output=0 source_sha256=f010d8056cf9fc54e956d16b804a7fdc4b926f6d58293ef597b0118ba6ba1418 payload_sha256=fa546540fa8df2b19827028479273b5ef13b13b40c677276bb1c387d6c812eaf artifact=study_guide/execution_artifacts/lab10/lab10-cell-0007-outputs.txt
+
+\lstinputlisting[style=terminalOutput]{../../execution_artifacts/lab10/lab10-cell-0007-outputs.txt}
+
+The manual tests execute all 24 statements, for 100% statement coverage. This is useful but not sufficient evidence of strong tests: execution does not guarantee that assertions would detect an incorrect result.
+
+\medskip\noindent Mutation testing supplies that stronger probe by introducing five plausible one-expression defects. Each mutation is compiled before use, and only one condition or return value changes at a time. The following cell installs them individually and checks whether the suite distinguishes each altered implementation from the reference.
+
+% coverage-cell: LABS/lab10/text-10-test-generation.ipynb cell=9 source_sha256=8421fd6c53bafe46d4b407a8b3e8aabf645743d27c8c0db24f79847fa0118c7f
+
+\begin{lstlisting}[style=studycode]
+# Each mutant changes exactly one expression in the reference implementation.
+def mutate_once(old, new):
+    assert original_function.count(old) == 1
+    mutated = original_function.replace(old, new, 1)
+    compile(mutated, "function_01.py", "exec")
+    return mutated
+
+mutant1 = mutate_once("if penalty > 100:", "if penalty < 100:")
+mutant2 = mutate_once("tot_penalties > 100", "tot_penalties >= 100")
+mutant3 = mutate_once("n_penalties > 5", "n_penalties >= 5")
+mutant4 = mutate_once("times[i] > max_time", "times[i] >= max_time")
+mutant5 = mutate_once("return disqualified", "return True")
+mutants = [mutant1, mutant2, mutant3, mutant4, mutant5]
+mutant_descriptions = [
+    "reverse individual penalty comparison", "include total penalty boundary",
+    "include penalty-count boundary", "include time boundary", "always disqualify",
+]
+print(f"Prepared {len(mutants)} single-change mutants.")
+\end{lstlisting}
+
+\label{out:lab10-cell-0009}
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=9 output=0 source_sha256=8421fd6c53bafe46d4b407a8b3e8aabf645743d27c8c0db24f79847fa0118c7f payload_sha256=13f6e81b7b40820ccbecca9745aa4b2ddb03ab2a9b18635862b229ee348f8580 artifact=study_guide/execution_artifacts/lab10/lab10-cell-0009-outputs.txt
+
+\lstinputlisting[style=terminalOutput]{../../execution_artifacts/lab10/lab10-cell-0009-outputs.txt}
+
+Five single-change mutants are ready. No mutant has been evaluated yet; this cell only creates the variants.
+
+\medskip\noindent For each mutation, the runner removes stale bytecode, installs the changed function, and reruns the same suite. A mutant is killed only if a test that passed on the reference now fails; an already failing test cannot count as evidence. A `finally` block restores the known implementation even if an evaluation raises an error.
+
+% coverage-cell: LABS/lab10/text-10-test-generation.ipynb cell=11 source_sha256=5d3036c4bfdd22adb8f9bbe15dea0c4ca3fbc9871c51088869c56e668d4366c6
+
+\begin{lstlisting}[style=studycode]
+file_path = LAB_DIR / "function_01.py"
+
+
+def write_reference(source):
+    file_path.write_text(source + "\n")
+    # A same-sized mutation made within one timestamp tick can otherwise reuse .pyc.
+    for cache in (LAB_DIR / "__pycache__").glob("function_01.*.pyc"):
+        cache.unlink()
+
+
+def evaluate_mutants(test_file, baseline, tag):
+    passing_baseline = {key for key, value in baseline["outcomes"].items() if value == "passed"}
+    details = []
+    try:
+        for index, (mutant, description) in enumerate(zip(mutants, mutant_descriptions), 1):
+            write_reference(mutant)
+            _, counts = run_suite(test_file, f"{tag}-mutant-{index}")
+            # An already-failing generated test cannot provide evidence of killing a mutant.
+            newly_failing = sorted(key for key, state in counts["outcomes"].items()
+                                   if key in passing_baseline and state == "failed")
+            killed = bool(newly_failing)
+            details.append({"mutant": index, "change": description,
+                            "killed": killed, "newly_failing_tests": newly_failing})
+            print(f"Mutant {index}: {'killed' if killed else 'survived'} ({description})")
+    finally:
+        write_reference(original_function)
+    return details
+
+
+manual_mutations = evaluate_mutants("test_function_01_manual.py", manual_baseline, "manual")
+killed_mutants = sum(entry["killed"] for entry in manual_mutations)
+survived_mutants = len(mutants) - killed_mutants
+mutation_score = killed_mutants / len(mutants)
+print(f"Killed: {killed_mutants}; survived: {survived_mutants}")
+print(f"Mutation score: {mutation_score:.2%}")
+\end{lstlisting}
+
+\label{out:lab10-cell-0011}
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=11 output=0 source_sha256=5d3036c4bfdd22adb8f9bbe15dea0c4ca3fbc9871c51088869c56e668d4366c6 payload_sha256=e5e88a382451e07d1e22fded8131b73cda7d5849c535bd4f80f68c57554b6762 artifact=study_guide/execution_artifacts/lab10/lab10-cell-0011-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=11 output=1 source_sha256=5d3036c4bfdd22adb8f9bbe15dea0c4ca3fbc9871c51088869c56e668d4366c6 payload_sha256=8c74172ea6b11db1429cf4e39a3dba2551f4a0e41b79d2019224ce8ab38ab4cc artifact=study_guide/execution_artifacts/lab10/lab10-cell-0011-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=11 output=2 source_sha256=5d3036c4bfdd22adb8f9bbe15dea0c4ca3fbc9871c51088869c56e668d4366c6 payload_sha256=cdfc2afa8232d88f5ccb399d77295c008ba58ccb6579622a8c04547ff6177cea artifact=study_guide/execution_artifacts/lab10/lab10-cell-0011-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=11 output=3 source_sha256=5d3036c4bfdd22adb8f9bbe15dea0c4ca3fbc9871c51088869c56e668d4366c6 payload_sha256=df5fa37472f96e0fa1562c4c3be0ff9ccc9749cbf414c7bd38246ac103e1881a artifact=study_guide/execution_artifacts/lab10/lab10-cell-0011-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=11 output=4 source_sha256=5d3036c4bfdd22adb8f9bbe15dea0c4ca3fbc9871c51088869c56e668d4366c6 payload_sha256=51852718ef0c85feb4d02361fd1f5a17ab19121003b70d1fe92ff236c12d2d42 artifact=study_guide/execution_artifacts/lab10/lab10-cell-0011-outputs.txt
+
+\lstinputlisting[style=terminalOutput]{../../execution_artifacts/lab10/lab10-cell-0011-outputs.txt}
+
+The manual suite kills all five mutants, giving a 100% mutation score for this finite mutation set. The score strengthens the coverage result while remaining limited to these five chosen defects.
+
+\medskip\noindent The final comparison repeats these measurements for the saved GPT, Copilot, and Qwen test examples and for a newly authored Codex suite. Existing examples are evaluated as supplied; their historical model provenance is not independently verified. The Copilot execution copy removes only an unconditional nested pytest launch, leaving test functions unchanged. This notebook performs no external model generation.
+
+% coverage-cell: LABS/lab10/text-10-test-generation.ipynb cell=13 source_sha256=e9f7f0d27105c20fa004900306ec966b688535c808a34f70853d852376eff9bb
+
+\begin{lstlisting}[style=studycode]
+import ast
+import datetime
+import hashlib
+import json
+
+# Fresh generation by the Codex agent handling this lab; no external API is called.
+codex_test_source = '"""Fresh Codex-authored tests generated for this laboratory execution."""\nimport pytest\nfrom lab10.function_01 import racer_disqualified\n\n@pytest.mark.parametrize("event", range(3))\n@pytest.mark.parametrize("offset, expected", [(-1, False), (0, False), (1, True)])\ndef test_time_limit_for_each_event(event, offset, expected):\n    winner = [100, 200, 300]\n    times = winner.copy()\n    times[event] = int(1.5 * winner[event]) + offset\n    assert racer_disqualified(times, winner, 0, []) is expected\n\n@pytest.mark.parametrize("penalties, expected", [\n    ([], False), ([99], False), ([100], False), ([101], True),\n    ([50, 50], False), ([50, 51], True), ([1] * 5, False), ([1] * 6, True),\n])\ndef test_penalty_limits(penalties, expected):\n    assert racer_disqualified([10, 20, 30], [10, 20, 30], len(penalties), penalties) is expected\n\n@pytest.mark.parametrize("position, invalid", [\n    (0, (10, 20, 30)), (0, [10, 20]), (0, [10, 20, "30"]),\n    (1, None), (1, [10, 20]), (1, [10, 20, 30.5]),\n    (2, "0"), (3, ()), (3, ["10"]), (3, [10]),\n])\ndef test_reference_input_contract(position, invalid):\n    args = [[10, 20, 30], [10, 20, 30], 0, []]\n    args[position] = invalid\n    with pytest.raises(ValueError):\n        racer_disqualified(*args)\n'
+(LAB_DIR / "test_function_01_codex.py").write_text(codex_test_source)
+
+# Evaluate the supplied examples alongside the new, explicitly labeled suite.
+test_files = [
+    "test_function_01_gpt.py", "test_function_01_copilot.py",
+    "test_function_01_qwen.py", "test_function_01_codex.py",
+]
+suite_dir = ARTIFACTS / "suites"
+suite_dir.mkdir(exist_ok=True)
+comparison = {}
+provenance = []
+
+for test_file in test_files:
+    source_path = LAB_DIR / test_file
+    test_source = source_path.read_text()
+    tree = ast.parse(test_source)
+    runner_calls = [node for node in tree.body if isinstance(node, ast.Expr)
+                    and isinstance(node.value, ast.Call)
+                    and isinstance(node.value.func, ast.Attribute)
+                    and isinstance(node.value.func.value, ast.Name)
+                    and node.value.func.value.id == "pytest"
+                    and node.value.func.attr == "main"]
+    # Remove only side-effectful top-level test-runner invocations in execution copies.
+    lines = test_source.splitlines(keepends=True)
+    for node in reversed(runner_calls):
+        del lines[node.lineno - 1:node.end_lineno]
+    execution_path = suite_dir / test_file
+    execution_path.write_text("".join(lines))
+    provenance.append({
+        "file": test_file,
+        "origin": "fresh Codex generation" if "codex" in test_file else "supplied repository example",
+        "source_sha256": hashlib.sha256(test_source.encode()).hexdigest(),
+        "removed_top_level_pytest_main_calls": len(runner_calls),
+    })
+
+    print("\nDoing:", test_file)
+    write_reference(original_function)
+    tag = source_path.stem
+    _, baseline = run_suite(execution_path, tag + "-baseline")
+    number_of_tests = baseline["total"]
+    pass_rate = baseline["pass_rate"]
+    print(f"Number of tests: {number_of_tests}")
+    print(f"Pass Rate: {pass_rate:.2%} ({baseline['failed']} failed)")
+    if baseline["failed"]:
+        print("Failing reference tests:", [key for key, state in baseline["outcomes"].items() if state == "failed"])
+    _, coverage_report, coverage = measure_coverage(execution_path, tag)
+    print(f"Coverage: {coverage}%")
+    mutation_details = evaluate_mutants(execution_path, baseline, tag)
+    killed_mutants = sum(entry["killed"] for entry in mutation_details)
+    survived_mutants = len(mutants) - killed_mutants
+    mutation_score = killed_mutants / len(mutants)
+    print(f"Mutation score: {mutation_score:.2%}")
+    comparison[test_file] = {
+        "tests": number_of_tests, "passed": baseline["passed"], "failed": baseline["failed"],
+        "pass_rate": pass_rate, "statement_coverage_percent": coverage,
+        "killed_mutants": killed_mutants, "survived_mutants": survived_mutants,
+        "mutation_score": mutation_score, "mutants": mutation_details,
+    }
+
+write_reference(original_function)
+(ARTIFACTS / "comparison.json").write_text(json.dumps(comparison, indent=2) + "\n")
+(ARTIFACTS / "test-provenance.json").write_text(json.dumps(provenance, indent=2) + "\n")
+print("\nOriginal function restored:", file_path.read_text() == original_function + "\n")
+\end{lstlisting}
+
+\label{out:lab10-cell-0013}
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=13 output=0 source_sha256=e9f7f0d27105c20fa004900306ec966b688535c808a34f70853d852376eff9bb payload_sha256=d258ab5d1fb2f928d27ce77261ff23e82a2e5106d82e007220d9a03152e5fb85 artifact=study_guide/execution_artifacts/lab10/lab10-cell-0013-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=13 output=1 source_sha256=e9f7f0d27105c20fa004900306ec966b688535c808a34f70853d852376eff9bb payload_sha256=1bddf770baf8d5cd2bada7ee2ff7121328467594b6a16fb782da55e12c0ec364 artifact=study_guide/execution_artifacts/lab10/lab10-cell-0013-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=13 output=2 source_sha256=e9f7f0d27105c20fa004900306ec966b688535c808a34f70853d852376eff9bb payload_sha256=bf635b7ed6d5e9941669b52ccc7e388a7227340f132cd8945ea6bd1af5389db1 artifact=study_guide/execution_artifacts/lab10/lab10-cell-0013-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=13 output=3 source_sha256=e9f7f0d27105c20fa004900306ec966b688535c808a34f70853d852376eff9bb payload_sha256=e5e88a382451e07d1e22fded8131b73cda7d5849c535bd4f80f68c57554b6762 artifact=study_guide/execution_artifacts/lab10/lab10-cell-0013-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=13 output=4 source_sha256=e9f7f0d27105c20fa004900306ec966b688535c808a34f70853d852376eff9bb payload_sha256=c5506d33e048f6590c22ec8b3beeec9baa9ca812ae71e0ee107b26083418a5a8 artifact=study_guide/execution_artifacts/lab10/lab10-cell-0013-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=13 output=5 source_sha256=e9f7f0d27105c20fa004900306ec966b688535c808a34f70853d852376eff9bb payload_sha256=d0e1888cac62b815dc68319717eeffdb1098c0a3b5a2a4a9f960004676da07ad artifact=study_guide/execution_artifacts/lab10/lab10-cell-0013-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=13 output=6 source_sha256=e9f7f0d27105c20fa004900306ec966b688535c808a34f70853d852376eff9bb payload_sha256=28394ceef3338827d6b43fa46d64ec5f74a255ec621fd71fdd1d22d508f524b7 artifact=study_guide/execution_artifacts/lab10/lab10-cell-0013-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=13 output=7 source_sha256=e9f7f0d27105c20fa004900306ec966b688535c808a34f70853d852376eff9bb payload_sha256=b0871f2e512315b21da812a7f314c15dc37a7457354114ba4999acba2fc27fb7 artifact=study_guide/execution_artifacts/lab10/lab10-cell-0013-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=13 output=8 source_sha256=e9f7f0d27105c20fa004900306ec966b688535c808a34f70853d852376eff9bb payload_sha256=5dd8710f6b222d0544662e91305934aa3a0d3ee34dbe66a65a1ac0f697fcaf40 artifact=study_guide/execution_artifacts/lab10/lab10-cell-0013-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=13 output=9 source_sha256=e9f7f0d27105c20fa004900306ec966b688535c808a34f70853d852376eff9bb payload_sha256=611891b836a5e46180a0b49d78d5c269282409b3a05903ae1bcf3fc1ac814e7f artifact=study_guide/execution_artifacts/lab10/lab10-cell-0013-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=13 output=10 source_sha256=e9f7f0d27105c20fa004900306ec966b688535c808a34f70853d852376eff9bb payload_sha256=e5e88a382451e07d1e22fded8131b73cda7d5849c535bd4f80f68c57554b6762 artifact=study_guide/execution_artifacts/lab10/lab10-cell-0013-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=13 output=11 source_sha256=e9f7f0d27105c20fa004900306ec966b688535c808a34f70853d852376eff9bb payload_sha256=8c74172ea6b11db1429cf4e39a3dba2551f4a0e41b79d2019224ce8ab38ab4cc artifact=study_guide/execution_artifacts/lab10/lab10-cell-0013-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=13 output=12 source_sha256=e9f7f0d27105c20fa004900306ec966b688535c808a34f70853d852376eff9bb payload_sha256=cdfc2afa8232d88f5ccb399d77295c008ba58ccb6579622a8c04547ff6177cea artifact=study_guide/execution_artifacts/lab10/lab10-cell-0013-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=13 output=13 source_sha256=e9f7f0d27105c20fa004900306ec966b688535c808a34f70853d852376eff9bb payload_sha256=df5fa37472f96e0fa1562c4c3be0ff9ccc9749cbf414c7bd38246ac103e1881a artifact=study_guide/execution_artifacts/lab10/lab10-cell-0013-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=13 output=14 source_sha256=e9f7f0d27105c20fa004900306ec966b688535c808a34f70853d852376eff9bb payload_sha256=41fd540a5d88bb16d52605b66396d9eb5ff65b8fbffb312a6711804b37d1646d artifact=study_guide/execution_artifacts/lab10/lab10-cell-0013-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=13 output=15 source_sha256=e9f7f0d27105c20fa004900306ec966b688535c808a34f70853d852376eff9bb payload_sha256=6178ffdac23689c766dfe6998f5a39f4112833bc4f2f64c816e4cbd0d694c51d artifact=study_guide/execution_artifacts/lab10/lab10-cell-0013-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=13 output=16 source_sha256=e9f7f0d27105c20fa004900306ec966b688535c808a34f70853d852376eff9bb payload_sha256=611891b836a5e46180a0b49d78d5c269282409b3a05903ae1bcf3fc1ac814e7f artifact=study_guide/execution_artifacts/lab10/lab10-cell-0013-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=13 output=17 source_sha256=e9f7f0d27105c20fa004900306ec966b688535c808a34f70853d852376eff9bb payload_sha256=e5e88a382451e07d1e22fded8131b73cda7d5849c535bd4f80f68c57554b6762 artifact=study_guide/execution_artifacts/lab10/lab10-cell-0013-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=13 output=18 source_sha256=e9f7f0d27105c20fa004900306ec966b688535c808a34f70853d852376eff9bb payload_sha256=8c74172ea6b11db1429cf4e39a3dba2551f4a0e41b79d2019224ce8ab38ab4cc artifact=study_guide/execution_artifacts/lab10/lab10-cell-0013-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=13 output=19 source_sha256=e9f7f0d27105c20fa004900306ec966b688535c808a34f70853d852376eff9bb payload_sha256=cdfc2afa8232d88f5ccb399d77295c008ba58ccb6579622a8c04547ff6177cea artifact=study_guide/execution_artifacts/lab10/lab10-cell-0013-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=13 output=20 source_sha256=e9f7f0d27105c20fa004900306ec966b688535c808a34f70853d852376eff9bb payload_sha256=df5fa37472f96e0fa1562c4c3be0ff9ccc9749cbf414c7bd38246ac103e1881a artifact=study_guide/execution_artifacts/lab10/lab10-cell-0013-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=13 output=21 source_sha256=e9f7f0d27105c20fa004900306ec966b688535c808a34f70853d852376eff9bb payload_sha256=1ccc2be15ce2aa954e158797f2c7ed3667881f233e9f14639029f85b6382824b artifact=study_guide/execution_artifacts/lab10/lab10-cell-0013-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=13 output=22 source_sha256=e9f7f0d27105c20fa004900306ec966b688535c808a34f70853d852376eff9bb payload_sha256=e28465c3f7d06189d4753cdd3d1edc8fda21a2732f101ebecafa1fd358200847 artifact=study_guide/execution_artifacts/lab10/lab10-cell-0013-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=13 output=23 source_sha256=e9f7f0d27105c20fa004900306ec966b688535c808a34f70853d852376eff9bb payload_sha256=611891b836a5e46180a0b49d78d5c269282409b3a05903ae1bcf3fc1ac814e7f artifact=study_guide/execution_artifacts/lab10/lab10-cell-0013-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=13 output=24 source_sha256=e9f7f0d27105c20fa004900306ec966b688535c808a34f70853d852376eff9bb payload_sha256=e5e88a382451e07d1e22fded8131b73cda7d5849c535bd4f80f68c57554b6762 artifact=study_guide/execution_artifacts/lab10/lab10-cell-0013-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=13 output=25 source_sha256=e9f7f0d27105c20fa004900306ec966b688535c808a34f70853d852376eff9bb payload_sha256=8c74172ea6b11db1429cf4e39a3dba2551f4a0e41b79d2019224ce8ab38ab4cc artifact=study_guide/execution_artifacts/lab10/lab10-cell-0013-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=13 output=26 source_sha256=e9f7f0d27105c20fa004900306ec966b688535c808a34f70853d852376eff9bb payload_sha256=cdfc2afa8232d88f5ccb399d77295c008ba58ccb6579622a8c04547ff6177cea artifact=study_guide/execution_artifacts/lab10/lab10-cell-0013-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=13 output=27 source_sha256=e9f7f0d27105c20fa004900306ec966b688535c808a34f70853d852376eff9bb payload_sha256=df5fa37472f96e0fa1562c4c3be0ff9ccc9749cbf414c7bd38246ac103e1881a artifact=study_guide/execution_artifacts/lab10/lab10-cell-0013-outputs.txt
+
+% coverage-output: LABS/lab10/text-10-test-generation.ipynb cell=13 output=28 source_sha256=e9f7f0d27105c20fa004900306ec966b688535c808a34f70853d852376eff9bb payload_sha256=4032aa91e0928a26897d9cc0885bb5477555ff96171d1fbea279190ef163f595 artifact=study_guide/execution_artifacts/lab10/lab10-cell-0013-outputs.txt
+
+\lstinputlisting[style=terminalOutput]{../../execution_artifacts/lab10/lab10-cell-0013-outputs.txt}
+
+The results preserve an important failure: GPT expects `[120, 140, 160]` to be disqualified against winners `[80, 100, 110]`, although the strict 1.5× limits are `[120, 150, 165]` and none is exceeded. GPT passes 11/12 tests, covers 96% of statements, and kills 2/5 mutants. Copilot passes 3/3 and kills 5/5; Qwen passes 20/20 and kills 5/5; the fresh Codex suite passes 27/27 and kills 5/5. Statement coverage differs from branch coverage, and mutation kills count only newly failing tests. These observations compare the particular saved suites, not the general capabilities of their named systems.
+
+\subsection{Interpreting the comparison}
+
+The strict inequalities make the threshold boundaries central: equality is accepted, and only a value above the limit disqualifies. The GPT example's failed expectation is therefore retained as an observed test defect. The results support only a narrow conclusion about these suites and five selected mutants, not a general ranking of model providers. No Lab 10 lecture recording was supplied, so the explanations here follow the notebook and execution evidence only.
+
+\end{document}

@@ -1,0 +1,50 @@
+{
+  "started_utc": "2026-10-25T22:07:47.575412+00:00",
+  "python": "3.11.16",
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "backend": "CPU (pytest, coverage, mutation analysis)",
+  "cells": [
+    {
+      "cell_index": 1,
+      "source_sha256": "fb6dd31a2378400de74691b2e78fd45fa8634fec9d61ef5eb9bd2f6fa683a4aa",
+      "seconds": 0.023110999958589673,
+      "status": "success"
+    },
+    {
+      "cell_index": 3,
+      "source_sha256": "9d1d9a983d9312345b1b30605da6e38ae77f8ce3eb9d8efb05a5ad942cf8b9ae",
+      "seconds": 0.7730122500215657,
+      "status": "success"
+    },
+    {
+      "cell_index": 5,
+      "source_sha256": "47d2e4717bcf001ccbcaf38a2717bff6d37eae3cd9044e077f35bb888bc1cfad",
+      "seconds": 0.38169954100158066,
+      "status": "success"
+    },
+    {
+      "cell_index": 7,
+      "source_sha256": "f010d8056cf9fc54e956d16b804a7fdc4b926f6d58293ef597b0118ba6ba1418",
+      "seconds": 1.4240902499877848,
+      "status": "success"
+    },
+    {
+      "cell_index": 9,
+      "source_sha256": "8421fd6c53bafe46d4b407a8b3e8aabf645743d27c8c0db24f79847fa0118c7f",
+      "seconds": 0.012583959032781422,
+      "status": "success"
+    },
+    {
+      "cell_index": 11,
+      "source_sha256": "5d3036c4bfdd22adb8f9bbe15dea0c4ca3fbc9871c51088869c56e668d4366c6",
+      "seconds": 2.618075874983333,
+      "status": "success"
+    },
+    {
+      "cell_index": 13,
+      "source_sha256": "e9f7f0d27105c20fa004900306ec966b688535c808a34f70853d852376eff9bb",
+      "seconds": 14.154425915970933,
+      "status": "success"
+    }
+  ]
+}

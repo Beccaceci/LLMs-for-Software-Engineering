@@ -1,0 +1,2 @@
+
+t_de183bbd677e46caace029b07ed9ee5e.py::test_non_numeric_grades[None]

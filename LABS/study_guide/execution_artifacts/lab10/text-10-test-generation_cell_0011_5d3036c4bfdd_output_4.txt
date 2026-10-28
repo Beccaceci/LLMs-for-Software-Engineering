@@ -1,0 +1,3 @@
+Mutant 5: killed (always disqualify)
+Killed: 5; survived: 0
+Mutation score: 100.00%

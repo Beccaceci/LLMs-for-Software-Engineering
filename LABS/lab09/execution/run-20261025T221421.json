@@ -1,0 +1,32 @@
+{
+  "started_utc": "2026-10-25T22:14:21.961078+00:00",
+  "python": "3.11.16",
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "mode": "selected",
+  "cells": [
+    {
+      "index": 1,
+      "status": "ok",
+      "seconds": 0.05343612498836592,
+      "source_sha256": "8dd68aba9dbab4d7ab39f142b94af5a9cc64a1d5a0af4c9e69897fad0853e50c"
+    },
+    {
+      "index": 10,
+      "status": "ok",
+      "seconds": 0.7027883330010809,
+      "source_sha256": "1daeed1554491deb6421c00cb61d7ad76dba507839602ffd097b75fb481185f7"
+    },
+    {
+      "index": 14,
+      "status": "ok",
+      "seconds": 0.6198015839909203,
+      "source_sha256": "52d5f042bd7bdf89d23730b9aedc1fb0943831bb6a70c07b98032fa5cb31fa80"
+    },
+    {
+      "index": 16,
+      "status": "ok",
+      "seconds": 1.2985918749473058,
+      "source_sha256": "ebaf2737dae25738187d265f85df50ac75ecc656491a761ca6c90e23e57c6b02"
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+peft_model.print_trainable_parameters()

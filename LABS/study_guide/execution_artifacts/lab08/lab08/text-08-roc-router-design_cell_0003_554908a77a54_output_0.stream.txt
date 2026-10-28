@@ -1,0 +1,2 @@
+True Positive Rate (TPR): 0.44
+False Positive Rate (FPR): 0.03888888888888889

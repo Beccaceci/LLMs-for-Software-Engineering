@@ -1,0 +1,1 @@
+User instruction: Generate the use cases for the hiking platform.

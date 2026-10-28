@@ -1,0 +1,1 @@
+output.logits[0].argmax(axis=1)

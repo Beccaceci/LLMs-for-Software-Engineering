@@ -1,0 +1,9 @@
+/Users/nicolabeccaceci/miniconda3/lib/python3.13/site-packages/torch/utils/data/dataloader.py:759: UserWarning: 'pin_memory' argument is set as true but not supported on MPS now, device pinned memory won't be used.
+  super().__init__(loader)
+
+
+<IPython.core.display.HTML object>
+
+<IPython.core.display.HTML object>
+
+Accuracy on the validation set: 0.8800

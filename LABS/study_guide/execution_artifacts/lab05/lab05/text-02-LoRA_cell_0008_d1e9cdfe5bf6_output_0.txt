@@ -1,0 +1,1 @@
+trainable params: 109483778 || all params: 109483778 || trainable%: 100.00

@@ -1,0 +1,15 @@
+{
+  "argv": [
+    "/Users/nicolabeccaceci/.venvs/llms-lab07/bin/python",
+    "-Xfrozen_modules=off",
+    "-m",
+    "ipykernel_launcher",
+    "-f",
+    "{connection_file}"
+  ],
+  "display_name": "Python (Lab 07 local run)",
+  "language": "python",
+  "metadata": {
+    "debugger": true
+  }
+}

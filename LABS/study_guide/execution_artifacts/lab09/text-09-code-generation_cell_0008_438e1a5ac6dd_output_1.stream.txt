@@ -1,0 +1,38 @@
+def compute_average(grades):
+    """
+    Compute the arithmetic mean of a list of grades after removing the minimum and maximum values.
+
+    Args:
+        grades (list): A list of grades. Each grade should be a real number between 18 and 30 inclusive or 33 for laude.
+
+    Returns:
+        float: The arithmetic mean of the remaining grades.
+
+    Raises:
+        ValueError: If the list contains booleans, invalid values, or nonnumeric values.
+        TypeError: If the input is not a list.
+    """
+
+    # Check if input is a list
+    if not isinstance(grades, list):
+        raise TypeError("Input must be a list")
+
+    # Check if list contains booleans or invalid values
+    if not all(isinstance(grade, (int, float)) and 18 <= grade <= 30 or grade == 33 for grade in grades):
+        raise ValueError("List must contain only real numbers between 18 and 30 inclusive or 33 for laude")
+
+    # Create a copy of the list to avoid mutation
+    grades_copy = grades.copy()
+
+    # Remove the minimum and maximum values
+    grades_copy.remove(min(grades_copy))
+    grades_copy.remove(max(grades_copy))
+
+    # Check if list is empty after removing minimum and maximum values
+    if len(grades_copy) == 0:
+        raise ValueError("List must contain at least two values")
+
+    # Compute the arithmetic mean
+    average = sum(grades_copy) / len(grades_copy)
+
+    return average

@@ -1,0 +1,43 @@
+{
+  "started_utc": "2026-10-26T08:26:37.335581+00:00",
+  "python": "3.11.16",
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "cells": [
+    {
+      "cell_index": 3,
+      "source_sha256": "d4b466cc38181a760d8844e3c5f398b1fff4571ebbf142828d9c53d2cc4fc838",
+      "seconds": 1.625090958958026,
+      "status": "ok"
+    },
+    {
+      "cell_index": 29,
+      "source_sha256": "9b1a4f06ae574ddcfaf74e4ebc1d4f1aff3389b900c8ee377d109699e810171a",
+      "seconds": 256.5755907090497,
+      "status": "ok"
+    },
+    {
+      "cell_index": 32,
+      "source_sha256": "04942a2b7a11ed4c11893bc01c27d0e471ff1de605d7e3b2da178fedd494459f",
+      "seconds": 0.013644166989251971,
+      "status": "ok"
+    },
+    {
+      "cell_index": 34,
+      "source_sha256": "aafc2120e867513a8447451d8880dcbeb4a3b3f6a3754299ae8dfceb5449d927",
+      "seconds": 0.004302707966417074,
+      "status": "ok"
+    },
+    {
+      "cell_index": 36,
+      "source_sha256": "49b817fbd01221bacb802b6777eba8e5a87d3b3a64cf09227c92107ae57ca478",
+      "seconds": 710.8013820829801,
+      "status": "ok"
+    },
+    {
+      "cell_index": 37,
+      "source_sha256": "bbb6347798f4da8605fe94947ca94e99acb6dbbd9f3de5acaae01d68b4a670e6",
+      "seconds": 0.026570290967356414,
+      "status": "ok"
+    }
+  ]
+}

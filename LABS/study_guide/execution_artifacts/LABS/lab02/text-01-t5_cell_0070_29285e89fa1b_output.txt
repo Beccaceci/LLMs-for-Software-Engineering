@@ -1,0 +1,6 @@
+Encoder's input
+tensor([[13959, 22269,    12, 13692,    10, 21820,     6,   149,    33,    25,
+            58,     1]])
+
+Decoder's input
+tensor([[0]])

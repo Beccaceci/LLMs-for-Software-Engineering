@@ -1,0 +1,197 @@
+paper0.pdf abstract (236 words):
+Large Language Models (LLMs) are undergoing a period of rapid updates and changes, with state-
+of-the-art (SOTA) model frequently being replaced. When applying LLMs to a specific scientific
+field, it’s challenging to acquire unique domain knowledge while keeping the model itself advanced.
+To address this challenge, a sophisticated large language model system named as Xiwu has been
+developed, allowing you switch between the most advanced foundation models and quickly teach the
+model domain knowledge. In this work, we will report on the best practices for applying LLMs in the
+field of high-energy physics (HEP), including: a seed fission technology is proposed and some data
+collection and cleaning tools are developed to quickly obtain domain AI-Ready dataset; a just-in-time
+learning system is implemented based on the vector store technology; an on-the-fly fine-tuning system
+has been developed to facilitate rapid training under a specified foundation model.
+The results show that Xiwu can smoothly switch between foundation models such as LLaMA, Vicuna,
+ChatGLM and Grok-1. The trained Xiwu model is significantly outperformed the benchmark model
+on the HEP knowledge Q&A and code generation. This strategy significantly enhances the potential
+for growth of our model’s performance, with the hope of surpassing GPT-4 as it evolves with the
+development of open-source models. This work provides a customized LLM for the field of HEP,
+while also offering references for applying LLM to other fields, the corresponding codes are available
+on Github https://github.comzhang/zhengde0225/Xiwu.
+
+paper1.pdf abstract (161 words):
+With the ubiquitous use of modern large language
+models (LLMs) across industries, the inference serving for these
+models is ever expanding. Given the high compute and memory
+requirements of modern LLMs, more and more top-of-the-
+line GPUs are being deployed to serve these models. Energy
+availability has come to the forefront as the biggest challenge for
+data center expansion to serve these models. In this paper, we
+present the trade-offs brought up by making energy efficiency
+the primary goal of LLM serving under performance SLOs.
+We show that depending on the inputs, the model, and the
+service-level agreements, there are several knobs available to
+the LLM inference provider to use for being energy efficient.
+We characterize the impact of these knobs on the latency,
+throughput, as well as the energy. By exploring these trade-
+offs, we offer valuable insights into optimizing energy usage
+without compromising on performance, thereby paving the way
+for sustainable and cost-effective LLM deployment in data center
+environments.
+
+paper2.pdf abstract (130 words):
+The rapid adoption of large language models (LLMs) has led to
+significant advances in natural language processing and text gener-
+ation. However, the energy consumed through LLM model infer-
+ence remains a major challenge for sustainable AI deployment. To
+address this problem, we model the workload-dependent energy
+consumption and runtime of LLM inference tasks on heterogeneous
+GPU-CPU systems. By conducting an extensive characterization
+study of several state-of-the-art LLMs and analyzing their energy
+and runtime behavior across different magnitudes of input prompts
+and output text, we develop accurate (𝑅2 > 0.96) energy and run-
+time models for each LLM. We employ these models to explore
+an offline, energy-optimal LLM workload scheduling framework.
+Through a case study, we demonstrate the advantages of energy
+and accuracy aware scheduling compared to existing best practices.
+
+paper3.pdf abstract (160 words):
+The growing demand for efficient and scalable AI
+solutions has driven research into optimizing the performance
+and energy efficiency of computational infrastructures. The novel
+concept of redesigning inference clusters and modifying the
+GPT-Neo model offers a significant advancement in addressing
+the computational and environmental challenges associated with
+AI deployment. By developing a novel cluster architecture and
+implementing strategic architectural and algorithmic changes,
+the research achieved substantial improvements in throughput,
+latency, and energy consumption. The integration of advanced
+interconnect technologies, high-bandwidth memory modules, and
+energy-efficient power management techniques, alongside soft-
+ware optimizations, enabled the redesigned clusters to out-
+perform baseline models significantly. Empirical evaluations
+demonstrated superior scalability, robustness, and environmental
+sustainability, emphasizing the potential for more sustainable
+AI technologies. The findings underscore the importance of
+balancing performance with energy efficiency and provide a
+robust framework for future research and development in AI
+optimization. The research contributes valuable insights into the
+design and deployment of more efficient and environmentally
+responsible AI systems.
+
+paper4.pdf abstract (246 words):
+Establishing building energy models (BEMs) for building design and analysis poses significant challenges due to 
+demanding modeling efforts, expertise to use simulation software, and building science knowledge in practice. 
+These make building modeling labor-intensive, hindering its widespread adoptions in building development. 
+Therefore, to overcome these challenges in building modeling with enhanced automation in modeling practice, 
+this paper proposes Eplus-LLM (EnergyPlus-Large Language Model) as the auto-building modeling platform, 
+building on a fine-tuned large language model (LLM) to directly translate natural language description of 
+buildings to established building models of various geometries, occupancy scenarios, and equipment loads. 
+Through fine-tuning, the LLM (i.e., T5) is customized to digest natural language and simulation demands from 
+users and convert human descriptions into EnergyPlus modeling files. Then, the Eplus-LLM platform realizes the 
+automated building modeling through invoking the API of simulation software (i.e., the EnergyPlus engine) to 
+simulate the auto-generated model files and output simulation results of interest. The validation process, 
+involving four different types of prompts, demonstrates that Eplus-LLM reduces over 95% modeling efforts and 
+achieves 100% accuracy in establishing BEMs while being robust to interference in usage, including but not 
+limited to different tones, misspells, omissions, and redundancies. Overall, this research serves as the pioneering 
+effort to customize LLM for auto-modeling purpose (directly build-up building models from natural language), 
+aiming to provide a user-friendly human-AI interface that significantly reduces building modeling efforts. This 
+work also further facilitates large-scale building model efforts, e.g., urban building energy modeling (UBEM), in 
+modeling practice.
+
+paper5.pdf abstract (187 words):
+The rapid evolution and widespread adoption of
+generative large language models (LLMs) have made them a
+pivotal workload in various applications. Today, LLM inference
+clusters receive a large number of queries with strict Service
+Level Objectives (SLOs). To achieve the desired performance,
+these models execute on power-hungry GPUs causing the in-
+ference clusters to consume large amount of energy and, conse-
+quently, result in excessive carbon emissions. Fortunately, we find
+that there is a great opportunity to exploit the heterogeneity in
+inference compute properties and fluctuations in inference work-
+loads, to significantly improve energy-efficiency. However, such
+a diverse and dynamic environment creates a large search-space
+where different system configurations (e.g., number of instances,
+model parallelism, and GPU frequency) translate into different
+energy-performance trade-offs. To address these challenges, we
+propose DynamoLLM, the first energy-management framework
+for LLM inference environments. DynamoLLM automatically
+and dynamically reconfigures the inference cluster to optimize for
+energy and cost of LLM serving under the service’s performance
+SLOs. We show that at a service-level, DynamoLLM conserves
+53% energy and 38% operational carbon emissions, and reduces
+61% cost to the customer, while meeting the latency SLOs.
+
+paper6.pdf abstract (180 words):
+Large language model (LLM) has recently been
+considered a promising technique for many fields. This work
+explores LLM-based wireless network optimization via in-context
+learning. To showcase the potential of LLM technologies, we
+consider the base station (BS) power control as a case study,
+a fundamental but crucial technique that is widely investigated
+in wireless networks. Different from existing machine learning
+(ML) methods, our proposed in-context learning algorithm relies
+on LLM’s inference capabilities. It avoids the complexity of
+tedious model training and hyper-parameter fine-tuning, which is
+a well-known bottleneck of many ML algorithms. Specifically, the
+proposed algorithm first describes the target task via formatted
+natural language, and then designs the in-context learning
+framework and demonstration examples. After that, it considers
+two cases, namely discrete-state and continuous-state problems,
+and proposes state-based and ranking-based methods to select
+appropriate examples for these two cases, respectively. Finally, the
+simulations demonstrate that the proposed algorithm can achieve
+comparable performance as conventional deep reinforcement
+learning (DRL) techniques without dedicated model training or
+fine-tuning. Such an efficient and low-complexity approach has
+great potential for future wireless network optimization.
+
+paper7.pdf abstract (132 words):
+Both the training and use of Large Language Models (LLMs) require
+large amounts of energy. Their increasing popularity, therefore,
+raises critical concerns regarding the energy efficiency and sus-
+tainability of data centers that host them. This paper addresses the
+challenge of reducing energy consumption in data centers running
+LLMs. We propose a hybrid data center model that uses a cost-based
+scheduling framework to dynamically allocate LLM tasks across
+hardware accelerators that differ in their energy efficiencies and
+computational capabilities. Specifically, our workload-aware strat-
+egy determines whether tasks are processed on energy-efficient
+processors or high-performance GPUs based on the number of in-
+put and output tokens in a query. Our analysis of a representative
+LLM dataset, finds that this hybrid strategy can reduce CPU+GPU
+energy consumption by 7.5% compared to a workload-unaware
+baseline.
+
+paper8.pdf abstract (171 words):
+Reproducible science requires easy access to data, especially with
+the rise of data-driven and increasingly complex models used within
+energy research. Too often however, the data to reconstruct and
+verify purported solutions in publications is hidden due to some
+combination of commercial, legal, and sensitivity issues. This early
+work presents our initial efforts to leverage the recent advance-
+ments in Large Language Models (LLMs) to create usable and share-
+able energy datasets. In particular, we’re utilising their mimicry of
+human behaviors, with the goal of extracting and exploring syn-
+thetic energy data through the simulation of LLM agents capable of
+interacting with and executing actions in controlled environments.
+We also analyse and visualise publicly available data in an attempt
+to create realistic but not quite exact copies of the originals. Our
+early results show some promise, with outputs that resemble the
+twin peak curves for household energy consumption. The hope is
+that our generalised approach can be used to easily replicate usable
+and realistic copies of otherwise secret or sensitive data.
+
+paper9.pdf abstract (94 words):
+This paper introduces a method for personaliz-
+ing energy optimization using large language models (LLMs)
+combined with an optimization solver. This approach, termed
+human-guided optimization autoformalism, translates natural
+language speciﬁcations into optimization problems, enabling
+LLMs to handle various user-speciﬁc energy-related tasks. It
+allows for nuanced understanding and nonlinear reasoning
+tailored to individual preferences. The research covers common
+energy sector tasks like electric vehicle charging, HVAC control,
+and long-term planning for renewable energy installations. This
+novel strategy represents a signiﬁcant advancement in context-
+based optimization using LLMs, facilitating sustainable energy
+practices customized to individual needs.

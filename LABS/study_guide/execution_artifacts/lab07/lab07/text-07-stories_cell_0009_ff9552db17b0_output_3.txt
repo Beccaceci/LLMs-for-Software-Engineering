@@ -1,0 +1,7 @@
+1. Verify new hut worker registrations.
+2. Broadcast weather alerts.
+3. Maintain an organized user system.
+4. Facilitate collaboration between local guides, hut workers, and visitors.
+
+
+Extracting stories for role Hut Workers

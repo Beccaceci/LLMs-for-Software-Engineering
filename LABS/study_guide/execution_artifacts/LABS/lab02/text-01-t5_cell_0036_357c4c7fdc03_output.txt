@@ -1,0 +1,2 @@
+['this is the first sentence</s><pad><pad><pad>',
+ 'instead, this is the second sequence!</s>']

@@ -1,0 +1,3 @@
+# Laboratory 06 lecture-source check
+
+No matching lecture recording or transcript is available in the current course workspace or the Whisper Transcription library. The library contains a 10:12 Lab04 recording and a separate 1:29:06 lecture dated 2026-10-23; inspecting the latter shows computer-vision material (Faster R-CNN, object detection, and segmentation), unrelated to this laboratory’s prompt-engineering and RAG exercises. No transcript has been fabricated or attributed to Lab06. The professor’s Lab06 recording is expected later; until then, exercise requirements and explanations are grounded in the notebook and its supplied PDFs.

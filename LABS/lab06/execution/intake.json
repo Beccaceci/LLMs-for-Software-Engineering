@@ -1,0 +1,88 @@
+{
+  "notebook": "/Users/nicolabeccaceci/Desktop/LLMs/LABS/lab06/text-06-prompt-engineering-rag.ipynb",
+  "notebook_sha256": "394e5ad554af5d8de16edcde815cd9682de8ea3ea24c450447271a63d72ff250",
+  "captured_utc": "2026-10-26T15:02:20.426869+00:00",
+  "code_cells": [
+    {
+      "index": 1,
+      "source_sha256": "e3df99e94bb906035b250971c46eec4dc6194435af77dc21bcd8fe4f04d34f8d",
+      "execution_count": null,
+      "output_types": []
+    },
+    {
+      "index": 3,
+      "source_sha256": "a16c1de1c9b9ca18339ccaeadb0646da3cf7266acdb30f8804033b172dbc76c2",
+      "execution_count": 2,
+      "output_types": [
+        "stream"
+      ]
+    },
+    {
+      "index": 5,
+      "source_sha256": "0b408f31a8ba33a0a19cea6b784f73cc6b3f911df9dffa9d6615604e93616621",
+      "execution_count": null,
+      "output_types": []
+    },
+    {
+      "index": 7,
+      "source_sha256": "22feef229af1b79ae18d1c22e5125d099e4a1376d10065c5d4e5343c4fc9df90",
+      "execution_count": null,
+      "output_types": []
+    },
+    {
+      "index": 9,
+      "source_sha256": "99bcf535b4007f15d706444d7c28145e0f81369ce245ae181769e38ee4be54c6",
+      "execution_count": null,
+      "output_types": []
+    },
+    {
+      "index": 11,
+      "source_sha256": "0f7bbe803cc12f069126b606733950b80c4ff3c40fc423a234680aed8dc0024d",
+      "execution_count": null,
+      "output_types": []
+    },
+    {
+      "index": 13,
+      "source_sha256": "0cd0e520a248ecaff89626fcd02a8cc203b3605d1d1e20cded273b61c2c58cc4",
+      "execution_count": null,
+      "output_types": []
+    },
+    {
+      "index": 15,
+      "source_sha256": "774a2406687eaa5c5ddc2aee9a7b875750edee932fd840d8bfc63bd83914d245",
+      "execution_count": null,
+      "output_types": []
+    },
+    {
+      "index": 17,
+      "source_sha256": "b65c8832a34fe27c3ce9ef4e3c4e870c0fb40e97246f7b6f534b467fcfe7c0f4",
+      "execution_count": 3,
+      "output_types": [
+        "stream"
+      ]
+    },
+    {
+      "index": 19,
+      "source_sha256": "767e063fcaaf467358e825d40b8424fcb5c766cc79432a739b6b85491654e507",
+      "execution_count": 4,
+      "output_types": [
+        "stream",
+        "stream"
+      ]
+    },
+    {
+      "index": 21,
+      "source_sha256": "3a1a24381ac1026afbfc633537eec2500d22775e63d3cf25ef757af71bb3801b",
+      "execution_count": 5,
+      "output_types": [
+        "stream"
+      ]
+    },
+    {
+      "index": 23,
+      "source_sha256": "8db23af63980819f141f76b51c53d7b16a75a7e1fc61ef79e9c4ad79cef1b3cd",
+      "execution_count": null,
+      "output_types": []
+    }
+  ]
+}
